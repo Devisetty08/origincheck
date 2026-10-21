@@ -231,7 +231,7 @@ test("the AI signal stays off unless the server enables it", async ({ page }) =>
   await expect(page.locator("#aiOff")).toBeVisible();
 });
 
-test("Rewrite shows a diff for a clicked paragraph, applies kept changes and labels the export", async ({ page }) => {
+test("Rewrite shows a diff for a clicked sentence, applies kept changes and labels the export", async ({ page }) => {
   await serverConfig(page, { improve: "anthropic" });
   let sentText = "";
   await page.route("**/api/improve", async (r) => {
@@ -241,22 +241,25 @@ test("Rewrite shows a diff for a clicked paragraph, applies kept changes and lab
   await page.goto("./");
   await page.waitForLoadState("networkidle");
   await page.getByRole("button", { name: "Paste text instead" }).click();
-  const first = "Our team found that the results was very clear in the end.", second = "Second paragraph stays the same.";
-  await page.getByLabel("Document text").fill(`${first}\n\n${second}`);
+  const first = "Our team found that the results was very clear in the end.", rest = "It took a week.", second = "Second paragraph stays the same.";
+  await page.getByLabel("Document text").fill(`${first} ${rest}\n\n${second}`);
   await page.locator("#usePaste").click();
   await openTool(page, "rewrite");
   await expect(page.locator("#improveRun")).toBeDisabled(); // nothing picked yet
-  await page.locator('#rwDoc [data-para="0"]').click();
+  await page.locator('#rwDoc [data-sent="0.0"]').click(); // one click picks one sentence
   await expect(page.locator("#improveOriginal")).toHaveText(first);
   await page.locator('[data-goal="shorter"]').click();
   await page.locator("#improveRun").click();
   await expect(page.locator("#privacyServices")).toContainText("Anthropic");
   await page.locator("#privacyOk").click();
   await expect(page.locator("#improveDiff [data-change]").first()).toBeVisible();
-  expect(sentText).toBe(first); // only the chosen paragraph was sent
+  expect(sentText).toBe(first); // only the chosen sentence was sent
   await page.locator("#improveApply").click();
-  await expect(page.locator("#rwDoc")).toContainText("IMPROVED");
+  await expect(page.locator("#rwDoc")).toContainText(`IMPROVED team found that the results was very clear in the end. ${rest}`);
   await expect(page.locator("#rwDoc")).toContainText(second);
+  await page.locator('[data-unit="paragraph"]').click(); // switch to whole paragraphs
+  await page.locator('#rwDoc [data-para="0"]').click();
+  await expect(page.locator("#improveOriginal")).toHaveText(/^IMPROVED .* It took a week\.$/);
   await openTool(page, "check");
   const report = page.waitForEvent("download");
   await page.locator("#dlReport").click();

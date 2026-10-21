@@ -62,7 +62,7 @@ export default function ImproveWriting(p: Props) {
 
   const run = async () => {
     setParts(null); setMsg("");
-    if (!pk || !original.trim()) return setMsg("Click a paragraph on the left first.");
+    if (!pk || !original.trim()) return setMsg("Click a sentence or paragraph on the left first.");
     if (original.length > 4000) return setMsg("That passage is too long. Select up to 4,000 characters.");
     if (locked) return setMsg("This passage matches a source. Quote and cite it, or rewrite it in your own words — AI rewriting is off for it.");
     if (p.provider === "anthropic" && !(await p.confirmPrivacy([PROVIDER.anthropic]))) return; // the local model sends nothing
@@ -96,7 +96,7 @@ export default function ImproveWriting(p: Props) {
 
       <div className="mt-3 text-[12px] font-semibold uppercase tracking-wide text-mute">Original</div>
       <div className={cx("mt-1 max-h-48 overflow-auto rounded-lg border p-2.5 font-serif text-[14.5px] leading-[1.7] whitespace-pre-wrap", locked ? "border-close/50 bg-close/5" : "border-line bg-bg")} id="improveOriginal">
-        {original || <span className="font-sans text-[13px] text-mute">Click a paragraph on the left, or select part of one.</span>}
+        {original || <span className="font-sans text-[13px] text-mute">Click a sentence or paragraph on the left, or select any part of it.</span>}
       </div>
       {locked && <p className="mt-1 text-[12px] text-close">Matches a source — rewrite this yourself in the plagiarism check.</p>}
       <Button variant="primary" className="mt-2 w-full" onClick={run} disabled={busy || !pk || locked} id="improveRun">
