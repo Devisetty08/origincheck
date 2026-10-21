@@ -3,7 +3,7 @@
 import { canon } from "./strict";
 
 export type Tok = { w: string; s: number; e: number };
-export type Kind = "file" | "paste" | "internet" | "saved" | "own" | "draft";
+export type Kind = "file" | "paste" | "internet" | "library" | "saved" | "own" | "draft";
 export type Run = [b: number, e: number, j: number]; // doc words [b, e), source start word j
 
 export interface CiteMeta {
@@ -64,6 +64,7 @@ export const KIND_LABEL: Record<Kind, string> = {
   file: "Uploaded files",
   paste: "Pasted text",
   internet: "Internet",
+  library: "Books (Open Library)",
   saved: "Saved documents",
   own: "Your earlier work",
   draft: "Previous drafts",

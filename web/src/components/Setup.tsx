@@ -1,9 +1,9 @@
 "use client";
 import { useRef, useState } from "react";
-import { ClipboardPaste, FileUp, Files, Globe, Link2, Lock, Search, X } from "lucide-react";
+import { BookOpen, ClipboardPaste, FileUp, Files, Globe, Library, Link2, Lock, Search, X } from "lucide-react";
 import { type CiteMeta, type Settings, type Source, tokenize } from "@/lib/engine";
 import { SUPPORTED, extract } from "@/lib/extract";
-import { type ImportOutcome, importReferences, importUrl } from "@/lib/importer";
+import { CATALOGS, type CatalogItem, type ImportOutcome, importReferences, importUrl, loadCatalog } from "@/lib/importer";
 import { STYLE_LABEL, type Style } from "@/lib/citations";
 import type { Prefs, SavedDoc } from "@/lib/store";
 import { uid } from "@/lib/store";
@@ -27,7 +27,7 @@ const fillMeta = (m: Partial<CiteMeta> | undefined, name: string): CiteMeta | un
 export default function Setup(p: Props) {
   const [docMsg, setDocMsg] = useState("");
   const [srcMsg, setSrcMsg] = useState("");
-  const [mode, setMode] = useState<"files" | "paste" | "url" | "refs" | "web">("files");
+  const [mode, setMode] = useState<"files" | "paste" | "url" | "refs" | "web" | "books" | "lists">("files");
   const [pasteDoc, setPasteDoc] = useState<string | null>(null);
   const [pName, setPName] = useState("");
   const [pText, setPText] = useState("");
@@ -96,8 +96,9 @@ export default function Setup(p: Props) {
   const s = p.settings, set = (patch: Partial<Settings>) => p.setSettings({ ...s, ...patch });
   const savedOn = p.saved.length > 0 && p.useSaved;
   const web = webOn(p.prefs);
-  const ready = !!p.doc && (p.sources.length > 0 || savedOn || p.drafts > 0 || web);
   const internet = !!p.prefs.internet;
+  const books = internet && !!p.prefs.books;
+  const ready = !!p.doc && (p.sources.length > 0 || savedOn || p.drafts > 0 || web || books);
 
   return (
     <main className="mx-auto max-w-[1180px] px-4 pt-7 pb-12">
@@ -105,7 +106,7 @@ export default function Setup(p: Props) {
         <h1 className="text-[clamp(23px,4vw,30px)] font-bold leading-tight tracking-tight">Check your writing, then fix it honestly</h1>
         <p className="mt-1.5 text-[15.5px] text-mute">origincheck finds passages that share wording with your sources, explains why, and helps you quote, paraphrase and cite them properly.</p>
         <p className="mt-3 inline-flex items-center gap-2 rounded-full bg-soft px-3 py-1.5 text-[13px]">
-          <Lock size={15} className="text-accent" aria-hidden /> Everything runs in your browser. Nothing is uploaded{internet ? " except the DOIs and web addresses you look up" : ""}.
+          <Lock size={15} className="text-accent" aria-hidden /> Everything runs in your browser. Nothing is uploaded{web || books ? " except short search phrases and the DOIs and web addresses you look up" : internet ? " except the DOIs and web addresses you look up" : ""}.
         </p>
       </div>
 
@@ -136,7 +137,7 @@ export default function Setup(p: Props) {
           <h2 id="srcH" className="font-semibold">2. Sources to compare against</h2>
           <p className="text-[13.5px] text-mute">Papers, articles and web pages you read or used.</p>
           <div className="mt-3 flex flex-wrap gap-1.5" role="group" aria-label="How to add sources">
-            {([["files", "Files", <Files key="i" size={15} />], ["paste", "Paste", <ClipboardPaste key="i" size={15} />], ["url", "Web page", <Link2 key="i" size={15} />], ["refs", "References & DOIs", <Globe key="i" size={15} />], ["web", "Search the web", <Search key="i" size={15} />]] as const)
+            {([["files", "Files", <Files key="i" size={15} />], ["paste", "Paste", <ClipboardPaste key="i" size={15} />], ["url", "Web page", <Link2 key="i" size={15} />], ["refs", "References & DOIs", <Globe key="i" size={15} />], ["web", "Search the web", <Search key="i" size={15} />], ["books", "Books (Open Library)", <BookOpen key="i" size={15} />], ["lists", "Free book lists", <Library key="i" size={15} />]] as const)
               .map(([id, label, icon]) => (
                 <Button key={id} size="sm" variant={mode === id ? "primary" : "outline"} aria-pressed={mode === id} onClick={() => { setMode(id); setOutcomes([]); }}>{icon}{label}</Button>
               ))}
@@ -147,8 +148,8 @@ export default function Setup(p: Props) {
             <textarea className={cx(inputCls, "min-h-28")} aria-label="Source text" placeholder="Paste the source text here" value={pText} onChange={(e) => setPText(e.target.value)} />
             <div><Button size="sm" variant="primary" onClick={addPasted}>Add source</Button></div>
           </div>}
-          {(mode === "url" || mode === "refs" || mode === "web") && !internet && <div className="mt-3 rounded-lg bg-soft p-3 text-sm">
-            <p>{mode === "web" ? "Searching the web sends short phrases from your document (not the whole document) to a search service." : `Adding sources from the web sends ${mode === "url" ? "the address you enter" : "the references and DOIs you paste"} to look them up. Your document is never sent.`}</p>
+          {mode !== "files" && mode !== "paste" && !internet && <div className="mt-3 rounded-lg bg-soft p-3 text-sm">
+            <p>{mode === "books" ? "Searching inside books sends short phrases from your document (not the whole document) to Open Library." : mode === "lists" ? "Browsing the free book lists downloads them from GitHub, and adding a book fetches its page. Your document is never sent." : mode === "web" ? "Searching the web sends short phrases from your document (not the whole document) to a search service." : `Adding sources from the web sends ${mode === "url" ? "the address you enter" : "the references and DOIs you paste"} to look them up. Your document is never sent.`}</p>
             <Button size="sm" variant="primary" className="mt-2" onClick={() => p.setPrefs({ internet: true })}>Turn on internet features</Button>
           </div>}
           {mode === "url" && internet && <div className="mt-3 grid gap-2">
@@ -173,7 +174,17 @@ export default function Setup(p: Props) {
             <NumberField id="sQueries" label="Phrases to search" value={p.prefs.webQueries ?? 10} min={1} max={40} onChange={(v) => p.setPrefs({ webQueries: v })} />
             <p className="text-[12.5px] text-mute">Sends only those phrases — never your whole document. Each phrase is one search, and fewer phrases use less credit.</p>
             {p.prefs.webSearch && !p.prefs.searchKey?.trim() && <p className="text-[13px] text-high">Add an API key to turn web search on.</p>}
-          </div>}          {importing && <p className="mt-2 text-sm text-mute" role="status">{importing}</p>}
+          </div>}          {mode === "books" && internet && <div className="mt-3 grid gap-3 text-sm">
+            <Check id="sBooks" checked={!!p.prefs.books} onChange={(v) => p.setPrefs({ books: v })}
+              label="Search inside books on Open Library when I run the check"
+              hint="Searches the full text of millions of scanned books at the Internet Archive for evenly spaced 24-word phrases from your document. Books with matching text are added with the matching passages. No key needed." />
+            <NumberField id="sBookQueries" label="Phrases to search" value={p.prefs.bookQueries ?? 10} min={1} max={40} onChange={(v) => p.setPrefs({ bookQueries: v })} />
+          </div>}
+          {mode === "lists" && internet && <Catalogs net={net} onAdd={(item, text) => p.setSources((s) => [...s, {
+            id: uid(), name: item.title, kind: "internet", text, toks: tokenize(text),
+            meta: { authors: [], title: item.title, url: item.url, accessed: new Date().toISOString().slice(0, 10) },
+          }])} />}
+          {importing && <p className="mt-2 text-sm text-mute" role="status">{importing}</p>}
           {outcomes.length > 0 && <ul className="mt-3 grid gap-1.5 text-[13px]" aria-label="Import results">
             {outcomes.map((o, i) => <li key={i} className={cx("rounded-md border-l-4 bg-bg px-2.5 py-1.5", o.ok ? "border-low" : "border-high")}>
               <div className="truncate font-medium" title={o.entry}>{o.entry}</div>
@@ -227,7 +238,7 @@ export default function Setup(p: Props) {
         <Button size="lg" variant="primary" id="runBtn" disabled={!ready || !!p.busy} onClick={p.onRun}>
           {p.busy || (!p.doc ? "Add your document to start" : !ready ? "Add at least one source" : "Run check")}
         </Button>
-        {ready && !p.busy && <span className="text-[13.5px] text-mute">{plural(p.sources.length, "source")}{savedOn ? ` + ${p.saved.length} saved` : ""}{p.drafts ? ` + ${plural(p.drafts, "draft")}` : ""}{web ? " + web search" : ""}</span>}
+        {ready && !p.busy && <span className="text-[13.5px] text-mute">{plural(p.sources.length, "source")}{savedOn ? ` + ${p.saved.length} saved` : ""}{p.drafts ? ` + ${plural(p.drafts, "draft")}` : ""}{web ? " + web search" : ""}{books ? " + Open Library" : ""}</span>}
         {p.error && <p role="alert" className="w-full text-[13.5px] text-high">{p.error}</p>}
       </div>
     </main>
@@ -266,5 +277,62 @@ function FileRow({ tag, name, words, onRemove }: { tag: string; name: string; wo
       <span className="shrink-0 text-[12.5px] text-mute">{words.toLocaleString()} words</span>
       <button onClick={onRemove} aria-label={`Remove ${name}`} className="grid size-7 shrink-0 cursor-pointer place-items-center rounded-md text-mute hover:bg-soft hover:text-high"><X size={16} /></button>
     </li>
+  );
+}
+
+/** Browse the free-book catalogues (EbookFoundation/free-programming-books, 44bits/awesome-opensource-documents) and add titles as sources. */
+function Catalogs({ net, onAdd }: { net: { proxy: boolean; email?: string }; onAdd: (item: CatalogItem, text: string) => void }) {
+  const [cat, setCat] = useState<string>(CATALOGS[0].id);
+  const [items, setItems] = useState<Record<string, CatalogItem[]>>({});
+  const [status, setStatus] = useState("");
+  const [q, setQ] = useState("");
+  const [state, setState] = useState<Record<string, string>>({});
+  const current = items[cat];
+  const open = async (id: string) => {
+    setCat(id);
+    if (items[id]) return;
+    setStatus("Loading list…");
+    try {
+      const list = await loadCatalog(CATALOGS.find((c) => c.id === id)!.url);
+      setItems((m) => ({ ...m, [id]: list }));
+      setStatus("");
+    } catch (e) { setStatus(`Couldn't load the list (${(e as Error).message}).`); }
+  };
+  // Every search word must start a word in the title, section or note ("pro git" finds Pro Git, not Programming).
+  const terms = q.toLowerCase().split(/\s+/).filter(Boolean).map((t) => new RegExp(`(^|[^a-z0-9])${t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
+  const shown = (current ?? []).filter((it) => terms.every((t) => t.test(`${it.title} ${it.section} ${it.note}`.toLowerCase()))).slice(0, 40);
+  const add = async (it: CatalogItem) => {
+    setState((s) => ({ ...s, [it.url]: "Fetching…" }));
+    const o = await importUrl(it.url, net);
+    if (o.source) onAdd(it, o.source.text);
+    setState((s) => ({ ...s, [it.url]: o.ok ? "Added" : o.message }));
+  };
+  const repo = CATALOGS.find((c) => c.id === cat)!.repo;
+  return (
+    <div className="mt-3 grid gap-2.5 text-sm">
+      <div className="flex flex-wrap gap-2">
+        <select className="h-9 min-w-0 flex-1 rounded-md border border-line bg-bg px-2" aria-label="Book list" value={cat}
+          onChange={(e) => open(e.target.value)} onFocus={() => !current && open(cat)}>
+          {CATALOGS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+        </select>
+        {!current && <Button size="sm" variant="primary" onClick={() => open(cat)} id="loadList">Load list</Button>}
+      </div>
+      {current && <input className={inputCls} type="search" placeholder={`Search ${current.length.toLocaleString()} titles, e.g. "python" or "algorithms"`} aria-label="Search the list" value={q} onChange={(e) => setQ(e.target.value)} id="listSearch" />}
+      {status && <p className="text-mute" role="status">{status}</p>}
+      {current && <ul className="max-h-80 overflow-auto rounded-lg border border-line" aria-label="Titles">
+        {shown.map((it) => <li key={it.url + it.title} className="flex items-center gap-2 border-t border-line px-2.5 py-2 first:border-t-0">
+          <div className="min-w-0 flex-1">
+            <a className="block truncate font-medium hover:underline" href={it.url} target="_blank" rel="noreferrer" title={it.title}>{it.title}</a>
+            <div className="truncate text-[12px] text-mute">{it.section}{it.note ? ` · ${it.note}` : ""}</div>
+            {state[it.url] && state[it.url] !== "Added" && state[it.url] !== "Fetching…" && <div className="text-[12px] text-high">{state[it.url]}</div>}
+          </div>
+          <Button size="sm" disabled={state[it.url] === "Fetching…" || state[it.url] === "Added"} onClick={() => add(it)}>
+            {state[it.url] === "Added" ? "Added" : state[it.url] === "Fetching…" ? "Adding…" : "Add"}
+          </Button>
+        </li>)}
+        {!shown.length && <li className="px-2.5 py-2 text-mute">No titles match.</li>}
+      </ul>}
+      <p className="text-[12px] text-mute">From <a className="text-accent underline" href={`https://github.com/${repo}`} target="_blank" rel="noreferrer">{repo}</a>. Adding a title fetches its page, so it works best for books published as web pages.</p>
+    </div>
   );
 }

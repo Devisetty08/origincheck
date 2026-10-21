@@ -31,6 +31,8 @@ export interface Prefs {
   webSearch?: boolean; // search the web for matching phrases on each check
   searchKey?: string; // the user's own Jina API key, kept in this browser only
   webQueries?: number;
+  books?: boolean; // search inside Open Library's scanned books on each check
+  bookQueries?: number;
 }
 
 async function safeGet<T>(key: string, fallback: T): Promise<T> {

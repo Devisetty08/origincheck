@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BookOpen, Download, History, Library as LibIcon, Moon, Printer, Sun } from "lucide-react";
 import { type CiteMeta, type Result, type Settings, type Source, type Tok, bibStart, check, tokenize } from "@/lib/engine";
-import { webSearch } from "@/lib/importer";
+import { bookSearch, webSearch } from "@/lib/importer";
 import { plural } from "@/lib/words";
 import { type Style, inText } from "@/lib/citations";
 import { closeness, type Closeness } from "@/lib/closeness";
@@ -99,19 +99,29 @@ export default function App() {
     if (!doc) return;
     setRunError("");
     const all: Source[] = sources.map((s) => ({ ...s, meta: meta[s.name] ?? s.meta }));
-    if (webOn(prefs)) {
-      try {
-        const b0 = settings.bib ? bibStart(doc.text) : -1; // don't search the reference list
-        const res = await webSearch(b0 >= 0 ? doc.text.slice(0, b0) : doc.text, prefs.searchKey!.trim(), prefs.webQueries ?? 10,
-          (d, t) => setBusy(`Searching the web ${Math.min(d + 1, t)} of ${t}…`));
-        for (const s of res.sources) all.push({ id: uid(), name: s.name, kind: "internet", text: s.text, toks: tokenize(s.text), meta: meta[s.name] ?? s.meta });
-        setWebNote(`Web search: ${plural(res.searched, "phrase")} searched, ${plural(res.sources.length, "page")} compared${res.failed ? `, ${res.failed} search(es) failed` : ""}.`);
-      } catch (e) {
-        setBusy("");
-        setRunError((e as Error).message);
-        return;
+    const b0 = settings.bib ? bibStart(doc.text) : -1;
+    const body = b0 >= 0 ? doc.text.slice(0, b0) : doc.text; // never search the reference list
+    const notes: string[] = [];
+    const add = (found: { name: string; text: string; meta?: CiteMeta }[], kind: Source["kind"]) => {
+      for (const s of found) all.push({ id: uid(), name: s.name, kind, text: s.text, toks: tokenize(s.text), meta: meta[s.name] ?? s.meta });
+    };
+    try {
+      if (webOn(prefs)) {
+        const res = await webSearch(body, prefs.searchKey!.trim(), prefs.webQueries ?? 10, (d, t) => setBusy(`Searching the web ${Math.min(d + 1, t)} of ${t}…`));
+        add(res.sources, "internet");
+        notes.push(`Web search: ${plural(res.searched, "phrase")} searched, ${plural(res.sources.length, "page")} compared${res.failed ? `, ${res.failed} search(es) failed` : ""}.`);
       }
-    } else setWebNote("");
+      if (prefs.internet && prefs.books) {
+        const res = await bookSearch(body, prefs.bookQueries ?? 10, (d, t) => setBusy(`Searching inside books ${d} of ${t}…`));
+        add(res.sources, "library");
+        notes.push(`Open Library: ${plural(res.searched, "phrase")} searched inside books, ${plural(res.sources.length, "book")} with matching text${res.failed ? `, ${res.failed} search(es) failed` : ""}.`);
+      }
+    } catch (e) {
+      setBusy("");
+      setRunError((e as Error).message);
+      return;
+    }
+    setWebNote(notes.join(" "));
     setBusy("Checking…");
     await new Promise((r) => setTimeout(r, 30)); // let the busy state paint
     const project = projectKey(doc.name);

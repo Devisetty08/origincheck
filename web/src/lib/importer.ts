@@ -167,6 +167,88 @@ export async function webSearch(text: string, key: string, n: number, onProgress
   return { sources: [...found.values()], searched: phrases.length, failed };
 }
 
+/* ------------------------------ Open Library: search inside books ------------------------------ */
+
+/**
+ * Search inside the Internet Archive's scanned books (Open Library's full-text search) for phrases from the document.
+ * The matching snippets become the source text: enough to show and attribute the match. No key; sends only the phrases.
+ */
+export async function bookSearch(text: string, n: number, onProgress?: (done: number, total: number) => void) {
+  const phrases = pickPhrases(text, n);
+  const books = new Map<string, Imported & { snippets: Set<string> }>();
+  let failed = 0, done = 0;
+  const one = async (q: string) => {
+    try {
+      const r = await fetch(`https://openlibrary.org/search/inside.json?q=${encodeURIComponent(`"${q}"`)}`);
+      if (!r.ok) throw new Error();
+      const j = await r.json();
+      for (const h of (j.hits?.hits ?? []).slice(0, 3)) {
+        const f = h.fields ?? {}, id: string = f.identifier?.[0] ?? String(h._id).split("|")[0];
+        if (!books.has(id)) {
+          const title: string = f.meta_title?.[0] ?? id;
+          const creator: string | undefined = f.meta_creator?.[0];
+          const [family, given] = (creator ?? "").split(/\s*,\s*/);
+          books.set(id, {
+            name: `${title}${creator ? ` — ${creator}` : ""} (Open Library)`, text: "", url: `https://archive.org/details/${id}`, snippets: new Set(),
+            meta: { authors: family ? [{ family, given: given?.replace(/[\d-]+$/, "").trim() || undefined }] : [], title,
+              publisher: f.meta_publisher?.[0]?.replace(/^[^:]*:\s*/, ""), url: `https://archive.org/details/${id}`, accessed: today() },
+          });
+        }
+        for (const s of h.highlight?.text ?? [])
+          books.get(id)!.snippets.add(s.replace(/\{\{\{|\}\}\}/g, "").replace(/-\n(\w)/g, "$1").replace(/\s+/g, " ").trim());
+      }
+    } catch { failed++; }
+    onProgress?.(++done, phrases.length);
+  };
+  for (let i = 0; i < phrases.length; i += 4) await Promise.all(phrases.slice(i, i + 4).map(one)); // a few at a time
+  const sources = [...books.values()].map(({ snippets, ...b }) => ({ ...b, text: [...snippets].join("\n\n") }));
+  return { sources: sources.filter((s) => s.text.split(/\s+/).length >= 8), searched: phrases.length, failed };
+}
+
+/* ------------------------------ free book catalogues ------------------------------ */
+
+export interface CatalogItem { title: string; url: string; section: string; note: string }
+
+export const CATALOGS = [
+  { id: "fpb-subjects", label: "Free Programming Books — by subject", repo: "EbookFoundation/free-programming-books",
+    url: "https://raw.githubusercontent.com/EbookFoundation/free-programming-books/main/books/free-programming-books-subjects.md" },
+  { id: "fpb-langs", label: "Free Programming Books — by language", repo: "EbookFoundation/free-programming-books",
+    url: "https://raw.githubusercontent.com/EbookFoundation/free-programming-books/main/books/free-programming-books-langs.md" },
+  { id: "aosd", label: "Awesome Open Source Documents", repo: "44bits/awesome-opensource-documents",
+    url: "https://raw.githubusercontent.com/44bits/awesome-opensource-documents/master/README.md" },
+] as const;
+
+/** Markdown list of links → catalogue items. Handles inline [t](url) and reference-style [t][ref] links. */
+export function parseCatalog(md: string): CatalogItem[] {
+  const refs = new Map<string, string>();
+  for (const m of md.matchAll(/^\[([^\]]+)\]:\s*(\S+)/gm)) refs.set(m[1].toLowerCase(), m[2]);
+  const out: CatalogItem[] = [];
+  let section = "";
+  for (const line of md.split("\n")) {
+    const h = line.match(/^#{2,4}\s+(.+)/);
+    if (h) { section = h[1].trim(); continue; }
+    const li = line.match(/^\s*[*-]\s+(.+)/);
+    if (!li || /^(index|table of contents|license)$/i.test(section)) continue;
+    const links = [...li[1].matchAll(/\[([^\]]+)\](?:\(([^)\s]+)[^)]*\)|\[([^\]]+)\])/g)]
+      .map((m) => ({ text: m[1], url: m[2] ?? refs.get((m[3] ?? "").toLowerCase()) ?? "" }))
+      .filter((l) => /^https?:\/\//.test(l.url));
+    if (!links.length) continue;
+    const named = links.find((l) => !/^(site|repo|pdf|html|epub)$/i.test(l.text));
+    const title = named?.text ?? li[1].split(/\s*\(/)[0].replace(/\[[^\]]*\]/g, "").trim();
+    const url = (links.find((l) => /^site$/i.test(l.text)) ?? named ?? links[0]).url; // the readable site beats the source repo
+    const note = li[1].replace(/\(\s*\[(site|repo)\][^)]*\)/gi, "").replace(/\[([^\]]+)\](\([^)]*\)|\[[^\]]*\])/g, "$1")
+      .replace(title, "").replace(/^\s*[-–:]\s*/, "").trim();
+    if (title) out.push({ title, url, section, note });
+  }
+  return out;
+}
+
+export async function loadCatalog(url: string) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return parseCatalog(await r.text());
+}
+
 /** Import a pasted reference list or list of DOIs, one entry per line. */
 export async function importReferences(input: string, opts: NetOpts, onProgress?: (done: number, total: number) => void) {
   const entries = input.split(/\n+/).map((l) => l.trim()).filter((l) => l.length > 6);
