@@ -1,11 +1,11 @@
 # origincheck
 
-An open-source similarity checker that works like Turnitin. It finds passages in your document that share wording with source documents you supply and reports a **similarity index**, a ranked list of matching sources and colour-coded highlights.
+An open-source similarity checker and academic writing assistant. It finds passages in your document that share wording with your sources, explains why each one was flagged, and helps you fix it honestly: quote and cite, paraphrase and cite, or remove. The goal is a document where every borrowed idea is credited, not a score of 0%.
 
 It comes in two versions that use the same matching method and give the same similarity index on the same inputs:
 
-- **Web app**: one HTML page that runs entirely in your browser. **Live: https://devisetty08.github.io/origincheck/**
-- **Command-line tool**: `origincheck.py`, for batch checks, large source folders and an optional internet search.
+- **Web app** (`web/`): runs entirely in your browser. **Live: https://devisetty08.github.io/origincheck/**
+- **Command-line tool** (`origincheck.py`): for batch checks, large source folders and an optional internet search.
 
 ![Report view of the web app](example/screenshot.png)
 
@@ -13,18 +13,48 @@ It comes in two versions that use the same matching method and give the same sim
 
 Open https://devisetty08.github.io/origincheck/, add your document and your sources, and select **Run check**. Files are read in your browser and never uploaded.
 
-- Supports .docx, .pdf, .txt, .md, .html/.htm and .rtf, for the document and the sources. You can also paste text. A pasted source named with a URL is labelled "Internet".
-- Turnitin-style split view: the document on the left with matches highlighted in each source's colour, and the similarity index, a breakdown by source type and a ranked source list on the right.
-- Click a highlight or **View matches** to see the matching passage in the source, then step through the matches with ‹ ›.
-- **Exclude source** removes a source and gives its words to the next best source. **Include again** undoes it.
-- Filters: exclude quotes, exclude the bibliography, ignore matches under N words, exclude sources under X%, and change the fingerprint size.
-- Save a checked document in your browser (localStorage) so later checks also compare against it, like Turnitin's student-paper repository.
-- Download the report as a standalone HTML file, or print it or save it as a PDF.
-- Light and dark themes.
+**Similarity check**
+- Reads .docx, .pdf, .txt, .md, .html/.htm and .rtf for the document and the sources, or pasted text. Scanned PDFs need OCR first.
+- Turnitin-style split view: the document with matches highlighted and numbered in each source's colour, the similarity index, a breakdown by source type and a ranked source list.
+- Click a highlight or **View matches** to compare your text with the source passage, then step through that source's matches.
+- Filters: exclude quotes, the bibliography, matches under N words, sources under X%, or individual sources (their words go to the next best source).
+- **Stricter mode** also flags lightly reworded copying (word stems and common synonyms) as "possible close paraphrase", shown separately and never counted in the index.
 
-### Hosting it on GitHub Pages
+**Guided revision**
+- For each flagged passage: **Quote and cite**, **Paraphrase and cite** or **Remove**. Each edit is re-checked straight away, with undo.
+- The paraphrase editor hides the source while you write and shows a live closeness meter (**Too close / Borderline / Original wording**) with plain-language reasons such as "6 words in a row match the source". It gives advice, never replacement text.
+- Progress shows how many flagged passages are resolved and how the index has changed.
 
-`index.html` is a static file with no build step. In the repository, go to **Settings → Pages → Build and deployment → Deploy from a branch**, pick **`main`** and **`/ (root)`**, then save. The site appears at `https://<user>.github.io/origincheck/` within a minute or two. You can also just open `index.html` locally in a browser.
+**Citations**
+- Record author, title, year, journal or publisher, DOI, URL and access date for each source. Details are pre-filled from Word and PDF metadata, or from the DOI.
+- In-text citations and reference lists in **APA 7**, **Harvard** and **IEEE**.
+- Citation checker: citations with no reference entry, entries never cited, quotations without a citation, and matched sources not cited anywhere.
+
+**More**
+- **Draft history**: every check is saved with its date, label, index and sources, with a chart across drafts and a list of passages resolved or introduced between two drafts. Earlier drafts of the same document are compared automatically and excluded from the index by default.
+- **Self-plagiarism check**: mark saved documents as your own earlier work, and their matches are reported as a separate category.
+- **Source import** (optional internet features): paste a reference list or DOIs to fetch open-access full text (Crossref, OpenAlex, Unpaywall, Europe PMC), or add a web page by URL. Entries that couldn't be retrieved are listed with a link.
+- **Writing feedback** (advisory): reading ease, long sentences, passive voice, repeated words and inconsistent terminology.
+- **Exports**: standalone HTML report, print or save as PDF, the revised document as **.docx** (headings kept, citations and missing reference entries added), and a **self-check summary PDF** recording what you reviewed and resolved.
+- A short **guide to avoiding plagiarism**: when to quote, how to paraphrase and how to cite.
+- Light and dark themes, keyboard accessible, works on phone-width screens.
+
+**Privacy.** Documents are processed on your device. Saved documents, draft history and citation details stay in your browser (IndexedDB). You can export them to a file or delete them all in one step. Internet features are off by default. When on, they send only the DOIs, references and web addresses you enter, never your document. If a site blocks in-browser downloads, an optional reader service (r.jina.ai) is given the page address only.
+
+**Not included, by design.** origincheck doesn't rewrite or "spin" text to lower the score, doesn't "humanize" AI-generated text, and doesn't do AI-writing detection (current detectors are unreliable and flag human writing).
+
+### Developing and deploying the web app
+
+Built with Next.js (static export), TypeScript, Tailwind CSS, Radix-based components in the Origin UI style, Lucide icons, Recharts, mammoth.js and pdf.js.
+
+```
+cd web
+npm ci
+npm run dev        # http://localhost:3000
+npm run build      # static site in web/out
+```
+
+Deployment uses `.github/workflows/pages.yml`, which builds `web/` on every push to `main` and publishes it to GitHub Pages. One-time setup: in the repository, go to **Settings → Pages → Build and deployment → Source** and choose **GitHub Actions**.
 
 ## Command-line tool
 
@@ -118,7 +148,9 @@ Quotes, the bibliography, small matches and small sources can be excluded, as in
 
 ## Limits compared with real Turnitin
 
-- **The database.** Turnitin compares against billions of web pages, journals and past student papers. origincheck only knows the sources you give it, your saved documents and, in the CLI, what the web search finds. Your institution's report can show matches this tool doesn't.
+- **The database.** Commercial services compare against billions of web pages, journals and past student papers in private databases that origincheck can't search. origincheck only knows the sources you give it, your saved documents and drafts, imported open-access papers and, in the CLI, what the web search finds. Your institution's report can show matches this tool doesn't.
+- **Internet search in the web app.** A static site can't call a search API without exposing a key, so the web app adds internet sources by DOI, reference or URL instead. The CLI's `--web` option searches the web.
+- **Blocked downloads.** Many publishers and websites block in-browser downloads. The optional reader service gets around most of these. Anything still blocked is listed so you can download it and add the file.
 - **Copied wording, not heavy paraphrase.** It catches copied or lightly edited text. Turnitin's main score works the same way.
 - **No AI-writing detection.** AI detectors are unreliable and flag human writing as AI-generated, so origincheck doesn't include one.
 - **Scanned PDFs** have no text layer. Run OCR on them first.
@@ -134,7 +166,10 @@ For each highlighted passage, do one of these, then check again:
 ## Repository layout
 
 ```
-index.html          web app (single file)
+web/                web app (Next.js, static export)
+  src/lib/          matching engine, citations, closeness meter, writing feedback, import, exports
+  src/components/   user interface
+.github/workflows/  GitHub Pages deployment
 origincheck.py      command-line tool
 requirements.txt    python-docx, pypdf
 example/            sample document, sources, CLI report and screenshot

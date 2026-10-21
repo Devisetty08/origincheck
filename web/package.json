@@ -1,0 +1,40 @@
+{
+  "name": "origincheck-web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "predev": "node -e \"require('fs').copyFileSync('node_modules/pdfjs-dist/build/pdf.worker.min.mjs','public/pdf.worker.min.mjs')\"",
+    "dev": "next dev",
+    "prebuild": "node -e \"require('fs').copyFileSync('node_modules/pdfjs-dist/build/pdf.worker.min.mjs','public/pdf.worker.min.mjs')\"",
+    "build": "next build",
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "postbuild": "node scripts/flatten-segments.mjs"
+  },
+  "dependencies": {
+    "docx": "^9.13.0",
+    "idb-keyval": "^6.3.0",
+    "jspdf": "^4.2.1",
+    "jszip": "^3.10.1",
+    "lucide-react": "^1.60.0",
+    "mammoth": "^1.13.0",
+    "next": "16.4.2",
+    "pdfjs-dist": "^6.4.299",
+    "radix-ui": "^1.8.1",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "recharts": "^3.10.1",
+    "stemmer": "^2.0.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/turbopack": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.4.2",
+    "playwright": "^1.64.1",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}

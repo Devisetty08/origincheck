@@ -1,0 +1,124 @@
+// Text extraction in the browser: mammoth.js for Word, pdf.js for PDF, DOMParser for HTML.
+import type { CiteMeta } from "./engine";
+
+export interface Block { style: "h1" | "h2" | "h3" | "p"; text: string }
+export interface Extracted { text: string; blocks: Block[]; meta?: Partial<CiteMeta> }
+
+const BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+export const SUPPORTED = ".docx,.pdf,.txt,.md,.html,.htm,.rtf";
+
+/** HTML to text with paragraph breaks; also returns heading/paragraph blocks for .docx export. */
+export function htmlToText(html: string, readable = false): Extracted {
+  const d = new DOMParser().parseFromString(html, "text/html");
+  // Same tags as the CLI; `readable` (web pages fetched by URL) also drops page furniture.
+  d.querySelectorAll(readable ? "script,style,noscript,nav,footer,header,svg,aside,form" : "script,style,noscript,nav,footer,header,svg").forEach((e) => e.remove());
+  const body = d.body ?? d.documentElement;
+  const root = readable ? d.querySelector("article") ?? d.querySelector("main") ?? body : body;
+  const BLOCK = /^(P|DIV|BR|LI|H[1-6]|TR|TD|TH|SECTION|ARTICLE|TABLE|UL|OL|BLOCKQUOTE|PRE)$/;
+  let out = "";
+  const walk = (node: Node) => {
+    for (const c of node.childNodes) {
+      if (c.nodeType === 3) out += c.nodeValue;
+      else if (c.nodeType === 1) {
+        const b = BLOCK.test((c as Element).tagName);
+        if (b) out += "\n";
+        walk(c);
+        if (b) out += "\n";
+      }
+    }
+  };
+  walk(root);
+  const text = out.replace(/[ \t]+\n/g, "\n").replace(/\n\s*\n+/g, "\n\n").trim();
+  const blocks: Block[] = [];
+  root.querySelectorAll("h1,h2,h3,h4,h5,h6,p,li").forEach((e) => {
+    const t = (e.textContent ?? "").replace(/\s+/g, " ").trim();
+    if (!t) return;
+    const tag = e.tagName.toLowerCase();
+    blocks.push({ style: tag === "h1" ? "h1" : tag === "h2" ? "h2" : /^h[3-6]$/.test(tag) ? "h3" : "p", text: t });
+  });
+  const title = d.querySelector("title")?.textContent?.trim();
+  return { text, blocks, meta: title ? { title } : undefined };
+}
+
+export function rtfToText(raw: string) {
+  return raw.replace(/\\pard?/g, "\n").replace(/\\'[0-9a-f]{2}/g, "").replace(/\\[a-z]+-?\d* ?/g, "").replace(/[{}]/g, "");
+}
+
+function parseAuthors(s?: string): CiteMeta["authors"] {
+  // Tools often stamp a placeholder author; that's not a real citation.
+  if (!s?.trim() || /^(anonymous|unknown|user|author|admin(istrator)?|owner|microsoft office user)$/i.test(s.trim())) return [];
+  return s.split(/\s*(?:;|\band\b|&)\s*/).filter(Boolean).map((a) => {
+    if (a.includes(",")) { const [family, given] = a.split(/\s*,\s*/); return { family, given }; }
+    const parts = a.trim().split(/\s+/);
+    return { family: parts.pop()!, given: parts.join(" ") || undefined };
+  });
+}
+
+async function docx(buf: ArrayBuffer): Promise<Extracted> {
+  const mammoth = (await import("mammoth")).default;
+  const r = await mammoth.convertToHtml({ arrayBuffer: buf });
+  const ex = htmlToText(r.value);
+  ex.meta = undefined; // mammoth output has no <title>; read the Word properties instead
+  try {
+    const JSZip = (await import("jszip")).default;
+    const core = await (await JSZip.loadAsync(buf)).file("docProps/core.xml")?.async("string");
+    if (core) {
+      const x = new DOMParser().parseFromString(core, "application/xml");
+      const pick = (tag: string) => x.getElementsByTagNameNS("*", tag)[0]?.textContent?.trim();
+      const title = pick("title"), creator = pick("creator"), created = pick("created");
+      ex.meta = { title: title || undefined, authors: parseAuthors(creator), year: created?.slice(0, 4) };
+    }
+  } catch { /* properties are optional */ }
+  return ex;
+}
+
+async function pdf(buf: ArrayBuffer): Promise<Extracted> {
+  const pdfjs = await import("pdfjs-dist");
+  pdfjs.GlobalWorkerOptions.workerSrc = `${BASE}/pdf.worker.min.mjs`;
+  const doc = await pdfjs.getDocument({ data: new Uint8Array(buf) }).promise;
+  const pages: string[] = [];
+  for (let p = 1; p <= doc.numPages; p++) {
+    const tc = await (await doc.getPage(p)).getTextContent();
+    let out = "", lastY: number | null = null, lastH = 0;
+    for (const it of tc.items) {
+      if (!("str" in it) || !it.str) continue;
+      const y = it.transform[5], h = Math.abs(it.transform[3]) || it.height || 10;
+      if (lastY !== null && Math.abs(y - lastY) > 0.5) out += Math.abs(y - lastY) > 1.6 * Math.max(h, lastH) ? "\n\n" : "\n";
+      out += it.str;
+      lastY = y; lastH = h;
+    }
+    pages.push(out);
+  }
+  const text = pages.join("\n\n").replace(/-\n(\w)/g, "$1").replace(/(?<![.\n:])\n(?!\n)/g, " ");
+  let meta: Partial<CiteMeta> | undefined;
+  try {
+    const info = (await doc.getMetadata()).info as Record<string, string>;
+    const y = (info.CreationDate ?? "").match(/(\d{4})/)?.[1];
+    meta = { title: info.Title?.trim() || undefined, authors: parseAuthors(info.Author), year: y };
+  } catch { /* optional */ }
+  return { text, blocks: text.split(/\n\n+/).map((t) => ({ style: "p" as const, text: t.trim() })).filter((b) => b.text), meta };
+}
+
+const plainBlocks = (text: string): Block[] =>
+  text.split(/\n\s*\n+/).map((t) => t.trim()).filter(Boolean).map((t) => {
+    const h = t.match(/^(#{1,3})\s+(.*)$/);
+    return h ? { style: (["h1", "h2", "h3"] as const)[h[1].length - 1], text: h[2] } : { style: "p" as const, text: t.replace(/\s*\n\s*/g, " ") };
+  });
+
+export async function extract(file: File): Promise<Extracted> {
+  const ext = (file.name.match(/\.[^.]+$/)?.[0] ?? "").toLowerCase();
+  let ex: Extracted;
+  if (ext === ".docx") ex = await docx(await file.arrayBuffer());
+  else if (ext === ".pdf") ex = await pdf(await file.arrayBuffer());
+  else {
+    const raw = await file.text();
+    if (ext === ".html" || ext === ".htm") ex = htmlToText(raw);
+    else if (ext === ".rtf") { const t = rtfToText(raw); ex = { text: t, blocks: plainBlocks(t) }; }
+    else if (ext === ".txt" || ext === ".md") ex = { text: raw, blocks: plainBlocks(raw) };
+    else throw new Error(`${file.name}: unsupported file type. Use .docx, .pdf, .txt, .md, .html or .rtf.`);
+  }
+  ex.text = ex.text.replace(/\r\n?/g, "\n");
+  return ex;
+}
+
+export const DOI_RE = /\b10\.\d{4,9}\/[^\s"<>]+[^\s"<>.,;)\]]/g;
