@@ -149,6 +149,7 @@ The server never logs documents, strips keys from anything it logs, and limits h
 
 1. Import the repository in [Vercel](https://vercel.com/) and set the root directory to `web`.
 2. Add your keys under Settings, Environment Variables. The names are in [`web/.env.example`](web/.env.example). On Vercel the in-app Settings page is read-only.
+   Also add `ONNXRUNTIME_NODE_INSTALL` = `skip`. It stops the install from downloading GPU files the app never uses.
 3. Deploy.
 
 The rate limiter, search cache and pending Copyleaks scans live in memory, so each server instance has its own. For heavy public use, put Vercel's firewall in front and move Copyleaks scans to a shared store such as Upstash Redis. Copyleaks sends results to `PUBLIC_BASE_URL`; when running locally, use a tunnel such as `ngrok http 3100`.

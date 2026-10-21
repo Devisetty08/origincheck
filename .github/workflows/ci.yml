@@ -24,6 +24,10 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
       - run: npm ci
+        env:
+          # Transformers.js runs in the browser here, so onnxruntime-node never needs the CUDA binaries
+          # its install script downloads from NuGet on Linux (slow, and it fails the job when the feed is unreachable).
+          ONNXRUNTIME_NODE_INSTALL: skip
       - run: npm run lint
       - run: npx tsc --noEmit
       - name: Unit tests (Vitest)
