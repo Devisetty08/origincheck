@@ -119,7 +119,7 @@ test("downloads work", async ({ page }) => {
   await expect(page.locator("#aiRing text")).toHaveText(/^\d+$/);
 
   const report = page.waitForEvent("download");
-  await page.locator("#dlReport").click();
+  await page.locator("#dlHtml").click();
   const r = await report;
   expect(r.suggestedFilename()).toBe("draft_origincheck_report.html");
   const html = readFileSync(await r.path(), "utf8");
@@ -340,4 +340,19 @@ test("writing history records typed vs pasted text, snapshots after a pause, exp
   await expect(page.locator("#historySummary [data-summary]")).toHaveText(/^0% typed, 0% pasted, 0% AI-assisted, 100% imported$/);
   await page.locator("#historyToggle").uncheck();
   await expect(page.locator("#historyIndicator")).toHaveText("Writing history is off");
+});
+
+test("the PDF report has a cover, the highlighted document and the originality summary", async ({ page }) => {
+  await upload(page);
+  await expect(page.locator("#simRing text")).toHaveText("47%", { timeout: 30_000 });
+  await expect(page.locator("#grammarRing text")).toHaveText(/^\d+$/, { timeout: 30_000 });
+  const dl = page.waitForEvent("download");
+  await page.locator("#dlReport").click();
+  const d = await dl;
+  expect(d.suggestedFilename()).toBe("draft_originality_report.pdf");
+  const pdf = readFileSync(await d.path(), "latin1");
+  expect(pdf.startsWith("%PDF-")).toBe(true);
+  for (const t of ["Check ID:", "Word count:", "ORIGINALITY REPORT", "SIMILARITY INDEX", "PRIMARY SOURCES", "azure.txt", "ora2pg.pdf", "Uploaded file",
+    "Exclude bibliography", "Similarity is a signal, not proof", "Other checks"]) expect(pdf, t).toContain(t);
+  expect(pdf).toMatch(/\(47\) Tj/); // the similarity index, as drawn
 });

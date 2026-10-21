@@ -7,6 +7,7 @@ import { plural } from "@/lib/words";
 import { hasHangul, pickQueries } from "@/lib/queries";
 import { type PassageMatch, crossLangPairs, lexicalPass, semanticPass } from "@/lib/hybrid";
 import { detectLanguage } from "@/lib/language";
+import { exportOriginalityPdf, needsHtmlReport } from "@/lib/originalityPdf";
 import { type History as WritingHistory, type Origin, SNAPSHOT_AFTER_MS, addSnapshot, deleteHistory as deleteWritingHistory,
   exportReport as exportWritingReport, loadHistory as loadWritingHistory, newHistory, recordChange, saveHistory as saveWritingHistory } from "@/lib/writingHistory";
 import { type Style, inText } from "@/lib/citations";
@@ -539,7 +540,20 @@ export default function App() {
 
   const newCheck = () => { aiSeq.current++; setRun(null); setDoc(null); setWh(null); setView("check"); scrollTo(0, 0); };
 
+  /** The originality report as a PDF (cover, highlighted document, summary). Korean and other non-Latin text gets the HTML report. */
   const downloadReport = () => {
+    if (!doc) return;
+    if (needsHtmlReport(doc.text)) return downloadHtmlReport();
+    const count = (sev: string) => issues.filter((i) => i.severity === sev).length;
+    exportOriginalityPdf({
+      docName: doc.name, text: doc.text, toks: doc.toks, r: run?.r ?? null, sources: run?.all ?? [], skip: run?.skip ?? new Set(),
+      settings, checked: run?.checked ?? new Date(), checkId: doc.id.slice(0, 12),
+      grammar: grammarScore != null ? { score: grammarScore, errors: count("error"), warnings: count("warning"), style: count("style") } : undefined,
+      ai: ai.result && !ai.stale ? { result: ai.result } : ai.status === "short" ? { result: null, note: "Not enough text to estimate." } : undefined,
+      history: wh && whOn ? exportWritingReport(wh).summary.line : undefined, aiAssisted: doc.aiAssisted,
+    });
+  };
+  const downloadHtmlReport = () => {
     if (!doc) return;
     download(`${baseName(doc.name)}_origincheck_report.html`, reportHtml({
       docName: doc.name, text: doc.text, toks: doc.toks, r: run?.r ?? null, sources: run?.all ?? [], settings, checked: run?.checked ?? new Date(),
@@ -681,7 +695,8 @@ export default function App() {
                 ai={{ status: ai.status, pct: ai.pct, stage: ai.stage, mb: ai.mb, result: ai.result, stale: ai.stale }} />
               <NextSteps steps={nextSteps} />
               <div className="no-print flex flex-wrap gap-2" aria-label="Downloads">
-                <Button size="sm" onClick={downloadReport} id="dlReport"><Download size={14} />Download report</Button>
+                <Button size="sm" variant="primary" onClick={downloadReport} id="dlReport"><Download size={14} />Download report (PDF)</Button>
+                <Button size="sm" onClick={downloadHtmlReport} id="dlHtml"><Download size={14} />Web report (.html)</Button>
                 <Button size="sm" onClick={() => print()} className="max-sm:hidden"><Printer size={14} />Print / PDF</Button>
                 <Button size="sm" onClick={() => downloadCorrected("docx")}><Download size={14} />Corrected .docx</Button>
                 <Button size="sm" onClick={() => downloadCorrected("txt")}><Download size={14} />Corrected .txt</Button>

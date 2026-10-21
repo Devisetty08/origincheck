@@ -19,6 +19,7 @@ Your document is read and compared **in your browser**. Searches send only short
 | **Rewrite** | Click a paragraph, pick a mode (Clearer, Shorter, More formal, More casual, Plain language, Cut filler), compare your original with the suggestion, and keep only the changes you want. Uses a free model on your own computer by default. |
 | **AI indicator** | Optional. An estimate of how likely the text is machine-written, with a sentence heatmap and the reasons. Never a verdict. |
 | **History** | Every check's scores across drafts, with a chart. |
+| **Download report** | A PDF originality report: a cover page (check date, ID, word and character counts), your document with each matched passage highlighted in its source's colour and numbered, the similarity index with its breakdown (internet, publications, your sources, saved papers) and primary sources, the exclusion settings, and a page for grammar, the AI indicator and writing history. An interactive HTML version is also available; documents in non-Latin scripts such as Korean get the HTML version. |
 | **Settings** | Check options, plus the API keys and services the app uses. |
 
 ![The plagiarism report: highlighted matches and the source list](example/screenshot-plagiarism.png)
@@ -56,7 +57,7 @@ For each match you can **Mark as quoted & cited**, **Rewrite in my own words** (
 Rewrite works only on your own document, one passage at a time, and only when you press **Rewrite**, never as you type. By default it uses **Qwen2.5 7B** (Apache-2.0) running on your own computer through [Ollama](https://ollama.com/): free, and your text stays on the machine. One-time setup: install Ollama, then run `ollama pull qwen2.5:7b` (about 4.7 GB). In side-by-side tests it kept the facts (durations, names, objects) where the smaller Phi-4-mini changed them; any Ollama model can be chosen in Settings. Always check each suggested change. Anthropic's Claude can be chosen in Settings instead; it is paid per use and capped per month.
 
 - Paragraphs that match a source are **locked**: fix those yourself in the plagiarism check.
-- Changes you keep are labelled **AI-assisted** in the writing history, the HTML report and the .docx properties.
+- Changes you keep are labelled **AI-assisted** in the writing history, the PDF and HTML reports, and the .docx properties.
 - There is no "humanize" or "avoid AI detection" mode, prompts aren't tuned against detectors, and no "AI humanizer" service is used.
 
 ### Writing history
