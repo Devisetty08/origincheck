@@ -203,6 +203,7 @@ web/                web app (Next.js, static export)
   src/components/   user interface
 .github/workflows/  GitHub Pages deployment
 origincheck.py      command-line tool
+prose-inspector/    Streamlit app that reports sentence rhythm, stock phrases and repetition (analysis only; run: streamlit run app.py)
 requirements.txt    python-docx, pypdf
 example/            sample document, sources, CLI report and screenshot
 ```
