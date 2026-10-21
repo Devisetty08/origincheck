@@ -89,6 +89,9 @@ export function pdfText(pages: PdfItem[][]) {
   }).join("\n\n").replace(/-\n(\w)/g, "$1").replace(/(?<![.\n:])\n(?!\n)/g, " ");
 }
 
+/** Text of a PDF given as bytes (e.g. one the server fetched); parsed here in the browser with pdf.js. */
+export const pdfFromBytes = (bytes: Uint8Array) => pdf(bytes.slice().buffer);
+
 async function pdf(buf: ArrayBuffer): Promise<Extracted> {
   const pdfjs = await import("pdfjs-dist");
   pdfjs.GlobalWorkerOptions.workerSrc = `${BASE}/pdf.worker.min.mjs`;
@@ -127,4 +130,4 @@ export async function extract(file: File): Promise<Extracted> {
   return ex;
 }
 
-export const DOI_RE = /\b10\.\d{4,9}\/[^\s"<>]+[^\s"<>.,;)\]]/g;
+export { DOI_RE } from "./crossref";

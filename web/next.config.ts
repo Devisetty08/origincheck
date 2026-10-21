@@ -1,14 +1,10 @@
 import type { NextConfig } from "next";
 
-// GitHub Pages serves the site from /origincheck; the deploy workflow sets BASE_PATH.
-const basePath = process.env.BASE_PATH ?? "";
-
+// A server app (route handlers proxy every external API so keys stay on the server). Deploy on Vercel or any Node host.
 const nextConfig: NextConfig = {
-  output: "export",
-  basePath,
-  trailingSlash: true,
   images: { unoptimized: true },
-  env: { NEXT_PUBLIC_BASE_PATH: basePath },
+  env: { NEXT_PUBLIC_BASE_PATH: "" },
+  poweredByHeader: false,
   turbopack: {
     rules: {
       "*.css": {
