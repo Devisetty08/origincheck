@@ -121,6 +121,7 @@ export default function ImproveWriting(p: Props) {
             </span>))}
         </p>
         <p className="mt-1 text-[12px] text-mute">{changes.filter((x) => "on" in x && x.on).length} of {changes.length} changes kept. Click any change to keep or undo it.</p>
+        <p className="mt-1 text-[12px] text-mid" id="improveCheckFacts">Check each change: AI models, especially small local ones, sometimes alter facts such as numbers, durations or names.</p>
         <div className="mt-2 flex gap-2">
           <Button size="sm" variant="primary" onClick={apply} id="improveApply">Use in my document</Button>
           <Button size="sm" onClick={() => setParts(null)} id="improveDiscard">Discard</Button>

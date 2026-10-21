@@ -18,9 +18,13 @@ export const GOALS = {
 export type Goal = keyof typeof GOALS;
 export const MAX_CHARS = 4000;
 
-const SYSTEM = `You are a careful editor helping an author revise their own draft.
-Revise the passage the user sends according to the goal. Keep the author's meaning, claims, facts, numbers, quotations,
-citations and references exactly as they are; do not add new ideas or sources. Keep the language of the original.
+const SYSTEM = `You are a careful copy editor helping an author revise their own draft.
+Revise the passage the user sends according to the goal, changing only the wording.
+Rules:
+- Keep every fact exactly: the same people, places, objects, names, numbers, dates, durations and quantities.
+  Never replace a thing with a different thing (for example "the wall row" must stay "the wall row").
+- Keep the author's claims, meaning and certainty; keep quotations, citations and references unchanged.
+- Do not add new ideas, examples or sources. Keep the language of the original.
 Reply with the revised passage only: no preamble, no notes, no quotation marks around it.`;
 
 export class ImproveError extends Error {
@@ -79,7 +83,7 @@ async function viaAnthropic(text: string, goal: Goal, signal: AbortSignal) {
 async function viaOllama(text: string, goal: Goal, signal: AbortSignal) {
   const r = await fetch(`${ollamaBase()}/api/chat`, {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model: config.ollamaModel, stream: false, options: { temperature: 0.3 },
+    body: JSON.stringify({ model: config.ollamaModel, stream: false, options: { temperature: 0 }, // deterministic: small local models drift from the facts at higher temperatures
       messages: [{ role: "system", content: SYSTEM }, { role: "user", content: prompt(text, goal) }] }),
     signal: AbortSignal.any([signal, AbortSignal.timeout(180_000)]), // a small local model on a laptop CPU can take a while
   }).catch(() => { throw new ImproveError(502, `Ollama isn't reachable at ${config.ollamaUrl}. Is it running?`); });
