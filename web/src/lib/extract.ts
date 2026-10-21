@@ -114,8 +114,22 @@ const plainBlocks = (text: string): Block[] =>
     return h ? { style: (["h1", "h2", "h3"] as const)[h[1].length - 1], text: h[2] } : { style: "p" as const, text: t.replace(/\s*\n\s*/g, " ") };
   });
 
+export const MAX_FILE_MB = 50;
+export const PARSE_TIMEOUT_MS = 60_000;
+
+/** Reads a file in the browser, with a size cap and a time limit so a malformed file can't hang the page. */
 export async function extract(file: File): Promise<Extracted> {
   const ext = (file.name.match(/\.[^.]+$/)?.[0] ?? "").toLowerCase();
+  if (!SUPPORTED.split(",").includes(ext)) throw new Error(`${file.name}: unsupported file type. Use .docx, .pdf, .txt, .md, .html or .rtf.`);
+  if (file.size > MAX_FILE_MB * 1e6) throw new Error(`${file.name} is larger than ${MAX_FILE_MB} MB.`);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${file.name} took too long to read (over ${PARSE_TIMEOUT_MS / 1000} s). Try saving it again or as .txt.`)), PARSE_TIMEOUT_MS);
+  });
+  try { return await Promise.race([read(file, ext), timeout]); } finally { clearTimeout(timer); }
+}
+
+async function read(file: File, ext: string): Promise<Extracted> {
   let ex: Extracted;
   if (ext === ".docx") ex = await docx(await file.arrayBuffer());
   else if (ext === ".pdf") ex = await pdf(await file.arrayBuffer());
