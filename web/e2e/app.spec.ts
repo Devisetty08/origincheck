@@ -13,12 +13,29 @@ const mockAi = () => {
   });
 };
 
+// Embedding stand-in: one-hot vectors keyed by a hash of the text, so only identical text counts as a paraphrase.
+const mockEmbed = () => {
+  (window as unknown as { __ocEmbedMock: unknown }).__ocEmbedMock = async (texts: string[]) => texts.map((t) => {
+    let h = 0;
+    for (const c of t) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+    const v = new Float32Array(4096);
+    v[h % 4096] = 1;
+    return v;
+  });
+};
+
+/** Override what the server reports in /api/config (feature flags) for one test. Later routes win. */
+const serverConfig = (page: Page, patch: Record<string, unknown>) =>
+  page.route("**/api/config", async (r) => r.fulfill({ json: { ...(await (await r.fetch()).json()), ...patch } }));
+
 test.beforeEach(async ({ page }) => {
   errors.length = 0;
   page.on("pageerror", (e) => errors.push(`pageerror: ${e.message}`));
   page.on("console", (m) => { if (m.type() === "error") errors.push(`console: ${m.text()}`); });
   page.on("response", (r) => { if (r.status() >= 400) errors.push(`HTTP ${r.status()} ${r.url()}`); });
   await page.addInitScript(mockAi);
+  await page.addInitScript(mockEmbed);
+  await serverConfig(page, { aiLikelihood: true }); // the AI signal is off by default on a real server
 });
 test.afterEach(() => expect(errors).toEqual([]));
 
@@ -110,4 +127,121 @@ test("similarity waits for sources and runs as soon as one is added", async ({ p
   await expect(page.locator("#grammarRing text")).toHaveText(/^\d+$/, { timeout: 30_000 }); // other checks don't wait
   await page.getByTestId("cardSrc-input").setInputFiles([`${EX}references/azure.txt`, `${EX}references/ora2pg.pdf`]);
   await expect(page.locator("#simRing text")).toHaveText("47%", { timeout: 30_000 });
+});
+
+/* ---------- server-backed features (external APIs mocked at the browser boundary) ---------- */
+
+const sse = (events: [string, unknown][]) => events.map(([e, d]) => `event: ${e}\ndata: ${JSON.stringify(d)}\n\n`).join("");
+const AZURE = readFileSync(`${EX}references/azure.txt`, "utf8");
+
+test("Run all sources streams a status per source and adds what it found", async ({ page }) => {
+  let sent: { queries: string[]; groups: string[] } | null = null;
+  await page.route("**/api/search", async (r) => {
+    sent = r.request().postDataJSON();
+    const ev = (source: string, label: string, status: string, results: unknown[] = [], error?: string) =>
+      ["source", { source, label, status, ms: 120, queries: sent!.queries.length, results, ...(error ? { error } : {}) }] as [string, unknown];
+    await r.fulfill({ contentType: "text/event-stream", body: sse([
+      ["start", { sources: [["wikipedia-en", "Wikipedia"], ["crossref", "Crossref"], ["semantic-scholar", "Semantic Scholar"], ["arxiv", "arXiv"], ["brave", "Brave Search"]]
+        .map(([id, label]) => ({ id, label })), queries: sent!.queries.length }],
+      ev("wikipedia-en", "Wikipedia", "success", [{ title: "Azure Database for PostgreSQL", snippet: "", url: "https://en.wikipedia.org/wiki/Azure", authors: ["Wikipedia contributors"], source: "wikipedia-en", text: AZURE }]),
+      ev("crossref", "Crossref", "no results"),
+      ev("semantic-scholar", "Semantic Scholar", "rate-limited", [], "HTTP 429"),
+      ev("arxiv", "arXiv", "failed", [], "timeout"),
+      ev("brave", "Brave Search", "not configured", [], "BRAVE_API_KEY is not set"),
+      ["done", { ms: 900 }],
+    ]) });
+  });
+  await page.goto("./");
+  await page.waitForLoadState("networkidle");
+  await page.getByTestId("docDrop-input").setInputFiles(`${EX}draft.docx`);
+  await expect(page.locator("[data-card=similarity]")).toContainText("Add sources to run this check");
+  await page.locator("#runAll").click();
+  await expect(page.locator("#privacyServices li").first()).toBeVisible();
+  await page.locator("#privacyOk").click();
+  for (const [id, status] of [["wikipedia-en", "success"], ["crossref", "no results"], ["semantic-scholar", "rate-limited"], ["arxiv", "failed"], ["brave", "not configured"]])
+    await expect(page.locator(`tr[data-source="${id}"]`).first()).toHaveAttribute("data-status", status);
+  await expect(page.locator("#simRing text")).toHaveText(/^\d+%$/, { timeout: 30_000 });
+  // only short query chunks leave the browser, never the document
+  expect(sent!.queries.length).toBeGreaterThan(0);
+  for (const q of sent!.queries) expect(q.split(" ").length).toBeLessThanOrEqual(16);
+});
+
+test("turning an input off removes its sources from the check", async ({ page }) => {
+  await upload(page);
+  await expect(page.locator("#simRing text")).toHaveText("47%", { timeout: 30_000 });
+  await page.locator("summary", { hasText: "add more" }).click();
+  await page.locator('[data-toggle="files-no"]:visible').click();
+  await expect(page.locator("[data-card=similarity]")).toContainText("Add sources to run this check");
+  await page.locator('[data-toggle="files-yes"]:visible').click();
+  await expect(page.locator("#simRing text")).toHaveText("47%");
+});
+
+test("Check externally copies the text and opens the site without sending anything", async ({ page, context }) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await context.route("https://www.copykiller.com/**", (r) => r.fulfill({ body: "<title>CopyKiller</title>" }));
+  await upload(page);
+  await expect(page.locator("#simRing text")).toHaveText("47%", { timeout: 30_000 });
+  await page.locator("#externalCheck summary").click();
+  const popup = page.waitForEvent("popup");
+  await page.locator('[data-site="copykiller"]').click();
+  expect((await popup).url()).toContain("copykiller.com");
+  await expect(page.locator("#externalCheck [role=status]")).toContainText("Paste it into CopyKiller yourself");
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toContain("Azure Database for PostgreSQL");
+});
+
+test("grammar is English-only and says so for Korean text", async ({ page }) => {
+  await page.goto("./");
+  await page.waitForLoadState("networkidle");
+  await page.getByRole("button", { name: "Paste text instead" }).click();
+  await page.getByLabel("Document text").fill("이 문서는 한국어로 작성되었습니다. ".repeat(20));
+  await page.locator("#usePaste").click();
+  await page.getByRole("tab", { name: "Grammar" }).click();
+  await expect(page.locator("#englishOnly")).toContainText("English-only");
+  await expect(page.locator("#englishOnly")).toContainText("CopyKiller");
+});
+
+test("the AI signal stays off unless the server enables it", async ({ page }) => {
+  await serverConfig(page, { aiLikelihood: false });
+  await upload(page);
+  await expect(page.locator("#grammarRing text")).toHaveText(/^\d+$/, { timeout: 30_000 });
+  await page.getByRole("tab", { name: "AI indicator" }).click();
+  await expect(page.locator("#aiOff")).toBeVisible();
+});
+
+test("Improve my writing shows a diff, applies accepted changes and labels the export", async ({ page }) => {
+  await serverConfig(page, { improve: "anthropic" });
+  let sentText = "";
+  await page.route("**/api/improve", async (r) => {
+    sentText = r.request().postDataJSON().text;
+    await r.fulfill({ json: { revised: sentText.replace(/^(\S+)/, "IMPROVED"), provider: "anthropic", model: "claude-opus-5-5" } });
+  });
+  await page.goto("./");
+  await page.waitForLoadState("networkidle");
+  await page.getByRole("button", { name: "Paste text instead" }).click();
+  const original = "Our team found that the results was very clear in the end. Second paragraph stays the same.";
+  await page.getByLabel("Document text").fill(original);
+  await page.locator("#usePaste").click();
+  await page.getByRole("tab", { name: "Grammar" }).click();
+  await expect(page.locator("#improve")).toBeVisible();
+  // select the first sentence in the document
+  await page.locator("#gDoc").evaluate((el) => {
+    const r = document.createRange();
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    const first = walker.nextNode()!;
+    r.setStart(first, 0);
+    r.setEnd(first, Math.min(first.textContent!.length, 8));
+    getSelection()!.removeAllRanges();
+    getSelection()!.addRange(r);
+  });
+  await page.locator("#improveRun").click();
+  await expect(page.locator("#privacyServices")).toContainText("Anthropic");
+  await page.locator("#privacyOk").click();
+  await expect(page.locator("#improveDiff [data-change]").first()).toBeVisible();
+  expect(original.startsWith(sentText)).toBe(true); // only the selection was sent
+  await page.locator("#improveApply").click();
+  await expect(page.locator("#gDoc")).toContainText("IMPROVED");
+  await expect(page.locator("#gDoc")).toContainText("Second paragraph stays the same.");
+  const report = page.waitForEvent("download");
+  await page.locator("#dlReport").click();
+  expect(readFileSync(await (await report).path(), "utf8")).toContain("AI-assisted");
 });

@@ -76,7 +76,7 @@ export const KIND_LABEL: Record<Kind, string> = {
   draft: "Previous drafts",
 };
 
-const WORD_RE = /[A-Za-z0-9À-ɏ]+(?:['’][A-Za-z]+)?/g;
+const WORD_RE = /[A-Za-z0-9À-ɏᄀ-ᇿ㄰-㆏가-힣]+(?:['’][A-Za-z]+)?/g; // Latin and Hangul
 export const QUOTE_RE = /["“”]([\s\S]{3,800}?)["“”]/g;
 export const BIB_RE = /^\s*(references|bibliography|works cited|reference list|sources|literature cited)\s*:?\s*$/gim;
 

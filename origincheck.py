@@ -109,7 +109,7 @@ def extract_text(path: Path) -> str:
 # Tokenising and fingerprinting
 # --------------------------------------------------------------------------
 
-WORD_RE = re.compile(r"[A-Za-z0-9\u00C0-\u024F]+(?:['’][A-Za-z]+)?")
+WORD_RE = re.compile(r"[A-Za-z0-9\u00C0-\u024F\u1100-\u11FF\u3130-\u318F\uAC00-\uD7A3]+(?:['’][A-Za-z]+)?")
 
 
 def tokenize(text):
