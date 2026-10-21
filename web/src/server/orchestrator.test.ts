@@ -53,6 +53,17 @@ describe("runSource", () => {
     const e = await runSource(fake("a", async (q) => { if (q === "bad") throw httpErr(400); return [hit(q)]; }), ["bad", "good"], fast);
     expect(e.status).toBe("success");
   });
+  it("reports success with a note when rate-limited after finding results", async () => {
+    const e = await runSource(fake("a", async (q) => { if (q === "q2") throw httpErr(429, 10); return [hit(q)]; }), ["q1", "q2", "q3"], fast);
+    expect(e).toMatchObject({ status: "success", error: "1 of 3 queries completed; rate limited by the API" });
+    expect(e.results).toHaveLength(1);
+  });
+  it("reports failed, not no results, when the deadline stops it before any query completes", async () => {
+    let t = 0;
+    const e = await runSource(fake("a", async () => { t += 30_000; throw Object.assign(new Error("timed out"), { name: "TimeoutError" }); }), ["q1", "q2", "q3"],
+      { ...fast, now: () => t });
+    expect(e.status).toBe("failed");
+  });
   it("spaces requests by the source's minimum interval", async () => {
     let t = 0;
     const waits: number[] = [];

@@ -63,22 +63,24 @@ export async function runSource(a: Adapter, queries: string[], opts: Options = {
   if (missing) return { ...base, status: "not configured", ms: 0, results: [], error: missing };
   const results: NormalizedResult[] = [];
   const seen = new Set<string>();
-  let status: Status = "no results", error: string | undefined, failures = 0;
+  let error: string | undefined, done = 0, limited = false;
   for (const q of queries) {
     try {
       for (const r of await searchOne(a, q, o, start + o.sourceDeadlineMs)) {
         const k = r.doi?.toLowerCase() || r.url || r.title;
         if (!seen.has(k)) { seen.add(k); results.push(r); }
       }
+      done++;
     } catch (e) {
-      failures++;
-      if (e instanceof RateLimitedError) { status = "rate-limited"; error = e.message; break; }
       error = (e as Error).message;
+      if (e instanceof RateLimitedError) { limited = true; break; }
       if ((e as Error).name === "TimeoutError" && o.now() > start + o.sourceDeadlineMs) break;
     }
   }
-  if (status !== "rate-limited") status = results.length ? "success" : failures === queries.length ? "failed" : "no results";
-  return { ...base, status, ms: o.now() - start, results, error: status === "success" ? undefined : error };
+  // Results win: a source that found something before failing still reports success, with a note saying it stopped.
+  const status: Status = results.length ? "success" : limited ? "rate-limited" : done === 0 ? "failed" : "no results";
+  if (error && done > 0 && done < queries.length) error = `${done} of ${queries.length} queries completed; ${error}`;
+  return { ...base, status, ms: o.now() - start, results, error };
 }
 
 /** Run all sources, calling `emit` as each one finishes (for streaming). */
