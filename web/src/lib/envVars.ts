@@ -18,7 +18,7 @@ export const ENV_VARS: EnvVar[] = [
     help: "Needed for open-access links by DOI. Must be a real address." },
 
   { key: "BRAVE_API_KEY", group: "Web search", label: "Brave Search API key", secret: true, link: "https://brave.com/search/api/",
-    help: "Searches the open web — the closest to Turnitin's internet coverage. Paid from a monthly credit." },
+    help: "Searches the open web — the widest internet coverage origincheck can use. Paid from a monthly credit." },
   { key: "JINA_API_KEY", group: "Web search", label: "Jina API key", secret: true, link: "https://jina.ai/",
     help: "Fallback web search." },
   { key: "GOOGLE_API_KEY", group: "Web search", label: "Google API key", secret: true,

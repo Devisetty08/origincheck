@@ -13,8 +13,8 @@ Your document is read and compared **in your browser**. Searches send only short
 | Page | What you get |
 |---|---|
 | **Check document** | Add a file (.docx, .pdf, .txt, .md, .html, .rtf) or paste text. All checks start at once. The overview shows three scores and a **What to do next** list with one button per check. |
-| **Plagiarism check** | A Turnitin-style report: your document with matching passages highlighted and numbered by source, a ranked source list, and each source passage side by side. |
-| **Grammar** | Spelling, grammar, punctuation and style, checked on your device. Every suggestion is a card with **Accept** and **Dismiss**, Grammarly-style. Plus readability and a corrected .docx. |
+| **Plagiarism check** | A similarity report: your document with matching passages highlighted and numbered by source, a ranked source list, and each source passage side by side. |
+| **Grammar** | Spelling, grammar, punctuation and style, checked on your device. Every suggestion is a card with **Accept** and **Dismiss**. Plus readability and a corrected .docx. |
 | **Rewrite** | Click a paragraph, pick a mode (Clarity, Concise, Grammar only, Academic tone), compare your original with the suggestion, and keep only the changes you want. |
 | **AI indicator** | Optional. An estimate of how likely the text is machine-written, with a sentence heatmap and the reasons. Never a verdict. |
 | **History** | Every check's scores across drafts, with a chart. |
@@ -127,7 +127,7 @@ How matching works:
 
 ## Limits
 
-- **Not Turnitin's database.** Turnitin and similar services compare against private databases of web pages, journals and past student papers. origincheck searches public sources, so your institution's report can show matches this doesn't. The paid Copyleaks option narrows the gap.
+- **Not a commercial database.** Commercial plagiarism services compare against private databases of web pages, journals and past student papers. origincheck searches public sources, so your institution's report can show matches this doesn't. The paid Copyleaks option narrows the gap.
 - **Searches are sampled.** Up to 8 phrases per document by default. Raise **Passages searched per run** in Settings for long documents.
 - **Paywalled papers** are matched on their abstracts only. Add the file yourself if you have it.
 - **Grammar is English-only** (Harper). Other languages are detected and skipped, with a note.

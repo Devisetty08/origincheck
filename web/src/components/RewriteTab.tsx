@@ -1,5 +1,5 @@
 "use client";
-// Rewrite, QuillBot-style: click a paragraph (or select any text) on the left; the panel on the right shows the
+// Rewrite: click a paragraph (or select any text) on the left; the panel on the right shows the
 // original next to the suggestion. Passages that match a source are locked: those you rewrite yourself.
 import { type ReactNode, useMemo, useState } from "react";
 import { FileSearch, Lock } from "lucide-react";

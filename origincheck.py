@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-origincheck - a local, Turnitin-style similarity checker.
+origincheck - a local similarity checker.
 
 Compares a submission (Word, PDF, text, Markdown, HTML) against a folder of
 source documents and, optionally, the web. Produces a colour-coded HTML
@@ -123,7 +123,7 @@ def shingles(words, n):
 
 
 # --------------------------------------------------------------------------
-# Exclusions (Turnitin-style filters)
+# Exclusions (quotes, bibliography, small matches and sources)
 # --------------------------------------------------------------------------
 
 BIB_HEAD = re.compile(
@@ -378,7 +378,7 @@ Strikethrough text was excluded from the check.</div></div></aside>
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Turnitin-style local similarity checker")
+    ap = argparse.ArgumentParser(description="Local similarity checker")
     ap.add_argument("document", help="submission to check (.docx .pdf .txt .md .html .rtf)")
     ap.add_argument("-s", "--sources", action="append", default=[], help="folder of source documents (repeatable)")
     ap.add_argument("-o", "--out", help="report path (default: <document>_similarity.html)")
@@ -387,7 +387,7 @@ def main():
     ap.add_argument("--exclude-quotes", action="store_true", help="ignore text inside quotation marks")
     ap.add_argument("--exclude-bib", action="store_true", help="ignore the References/Bibliography section")
     ap.add_argument("--exclude-source-pct", type=float, default=0,
-                    help="drop sources contributing less than this %% (Turnitin 'exclude small sources')")
+                    help="drop sources contributing less than this %% (exclude small sources)")
     ap.add_argument("--web", action="store_true", help="also search the internet (needs BRAVE_API_KEY env var)")
     ap.add_argument("--web-queries", type=int, default=15, help="max web searches (default 15)")
     ap.add_argument("--no-repo", action="store_true", help="don't compare against the saved-submissions repository")

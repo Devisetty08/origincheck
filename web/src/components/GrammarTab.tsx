@@ -210,7 +210,7 @@ function CatChip({ label, n, active, onClick }: { label: string; n: number; acti
 
 const SEV_BAR: Record<Issue["severity"], string> = { error: "border-l-high", warning: "border-l-mid", style: "border-l-accent" };
 
-/** One suggestion, Grammarly-style: what's wrong, the fix, and Accept / Dismiss without hunting for the underline. */
+/** One suggestion as a card: what's wrong, the fix, and Accept / Dismiss without hunting for the underline. */
 function SuggestionCard({ i, text, active, onOpen, onAccept, onDismiss }: {
   i: Issue; text: string; active: boolean; onOpen: () => void; onAccept: (s: Issue["suggestions"][number]) => void; onDismiss: () => void;
 }) {

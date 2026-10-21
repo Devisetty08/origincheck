@@ -243,7 +243,7 @@ export default function App() {
     setRunningAll(false);
   };
 
-  // Like Turnitin: the search starts by itself when a document is added (the privacy notice still comes first, once).
+  // The search starts by itself when a document is added (the privacy notice still comes first, once).
   const autoSearched = useRef<string | null>(null);
   useEffect(() => {
     if (!doc || !cfg || prefs.autoSearch === false || autoSearched.current === doc.id) return;

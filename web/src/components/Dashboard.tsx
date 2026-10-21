@@ -85,7 +85,7 @@ export default function Dashboard(p: Props) {
 
 export interface Step { id: string; icon: React.ReactNode; title: string; text: string; action: string; onClick: () => void; tone?: "high" | "mid" | "low" | "mute" }
 
-/** "What to do next": one line per check with the single action that helps most, Turnitin/Grammarly style. */
+/** "What to do next": one line per check with the single action that helps most. */
 export function NextSteps({ steps }: { steps: Step[] }) {
   return (
     <section className="rounded-xl border border-line bg-panel p-4 sm:p-5" aria-labelledby="nextH" id="nextSteps">
