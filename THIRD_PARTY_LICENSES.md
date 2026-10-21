@@ -7,8 +7,8 @@ origincheck uses the open-source components below. Versions are the ones pinned 
 | Component | Version | Licence | Used for |
 |---|---|---|---|
 | [Harper](https://github.com/Automattic/harper) (`harper.js`) | 2.13.0 | Apache-2.0 | Grammar checking on the device (WebAssembly) |
-| [LanguageTool](https://github.com/languagetool-org/languagetool) | public HTTP API, not bundled | LGPL-2.1 (server software) | Optional extra grammar rules; off by default, sends text when on |
-| [Transformers.js](https://github.com/huggingface/transformers.js) (`@huggingface/transformers`) | 4.3.1 | Apache-2.0 | Running the AI-indicator models in the browser |
+| [LanguageTool](https://github.com/languagetool-org/languagetool) | self-hosted server, not bundled | LGPL-2.1 (server software) | Optional extra grammar rules through origincheck's proxy; off unless the operator enables it |
+| [Transformers.js](https://github.com/huggingface/transformers.js) (`@huggingface/transformers`) | 4.3.1 | Apache-2.0 | Running the paraphrase and AI-indicator models in the browser |
 | [ONNX Runtime Web](https://github.com/microsoft/onnxruntime) (`onnxruntime-web`, via Transformers.js) | 1.31.0-dev | MIT | Model inference |
 
 ## Models (downloaded on first use, not bundled)
@@ -17,6 +17,7 @@ origincheck uses the open-source components below. Versions are the ones pinned 
 |---|---|---|
 | [onnx-community/roberta-base-openai-detector-ONNX](https://huggingface.co/onnx-community/roberta-base-openai-detector-ONNX) | MIT (from the original model) | ONNX conversion of [openai-community/roberta-base-openai-detector](https://huggingface.co/openai-community/roberta-base-openai-detector) (MIT). Used quantized (`model_quantized.onnx`, ≈126 MB). |
 | [Xenova/distilgpt2](https://huggingface.co/Xenova/distilgpt2) | Apache-2.0 (from the original model) | ONNX conversion of [distilbert/distilgpt2](https://huggingface.co/distilbert/distilgpt2) (Apache-2.0). Used quantized (`decoder_model_merged_quantized.onnx`, ≈85 MB). |
+| [Xenova/paraphrase-multilingual-MiniLM-L12-v2](https://huggingface.co/Xenova/paraphrase-multilingual-MiniLM-L12-v2) | Apache-2.0 (from the original model) | ONNX conversion of [sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2](https://huggingface.co/sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2) (Apache-2.0). Used quantized (q8, ≈118 MB) for paraphrase detection. |
 
 ## Documents and files
 
@@ -29,6 +30,24 @@ origincheck uses the open-source components below. Versions are the ones pinned 
 | [JSZip](https://github.com/Stuk/jszip) | 3.10.1 | MIT or GPL-3.0-or-later (used under MIT) | Reading Word document properties |
 | [idb-keyval](https://github.com/jakearchibald/idb-keyval) | 6.3.0 | Apache-2.0 | Saved documents and history in the browser |
 | [stemmer](https://github.com/words/stemmer) | 2.0.1 | MIT | Stricter matching mode |
+
+## Server
+
+| Component | Version | Licence | Used for |
+|---|---|---|---|
+| [Anthropic TypeScript SDK](https://github.com/anthropics/anthropic-sdk-typescript) (`@anthropic-ai/sdk`) | 0.137.0 | MIT | Improve my writing (Claude) |
+| [ipaddr.js](https://github.com/whitequark/ipaddr.js) | 2.5.0 | MIT | Blocking private and internal addresses in the page fetcher |
+| [Readability](https://github.com/mozilla/readability) (`@mozilla/readability`) | 0.6.0 | Apache-2.0 | Extracting the main text of fetched web pages |
+| [linkedom](https://github.com/WebReflection/linkedom) | 0.18.13 | ISC | Server-side DOM for Readability and Europe PMC XML |
+| [fast-xml-parser](https://github.com/NaturalIntelligence/fast-xml-parser) | 5.11.2 | MIT | Reading arXiv's Atom feed |
+| [server-only](https://www.npmjs.com/package/server-only) | 0.0.1 | MIT | Keeping server modules out of the browser bundle |
+
+## Matching and editing
+
+| Component | Version | Licence | Used for |
+|---|---|---|---|
+| [fastest-levenshtein](https://github.com/ka-weihe/fastest-levenshtein) | 1.0.16 | MIT | Confirming near-verbatim matches |
+| [jsdiff](https://github.com/kpdecker/jsdiff) (`diff`) | 9.0.0 | BSD-3-Clause | Word diff in Improve my writing |
 
 ## Interface
 
@@ -44,9 +63,15 @@ origincheck uses the open-source components below. Versions are the ones pinned 
 | [Motion](https://github.com/motiondivision/motion) | 14.4.0 | MIT |
 | [Inter](https://github.com/rsms/inter) and [Source Serif 4](https://github.com/adobe-fonts/source-serif) fonts (via `next/font`) | — | SIL Open Font License 1.1 |
 
-## Online services (only when the user turns them on)
+## Online services and their content
 
-Crossref, OpenAlex, Unpaywall, Europe PMC, Open Library / Internet Archive, Jina (search and reader) and the LanguageTool public API are used under their own terms of service. They are not bundled with origincheck.
+These are called through public APIs under their own terms of service and are not bundled with origincheck: Wikipedia (MediaWiki Action and REST APIs), Crossref, OpenAlex, Unpaywall, Semantic Scholar, arXiv, CORE, Europe PMC, Open Library / Internet Archive, Gutendex (Project Gutenberg), Brave Search, Jina, Google Programmable Search (existing customers only), Datamuse, the Free Dictionary API, Anthropic and Ollama.
+
+- **Wikipedia** text is licensed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). origincheck shows matched Wikipedia passages with the article link and "Wikipedia contributors" as the author, which is the attribution the licence asks for.
+- **OpenAlex** and **Open Library** data are CC0; **arXiv** metadata is CC0; full texts keep their own licences (shown per paper by Unpaywall / Europe PMC where known).
+- **Project Gutenberg** texts are public domain in the USA; the Project Gutenberg name is a trademark and is used only to identify the source.
+
+Duplichecker and CopyKiller have no public API and are never called: the "Check externally" panel only opens them in a new tab.
 
 ## Command-line tool
 
