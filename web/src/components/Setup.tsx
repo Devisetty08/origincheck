@@ -97,7 +97,7 @@ export default function Setup(p: Props) {
   const savedOn = p.saved.length > 0 && p.useSaved;
   const web = webOn(p.prefs);
   const internet = !!p.prefs.internet;
-  const books = internet && !!p.prefs.books;
+  const books = p.prefs.books !== false; // on by default; only short phrases are sent
   const ready = !!p.doc && (p.sources.length > 0 || savedOn || p.drafts > 0 || web || books);
 
   return (
@@ -148,8 +148,8 @@ export default function Setup(p: Props) {
             <textarea className={cx(inputCls, "min-h-28")} aria-label="Source text" placeholder="Paste the source text here" value={pText} onChange={(e) => setPText(e.target.value)} />
             <div><Button size="sm" variant="primary" onClick={addPasted}>Add source</Button></div>
           </div>}
-          {mode !== "files" && mode !== "paste" && !internet && <div className="mt-3 rounded-lg bg-soft p-3 text-sm">
-            <p>{mode === "books" ? "Searching inside books sends short phrases from your document (not the whole document) to Open Library." : mode === "lists" ? "Browsing the free book lists downloads them from GitHub, and adding a book fetches its page. Your document is never sent." : mode === "web" ? "Searching the web sends short phrases from your document (not the whole document) to a search service." : `Adding sources from the web sends ${mode === "url" ? "the address you enter" : "the references and DOIs you paste"} to look them up. Your document is never sent.`}</p>
+          {(mode === "url" || mode === "refs" || mode === "lists") && !internet && <div className="mt-3 rounded-lg bg-soft p-3 text-sm">
+            <p>{mode === "lists" ? "Browsing the free book lists downloads them from GitHub, and adding a book fetches its page. Your document is never sent." : `Adding sources from the web sends ${mode === "url" ? "the address you enter" : "the references and DOIs you paste"} to look them up. Your document is never sent.`}</p>
             <Button size="sm" variant="primary" className="mt-2" onClick={() => p.setPrefs({ internet: true })}>Turn on internet features</Button>
           </div>}
           {mode === "url" && internet && <div className="mt-3 grid gap-2">
@@ -163,8 +163,8 @@ export default function Setup(p: Props) {
               placeholder={"One reference or DOI per line, e.g.\n10.1038/s41586-020-2649-2\nSmith, J. (2020). Title of the article. Journal, 12(3), 45–67."} />
             <div><Button size="sm" variant="primary" onClick={addRefs} disabled={!!importing || !refs.trim()}>Find open-access full text</Button></div>
           </div>}
-          {mode === "web" && internet && <div className="mt-3 grid gap-3 text-sm">
-            <Check id="sWeb" checked={!!p.prefs.webSearch} onChange={(v) => p.setPrefs({ webSearch: v })}
+          {mode === "web" && <div className="mt-3 grid gap-3 text-sm">
+            <Check id="sWeb" checked={p.prefs.webSearch !== false} onChange={(v) => p.setPrefs({ webSearch: v })}
               label="Search the web for matching text when I run the check"
               hint="Like the CLI's --web: picks evenly spaced 24-word phrases from your document, searches each as an exact phrase and compares the top pages." />
             <label className="grid gap-1">Search API key (Jina)
@@ -173,11 +173,12 @@ export default function Setup(p: Props) {
             </label>
             <NumberField id="sQueries" label="Phrases to search" value={p.prefs.webQueries ?? 10} min={1} max={40} onChange={(v) => p.setPrefs({ webQueries: v })} />
             <p className="text-[12.5px] text-mute">Sends only those phrases — never your whole document. Each phrase is one search, and fewer phrases use less credit.</p>
-            {p.prefs.webSearch && !p.prefs.searchKey?.trim() && <p className="text-[13px] text-high">Add an API key to turn web search on.</p>}
-          </div>}          {mode === "books" && internet && <div className="mt-3 grid gap-3 text-sm">
-            <Check id="sBooks" checked={!!p.prefs.books} onChange={(v) => p.setPrefs({ books: v })}
+            {p.prefs.webSearch !== false && !p.prefs.searchKey?.trim() && <p className="text-[13px] text-mute">Add a free API key and web search runs automatically on every check.</p>}
+          </div>}
+          {mode === "books" && <div className="mt-3 grid gap-3 text-sm">
+            <Check id="sBooks" checked={books} onChange={(v) => p.setPrefs({ books: v })}
               label="Search inside books on Open Library when I run the check"
-              hint="Searches the full text of millions of scanned books at the Internet Archive for evenly spaced 24-word phrases from your document. Books with matching text are added with the matching passages. No key needed." />
+              hint="Searches the full text of millions of scanned books at the Internet Archive for evenly spaced 24-word phrases from your document. Books with matching text are added with the matching passages. On by default, no key needed — only those short phrases are sent. Untick it to keep everything offline." />
             <NumberField id="sBookQueries" label="Phrases to search" value={p.prefs.bookQueries ?? 10} min={1} max={40} onChange={(v) => p.setPrefs({ bookQueries: v })} />
           </div>}
           {mode === "lists" && internet && <Catalogs net={net} onAdd={(item, text) => p.setSources((s) => [...s, {

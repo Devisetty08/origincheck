@@ -111,7 +111,7 @@ export default function App() {
         add(res.sources, "internet");
         notes.push(`Web search: ${plural(res.searched, "phrase")} searched, ${plural(res.sources.length, "page")} compared${res.failed ? `, ${res.failed} search(es) failed` : ""}.`);
       }
-      if (prefs.internet && prefs.books) {
+      if (prefs.books !== false) {
         const res = await bookSearch(body, prefs.bookQueries ?? 10, (d, t) => setBusy(`Searching inside books ${d} of ${t}…`));
         add(res.sources, "library");
         notes.push(`Open Library: ${plural(res.searched, "phrase")} searched inside books, ${plural(res.sources.length, "book")} with matching text${res.failed ? `, ${res.failed} search(es) failed` : ""}.`);
@@ -259,7 +259,8 @@ export default function App() {
   );
 }
 
-export const webOn = (p: Prefs) => !!(p.internet && p.webSearch && p.searchKey?.trim());
+// Book search is on by default; web search runs whenever a key is set. Both send only short phrases.
+export const webOn = (p: Prefs) => p.webSearch !== false && !!p.searchKey?.trim();
 
 export const passageKey =(t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 
