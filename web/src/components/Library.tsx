@@ -9,7 +9,7 @@ export default function Library({ saved, setSaved, onDeletedAll }: { saved: Save
   const [confirming, setConfirming] = useState(false);
   const [msg, setMsg] = useState("");
   return (
-    <div className="mx-auto grid max-w-[1180px] gap-4 px-4 pt-7 pb-12">
+    <div className="mx-auto grid grid-cols-[minmax(0,1fr)] max-w-[1180px] gap-4 px-4 pt-7 pb-12">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Saved documents and data</h1>
         <p className="text-mute">Stored only in this browser. New checks can compare against saved documents.</p>

@@ -20,7 +20,7 @@ export default function Drafts({ history, setHistory }: { history: DraftCheck[];
   const label = (d: DraftCheck) => `${d.label} · ${new Date(d.date).toLocaleDateString()} · ${d.index ?? "—"}%`;
 
   return (
-    <div className="mx-auto grid max-w-[1180px] gap-4 px-4 pt-7 pb-12">
+    <div className="mx-auto grid grid-cols-[minmax(0,1fr)] max-w-[1180px] gap-4 px-4 pt-7 pb-12">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Draft history</h1>
         <p className="text-mute">Every check is saved in this browser with its date, label, similarity index and sources.</p>

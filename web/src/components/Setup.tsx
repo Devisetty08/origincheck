@@ -48,7 +48,7 @@ export default function Setup(p: DocProps & SourcesProps & SettingsProps & { onO
           Your document is read and compared in your browser. Searches send only short phrases, never the whole document.
         </p>
       </div>
-      <div className="grid gap-[18px] md:grid-cols-2">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-[18px] md:grid-cols-2">
         <DocCard {...p} />
         <SourcesCard {...p} />
       </div>

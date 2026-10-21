@@ -539,7 +539,7 @@ export default function App() {
           {view === "history" && <Drafts history={history} setHistory={(h) => { setHistory(h); storeHistory(h); }} />}
           {view === "library" && <Library saved={saved} setSaved={(s) => { setSaved(s); storeSaved(s); }}
             onDeletedAll={() => { setSaved([]); setHistory([]); setMeta({}); setPrefsState({}); delete document.documentElement.dataset.theme; }} />}
-          {view === "settings" && <div className="mx-auto grid max-w-[1180px] gap-[18px] px-4 pt-7 pb-12">
+          {view === "settings" && <div className="mx-auto grid grid-cols-[minmax(0,1fr)] max-w-[1180px] gap-[18px] px-4 pt-7 pb-12">
             <div>
               <h1 className="text-[clamp(23px,4vw,30px)] font-bold leading-tight tracking-tight">Settings</h1>
               <p className="mt-1.5 text-[15.5px] text-mute">How the checks behave (saved in this browser), and the keys and services the server uses.</p>
@@ -559,7 +559,7 @@ export default function App() {
           {view === "check" && !doc && <Setup doc={doc} setDoc={openDoc} sources={sources} setSources={setSources} settings={settings} setSettings={setSettings}
             prefs={prefs} setPrefs={setPrefs} saved={saved} useSaved={useSaved} setUseSaved={setUseSaved} drafts={0}
             cfg={cfg} runs={runs} running={runningAll} canRun={false} onRunAll={runAll} confirmPrivacy={confirmPrivacy} onOpenSettings={() => go("settings")} />}
-          {view === "check" && doc && <div className="mx-auto grid max-w-[1400px] gap-4 px-4 pt-5">
+          {view === "check" && doc && <div className="mx-auto grid max-w-[1400px] grid-cols-[minmax(0,1fr)] gap-4 px-4 pt-5">
             <Dashboard active={tab} onOpen={setTab} onAddSources={addSourceFiles}
               sim={{ status: sim.status, index: run?.r.index, sources: run?.all.length ?? allSources.length, note: sim.note ?? (searching ? "Searching…" : undefined) }}
               grammar={{ status: grammar.status, pct: grammar.pct, score: grammarScore, issues }}
