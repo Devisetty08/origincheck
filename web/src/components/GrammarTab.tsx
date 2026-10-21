@@ -26,7 +26,7 @@ interface Props {
   onIgnore: (i: Issue) => void;
   onIgnoreRule: (rule: string) => void;
   onAcceptAllSpelling: () => void;
-  onEditText: (t: string) => void;
+  onEdit: () => void; // editing happens on the Write page
   onDownload: (kind: "docx" | "txt") => void;
   onAddWord: (word: string) => void;
   englishOnly: boolean;
@@ -66,7 +66,6 @@ function WordInfo({ word, onPick }: { word: string; onPick: (w: string) => void 
 export default function GrammarTab(p: Props) {
   const [cat, setCat] = useState<Category | "all">("all");
   const [open, setOpen] = useState<string | null>(null);
-  const [editing, setEditing] = useState(false);
   const docRef = useRef<HTMLDivElement>(null);
   const anchor = useRef<HTMLElement | null>(null);
 
@@ -114,7 +113,7 @@ export default function GrammarTab(p: Props) {
     <div className="grid grid-cols-1 items-start gap-5 min-[1000px]:grid-cols-[minmax(0,1fr)_340px]">
       <article className="print-plain min-w-0 rounded-xl border border-line bg-panel px-4 py-5 sm:px-8">
         <div className="no-print mb-3 flex flex-wrap items-center gap-2">
-          <Button size="sm" variant={editing ? "primary" : "outline"} onClick={() => setEditing(!editing)} aria-pressed={editing} id="editText"><Pencil size={14} />{editing ? "Done editing" : "Edit text"}</Button>
+          <Button size="sm" onClick={p.onEdit} id="editText"><Pencil size={14} />Edit text</Button>
           <Button size="sm" onClick={() => p.onDownload("docx")} id="dlDocx"><Download size={14} />Corrected .docx</Button>
           <Button size="sm" onClick={() => p.onDownload("txt")} id="dlTxt"><Download size={14} />.txt</Button>
           {p.busy && <span className="text-[13px] text-mute" role="status">Checking…</span>}
@@ -128,9 +127,7 @@ export default function GrammarTab(p: Props) {
           <b>Grammar checking is English-only.</b> This text isn&apos;t mostly English, so Harper wasn&apos;t run.
           {p.korean && " For Korean, CopyKiller (under “Check externally” on the Plagiarism check page) and a Korean spell checker are better options."}
         </p>}
-        {editing
-          ? <EditBox text={p.text} onChange={p.onEditText} />
-          : <div ref={docRef} id="gDoc" className="font-serif text-[16.5px] leading-[1.9] whitespace-pre-wrap wrap-anywhere">{body}</div>}
+        <div ref={docRef} id="gDoc" className="font-serif text-[16.5px] leading-[1.9] whitespace-pre-wrap wrap-anywhere">{body}</div>
       </article>
 
       <aside className="grid min-w-0 gap-3.5 min-[1000px]:sticky min-[1000px]:top-[72px]" aria-label="Grammar issues">
@@ -240,29 +237,5 @@ function SuggestionCard({ i, text, active, onOpen, onAccept, onDismiss }: {
         <Button size="sm" variant="ghost" onClick={onDismiss}>Dismiss</Button>
       </span>
     </li>
-  );
-}
-
-/** Free editing; changes are passed up after a pause so only changed paragraphs are re-checked. */
-function EditBox({ text, onChange }: { text: string; onChange: (t: string) => void }) {
-  const [value, setValue] = useState(text);
-  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const pending = useRef<string | null>(null);
-  const latest = useRef(onChange);
-  useEffect(() => { latest.current = onChange; });
-  useEffect(() => () => { // closing the editor flushes an edit still waiting for its pause
-    clearTimeout(timer.current);
-    if (pending.current != null) latest.current(pending.current);
-  }, []);
-  return (
-    <textarea aria-label="Document text" id="gEdit" value={value} spellCheck={false}
-      className="min-h-[60vh] w-full rounded-lg border border-line bg-bg p-3 font-serif text-[16px] leading-[1.8]"
-      onChange={(e) => {
-        const v = e.target.value;
-        setValue(v);
-        pending.current = v;
-        clearTimeout(timer.current);
-        timer.current = setTimeout(() => { pending.current = null; onChange(v); }, 600);
-      }} />
   );
 }

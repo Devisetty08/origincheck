@@ -311,3 +311,33 @@ test("Rewrite points to Settings when no AI provider is set, and Settings shows 
   await expect(page.locator("#settingsReadOnly")).toContainText("production mode"); // e2e runs next start
   await expect(page.locator("#saveSettings")).toBeDisabled();
 });
+
+test("writing history records typed vs pasted text, snapshots after a pause, exports and deletes", async ({ page, context }) => {
+  test.setTimeout(60_000);
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.goto("./");
+  await page.waitForLoadState("networkidle");
+  await openTool(page, "write");
+  await page.getByLabel("Document title").fill("History essay");
+  await page.locator("#startWriting").click();
+  await expect(page.locator("#historyIndicator")).toHaveText("Writing history is on");
+  const editor = page.locator("#writeEditor");
+  await editor.click();
+  await page.keyboard.type("I typed this first sentence myself. ");
+  const pasted = "This whole sentence was pasted in from elsewhere.";
+  await page.evaluate((t) => navigator.clipboard.writeText(t), pasted);
+  await page.keyboard.press("ControlOrMeta+V");
+  await expect(editor).toHaveValue(/pasted in from elsewhere\.$/);
+  await expect(page.locator("#historySlider")).toHaveAttribute("max", "1", { timeout: 15_000 }); // a snapshot after the pause
+  await expect(page.locator("#historySummary [data-summary]")).toHaveText(/^4\d% typed, 5\d% pasted, 0% AI-assisted$/);
+  const json = page.waitForEvent("download");
+  await page.locator("#historyJson").click();
+  const report = JSON.parse(readFileSync(await (await json).path(), "utf8"));
+  expect(report).toMatchObject({ title: "History essay", pastes: [{ characters: pasted.length }] });
+  expect(report.note).toMatch(/not proof of authorship/);
+  page.once("dialog", (d) => d.accept());
+  await page.locator("#historyDelete").click();
+  await expect(page.locator("#historySummary [data-summary]")).toHaveText(/^0% typed, 0% pasted, 0% AI-assisted, 100% imported$/);
+  await page.locator("#historyToggle").uncheck();
+  await expect(page.locator("#historyIndicator")).toHaveText("Writing history is off");
+});

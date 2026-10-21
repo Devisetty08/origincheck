@@ -1,12 +1,14 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MotionConfig } from "motion/react";
-import { ArrowLeft, BookOpen, Bot, Download, FileCheck, FileSearch, History, Library as LibIcon, Moon, PenLine, Printer, Settings as SettingsIcon, SpellCheck, Sun } from "lucide-react";
+import { ArrowLeft, BookOpen, Bot, NotebookPen, Download, FileCheck, FileSearch, History, Library as LibIcon, Moon, PenLine, Printer, Settings as SettingsIcon, SpellCheck, Sun } from "lucide-react";
 import { type CiteMeta, type Result, type Settings, type Source, type Tok, bibStart, tokenize } from "@/lib/similarity";
 import { plural } from "@/lib/words";
 import { hasHangul, pickQueries } from "@/lib/queries";
 import { type PassageMatch, crossLangPairs, lexicalPass, semanticPass } from "@/lib/hybrid";
 import { detectLanguage } from "@/lib/language";
+import { type History as WritingHistory, type Origin, SNAPSHOT_AFTER_MS, addSnapshot, deleteHistory as deleteWritingHistory,
+  exportReport as exportWritingReport, loadHistory as loadWritingHistory, newHistory, recordChange, saveHistory as saveWritingHistory } from "@/lib/writingHistory";
 import { type Style, inText } from "@/lib/citations";
 import { closeness, type Closeness } from "@/lib/closeness";
 import { aiScore } from "@/lib/aiScore";
@@ -23,6 +25,7 @@ import { Button, Dialog, Logo, type Status, cx } from "./ui";
 import Setup, { SettingsCard, SourcesCard } from "./Setup";
 import { ServerSettings } from "./SettingsPage";
 import RewriteTab from "./RewriteTab";
+import WritePage from "./WritePage";
 import ExternalCheck from "./ExternalCheck";
 import PaidCheck from "./PaidCheck";
 import Report from "./Report";
@@ -73,7 +76,7 @@ const GROUP_SERVICES: Record<SourceGroup, string> = {
   lists: "Project Gutenberg and PoetryDB",
 };
 type View = "check" | "history" | "library" | "settings";
-const TOOL_TITLE: Record<Tab, string> = { similarity: "Plagiarism check", grammar: "Grammar", ai: "AI indicator", rewrite: "Rewrite" };
+const TOOL_TITLE: Record<Tab, string> = { write: "Write", similarity: "Plagiarism check", grammar: "Grammar", ai: "AI indicator", rewrite: "Rewrite" };
 type PrivacyKind = "search" | "improve" | "paid";
 const PRIVACY: Record<PrivacyKind, { title: string; description: string; note: string }> = {
   search: { title: "Before searching outside your browser",
@@ -88,6 +91,7 @@ const PRIVACY: Record<PrivacyKind, { title: string; description: string; note: s
 };
 /** What each tool page says before a document is added. */
 const INTRO: Record<Tab, { title: string; text: string }> = {
+  write: { title: "Write", text: "Write in origincheck's editor; every check updates as you go." },
   similarity: { title: "Plagiarism check", text: "Compares your document with your sources, publications, the web and books. Copied wording is highlighted and counted in the similarity index; lightly edited copying and paraphrase are shown separately. Add your document below, then add sources or use Run all sources." },
   grammar: { title: "Grammar check", text: "Spelling, grammar, punctuation and style, checked on your device. No sources needed: add or paste your document below." },
   ai: { title: "AI indicator", text: "An estimate of how likely the text is machine-written. It is a signal, never proof. Add your document below." },
@@ -99,6 +103,7 @@ export default function App() {
   const [view, setView] = useState<View>("check");
   const [tool, setTool] = useState<"check" | Tab>("check"); // which sidebar tool the user picked
   const [doc, setDoc] = useState<Doc | null>(null);
+  const [wh, setWh] = useState<WritingHistory | null>(null);
   const docText = doc?.text ?? "";
   const docLang = useMemo(() => detectLanguage(docText), [docText]);
   const [sources, setSources] = useState<Source[]>([]);
@@ -112,6 +117,7 @@ export default function App() {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [skipIds, setSkipIds] = useState<Set<string>>(new Set());
   const [prefs, setPrefsState] = useState<Prefs>({});
+  const whOn = prefs.writingHistory !== false; // writing history: on unless the user turns it off (shown on the Write page)
   const [useSaved, setUseSaved] = useState(true);
   const [saved, setSaved] = useState<SavedDoc[]>([]);
   const [history, setHistory] = useState<DraftCheck[]>([]);
@@ -274,6 +280,7 @@ export default function App() {
 
   /* ---------- a new document starts all three checks ---------- */
   const openDoc = (d: Omit<Doc, "id"> | null) => {
+    setWh(null); // the new document's writing history loads in an effect
     if (!d) { setDoc(null); return; }
     const next = { ...d, id: uid() };
     setDoc(next);
@@ -440,11 +447,49 @@ export default function App() {
   };
 
   /* ---------- editing the text (grammar fixes, remedies, free edits) ---------- */
-  const setText = (t: string) => {
+  const setText = (t: string, origin: Origin = "typed") => {
     if (!doc || t === doc.text) return;
     edited.current = true;
+    if (whOn) setWh((h) => h && recordChange(h, doc.text, t, origin)); // writing history: where the new text came from
     setDoc({ ...doc, text: t, toks: tokenize(t) });
     setAi((a) => (a.result ? { ...a, stale: true } : a));
+  };
+
+  /* ---------- writing history: loaded per document, snapshotted after a pause, kept only in this browser ---------- */
+  const textRef = useRef("");
+  useEffect(() => { textRef.current = doc?.text ?? ""; });
+  useEffect(() => {
+    if (!doc) return; // cleared by openDoc / newCheck
+    let live = true;
+    const key = projectKey(doc.name);
+    loadWritingHistory(key).then((h) => {
+      if (!live) return;
+      const origin: Origin = doc.kind === "file" ? "imported" : doc.text ? "pasted" : "typed";
+      let next = h ?? newHistory(key, doc.name, doc.text, origin);
+      // a new version of a document already in history (e.g. the next draft uploaded): record what changed
+      if (h && h.lastText !== doc.text) next = addSnapshot(recordChange(h, h.lastText, doc.text, origin), doc.text, "import");
+      setWh(next);
+      if (whOn && next !== h) saveWritingHistory(next);
+    });
+    return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doc?.id]);
+  const whLastEdit = wh?.lastEditAt;
+  useEffect(() => {
+    if (!whOn || !whLastEdit) return;
+    const t = setTimeout(() => setWh((h) => {
+      if (!h) return h;
+      const next = addSnapshot(h, textRef.current, "edit");
+      if (next !== h) saveWritingHistory(next); // stored only together with a snapshot, so the stored parts always line up
+      return next;
+    }), SNAPSHOT_AFTER_MS);
+    return () => clearTimeout(t);
+  }, [whLastEdit, whOn]);
+  const saveSnapshot = () => setWh((h) => { if (!h) return h; const next = addSnapshot(h, textRef.current, "save"); saveWritingHistory(next); return next; });
+  const clearHistory = async () => {
+    if (!doc || !wh) return;
+    await deleteWritingHistory(wh.key);
+    setWh(newHistory(wh.key, doc.name, doc.text, "imported")); // a fresh history from the current text (saved at the next snapshot)
   };
 
   const applyEdit = (s: number, e: number, replacement: string, res: Omit<Resolution, "id" | "at">, recheckOf?: { sid: number; mine?: string; sourcePassage?: string }) => {
@@ -492,13 +537,13 @@ export default function App() {
     return storeSaved(next);
   };
 
-  const newCheck = () => { aiSeq.current++; setRun(null); setDoc(null); setView("check"); scrollTo(0, 0); };
+  const newCheck = () => { aiSeq.current++; setRun(null); setDoc(null); setWh(null); setView("check"); scrollTo(0, 0); };
 
   const downloadReport = () => {
     if (!doc) return;
     download(`${baseName(doc.name)}_origincheck_report.html`, reportHtml({
       docName: doc.name, text: doc.text, toks: doc.toks, r: run?.r ?? null, sources: run?.all ?? [], settings, checked: run?.checked ?? new Date(),
-      aiAssisted: doc.aiAssisted, grammar: grammarScore != null ? { score: grammarScore, issues } : undefined,
+      aiAssisted: doc.aiAssisted, history: wh && whOn ? exportWritingReport(wh).summary.line : undefined, grammar: grammarScore != null ? { score: grammarScore, issues } : undefined,
       ai: { result: ai.stale ? null : ai.result, signals: ai.signals,
         note: ai.stale ? "The text changed after the estimate; re-run it in the app." : ai.status === "short" ? "Not enough text to estimate." : ai.status === "off" ? "Turned off." : undefined },
     }), "text/html");
@@ -521,6 +566,7 @@ export default function App() {
 
   const NAV: { id: string; label: string; short: string; icon: React.ReactNode; on: () => void; active: boolean }[] = [
     { id: "check", label: "Check document", short: "Check", icon: <FileCheck size={18} />, on: () => go("check"), active: view === "check" && tool === "check" },
+    { id: "write", label: "Write", short: "Write", icon: <NotebookPen size={18} />, on: () => go("check", "write"), active: toolActive("write") },
     { id: "similarity", label: "Plagiarism check", short: "Plagiarism", icon: <FileSearch size={18} />, on: () => go("check", "similarity"), active: toolActive("similarity") },
     { id: "grammar", label: "Grammar", short: "Grammar", icon: <SpellCheck size={18} />, on: () => go("check", "grammar"), active: toolActive("grammar") },
     { id: "ai", label: "AI indicator", short: "AI", icon: <Bot size={18} />, on: () => go("check", "ai"), active: toolActive("ai") },
@@ -531,7 +577,7 @@ export default function App() {
   const improveCard = (picked: { s: number; e: number } | null) => doc && <ImproveWriting text={doc.text} picked={picked} provider={cfg?.improve ?? null} model={cfg?.improveModel} setupNote={cfg?.improveNote} flagged={flagged}
     confirmPrivacy={(s) => confirmPrivacy(s, "improve")} onSetup={() => go("settings")}
     onApply={(s, e, t) => {
-      setText(doc.text.slice(0, s) + t + doc.text.slice(e));
+      setText(doc.text.slice(0, s) + t + doc.text.slice(e), "ai");
       setDoc((d) => d && { ...d, aiAssisted: (d.aiAssisted ?? 0) + 1 });
     }} />;
 
@@ -596,7 +642,23 @@ export default function App() {
               saved={saved} useSaved={useSaved} setUseSaved={setUseSaved} drafts={priorDrafts.length} />
             <ServerSettings onSaved={loadCfg} />
           </div>}
-          {view === "check" && !doc && tool !== "check" && <section className="mx-auto max-w-[1180px] px-4 pt-7" id="toolIntro" aria-label={INTRO[tool].title}>
+          {view === "check" && !doc && tool === "write" && <section className="mx-auto max-w-[1180px] px-4 pt-7" id="writeStart">
+            <div className="rounded-xl border border-accent/40 bg-soft p-4">
+              <h1 className="text-xl font-bold">Write</h1>
+              <p className="mt-1 text-[14.5px]">Write in origincheck&apos;s editor: grammar, plagiarism and the other checks update as you go, and its writing history
+                (on by default, kept only in this browser) records how your text develops: what you typed, pasted, or accepted from Rewrite.</p>
+              <form className="mt-3 flex flex-wrap gap-2" onSubmit={(e) => {
+                e.preventDefault();
+                const title = String(new FormData(e.currentTarget).get("title") ?? "").trim() || "Untitled draft";
+                openDoc({ name: title, text: "", toks: [], headings: new Map(), kind: "paste" });
+              }}>
+                <input name="title" aria-label="Document title" placeholder="Title, e.g. History essay" className="h-9 min-w-0 flex-1 rounded-lg border border-line bg-bg px-3 text-sm" />
+                <Button type="submit" variant="primary" id="startWriting"><NotebookPen size={15} />Start writing</Button>
+              </form>
+              <p className="mt-2 text-[13px] text-mute">Or add an existing document below to continue it here.</p>
+            </div>
+          </section>}
+          {view === "check" && !doc && tool !== "check" && tool !== "write" && <section className="mx-auto max-w-[1180px] px-4 pt-7" id="toolIntro" aria-label={INTRO[tool].title}>
             <div className="rounded-xl border border-accent/40 bg-soft p-4">
               <h1 className="text-xl font-bold">{INTRO[tool].title}</h1>
               <p className="mt-1 text-[14.5px]">{INTRO[tool].text}</p>
@@ -652,7 +714,9 @@ export default function App() {
               onIgnore={(i) => setIgnored((x) => new Set(x).add(i.id))}
               onIgnoreRule={(r) => setIgnoredRules((x) => new Set(x).add(r))}
               onAcceptAllSpelling={() => setText(applyAll(doc.text, issues.filter((i) => i.category === "spelling" && i.severity !== "style")))}
-              onEditText={setText} onDownload={downloadCorrected} />}
+              onEdit={() => go("check", "write")} onDownload={downloadCorrected} />}
+            {tool === "write" && <WritePage title={doc.name} text={doc.text} onChange={(t, origin) => setText(t, origin)} history={wh}
+              on={whOn} setOn={(v) => setPrefs({ writingHistory: v })} onSnapshot={saveSnapshot} onDelete={clearHistory} />}
             {tool === "rewrite" && <RewriteTab text={doc.text} flagged={flagged} onOpenPlagiarism={() => go("check", "similarity")}
               renderPanel={(picked) => improveCard(picked)} />}
             {tool === "ai" && <AiTab s={ai} available={aiAvailable} onRerun={() => startAi(doc.text)} onEnable={() => { setPrefs({ ai: true }); startAi(doc.text, true); }} />}
@@ -660,7 +724,7 @@ export default function App() {
         </main>
       </div>
 
-      <nav aria-label="Tools" className="no-print fixed inset-x-0 bottom-0 z-30 grid grid-cols-6 border-t border-line bg-panel md:hidden">
+      <nav aria-label="Tools" className="no-print fixed inset-x-0 bottom-0 z-30 grid grid-cols-7 border-t border-line bg-panel md:hidden">
         {NAV.filter((n) => n.id !== "settings").map((n) => <button key={n.id} onClick={n.on} aria-current={n.active ? "page" : undefined} data-nav-mobile={n.id}
           className={cx("flex cursor-pointer flex-col items-center gap-0.5 py-2 text-[11px] font-medium", n.active ? "text-accent" : "text-mute")}>
           {n.icon}{n.short}</button>)}
