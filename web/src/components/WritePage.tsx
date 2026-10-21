@@ -1,7 +1,7 @@
 "use client";
 // Write: origincheck's own editor. Writing history (if on) records how the text develops here: snapshots after a
 // pause, and whether each part was typed, pasted or AI-assisted. Nothing outside this editor is recorded.
-import { useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import { diffWords } from "diff";
 import { Circle, Download, History, Save, Trash2 } from "lucide-react";
 import { type History as WH, NOTE, ORIGIN_LABEL, type Origin, exportReport, summary, textAt } from "@/lib/writingHistory";
@@ -19,6 +19,8 @@ interface Props {
   setOn: (v: boolean) => void;
   onSnapshot: () => void;
   onDelete: () => void;
+  /** Passages that match a source, shown above the history (when a plagiarism check has run). */
+  matches?: ReactNode;
 }
 
 export default function WritePage(p: Props) {
@@ -38,7 +40,8 @@ export default function WritePage(p: Props) {
             p.onChange(e.target.value, kind === "insertFromPaste" || kind === "insertFromDrop" || kind === "insertFromPasteAsQuotation" ? "pasted" : "typed");
           }} />
       </article>
-      <aside className="grid min-w-0 gap-3.5 min-[1000px]:sticky min-[1000px]:top-[72px]" aria-label="Writing history">
+      <aside className="grid min-w-0 gap-3.5 min-[1000px]:sticky min-[1000px]:top-[72px]" aria-label="Matches and writing history">
+        {p.matches}
         <HistoryPanel {...p} />
       </aside>
     </div>

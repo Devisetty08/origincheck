@@ -45,7 +45,7 @@ For each match you can mark it as quoted and cited, cite the source, rewrite it 
 
 The AI won't reword the red sentences. Rewording copied text is still copying, so those you quote, cite or rewrite yourself. There's also no "humanize" or "beat the AI detector" mode, and there won't be.
 
-**Write.** A built-in editor where every check updates as you type. It can keep a writing history (see below).
+**Write.** A built-in editor where every check updates as you type. It can keep a writing history (see below). Next to the editor is a list of the passages that match a source. Pick one and it's selected in the editor, ready for you to rewrite in your own words. While you type, a meter shows whether your version is still too close to the source (the source wording stays hidden unless you ask for it) and whether the passage still matches. When it no longer matches, add the citation with one click.
 
 **Grammar.** Spelling, grammar, punctuation and style, checked on your own device. Each suggestion has Accept and Dismiss. You also get definitions and synonyms for any word, a readability score, the tone of the text, and a corrected .docx.
 

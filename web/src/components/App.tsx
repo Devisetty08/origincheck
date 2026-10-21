@@ -30,7 +30,7 @@ import WritePage from "./WritePage";
 import ExternalCheck from "./ExternalCheck";
 import PaidCheck from "./PaidCheck";
 import Report, { RecheckCard } from "./Report";
-import { FixMatches } from "./remedies";
+import { FixMatches, WriteMatches } from "./remedies";
 import Drafts from "./Drafts";
 import Library from "./Library";
 import Dashboard, { NextSteps, type Step, type Tab } from "./Dashboard";
@@ -732,6 +732,7 @@ export default function App() {
               onAcceptAllSpelling={() => setText(applyAll(doc.text, issues.filter((i) => i.category === "spelling" && i.severity !== "style")))}
               onEdit={() => go("check", "write")} onDownload={downloadCorrected} />}
             {tool === "write" && <WritePage title={doc.name} text={doc.text} onChange={(t, origin) => setText(t, origin)} history={wh}
+              matches={run && <WriteMatches editorId="writeEditor" hybrid={hybrid} doc={doc} run={run} ctx={ctx} citeFor={citeFor} applyEdit={applyEdit} saveMeta={saveMeta} />}
               on={whOn} setOn={(v) => setPrefs({ writingHistory: v })} onSnapshot={saveSnapshot} onDelete={clearHistory} />}
             {tool === "rewrite" && <RewriteTab text={doc.text} flagged={flagged} index={run?.r.index} onOpenPlagiarism={() => go("check", "similarity")}
               renderPanel={(picked) => <>

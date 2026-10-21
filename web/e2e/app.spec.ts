@@ -284,6 +284,24 @@ test("Rewrite highlights sentences that match a source and fixes one by quoting 
   await expect.poll(() => matched.count()).toBeLessThan(count);
 });
 
+test("Write lists matched passages and tracks a rewrite in your own words until it no longer matches", async ({ page }) => {
+  await upload(page);
+  await expect(page.locator("#simRing text")).toHaveText("47%", { timeout: 30_000 });
+  await openTool(page, "write");
+  await expect(page.locator("#writeMatches")).toContainText("Similarity 47%");
+  await page.locator("#writeMatches [data-match]").first().click();
+  await expect(page.locator("#writeMeter [data-level]")).toHaveAttribute("data-level", "too-close");
+  await expect(page.locator("#writeStatus")).toContainText("Still matches the source");
+  // the passage is selected in the editor: typing replaces it
+  await page.keyboard.type("In my own testing, moving the schema by hand took far longer than expected, so a tool for it saves real effort.");
+  await expect(page.locator("#writeStatus")).toContainText("No longer matches the source");
+  await expect(page.locator("#writeMeter [data-level]")).toHaveAttribute("data-level", "original");
+  await page.locator("#writeCite").click();
+  await page.locator("#citeSave").click(); // no citation details yet: the title is prefilled
+  await expect(page.locator("#writeStatus")).toContainText("Citation present");
+  await expect(page.locator("#writeEditor")).toHaveValue(/saves real effort \(.+\)\./);
+});
+
 test("each tool in the sidebar has its own page and opens on its results", async ({ page }) => {
   await page.goto("./");
   await page.waitForLoadState("networkidle");
