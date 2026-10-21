@@ -3,7 +3,9 @@
 import { canon } from "./strict";
 
 export type Tok = { w: string; s: number; e: number };
-export type Kind = "file" | "paste" | "internet" | "library" | "saved" | "own" | "draft";
+export type Kind = "file" | "paste" | "internet" | "scholarly" | "library" | "saved" | "own" | "draft";
+/** The "Sources to compare against" input a source came from (each input has a Yes/No toggle). */
+export type Input = "files" | "paste" | "url" | "refs" | "web" | "books" | "lists";
 export type Run = [b: number, e: number, j: number]; // doc words [b, e), source start word j
 
 export interface CiteMeta {
@@ -27,6 +29,9 @@ export interface Source {
   text: string;
   toks: Tok[];
   meta?: CiteMeta;
+  input?: Input;
+  /** For sources found by "Run all sources": which adapter found it, and where. */
+  found?: { adapter: string; url?: string; doi?: string; oaUrl?: string; authors?: string[]; year?: number };
 }
 
 export interface Settings {
@@ -64,6 +69,7 @@ export const KIND_LABEL: Record<Kind, string> = {
   file: "Uploaded files",
   paste: "Pasted text",
   internet: "Internet",
+  scholarly: "Publications",
   library: "Books (Open Library)",
   saved: "Saved documents",
   own: "Your earlier work",

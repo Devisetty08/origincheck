@@ -59,6 +59,49 @@ export async function runAi(text: string, sentences: { start: number; end: numbe
   });
 }
 
+/* ------------------------------ sentence embeddings (paraphrase detection) ------------------------------ */
+
+type EmbedMock = (texts: string[]) => Float32Array[];
+declare global { interface Window { __ocEmbedMock?: EmbedMock } } // set by end-to-end tests
+
+let embedWorker: Worker | null = null;
+let embedSeq = 0;
+
+export async function runEmbeddings(texts: string[], onProgress?: (p: AiProgress) => void): Promise<Float32Array[]> {
+  if (window.__ocEmbedMock) return window.__ocEmbedMock(texts);
+  embedWorker ??= new Worker(new URL("../workers/embed.worker.ts", import.meta.url), { type: "module" });
+  const id = ++embedSeq;
+  return new Promise((resolve, reject) => {
+    const onMsg = (e: MessageEvent<{ id: number; type: string; vectors?: Float32Array[]; message?: string } & AiProgress>) => {
+      if (e.data.id !== id) return;
+      if (e.data.type === "progress") onProgress?.({ stage: e.data.stage, pct: e.data.pct, mb: e.data.mb });
+      else {
+        embedWorker!.removeEventListener("message", onMsg);
+        if (e.data.type === "result") resolve(e.data.vectors!);
+        else reject(new Error(e.data.message ?? "embedding failed"));
+      }
+    };
+    embedWorker!.addEventListener("message", onMsg);
+    embedWorker!.postMessage({ id, texts });
+  });
+}
+
+/* ------------------------------ run all sources (server search, streamed) ------------------------------ */
+
+export type SourceGroup = "refs" | "web" | "books" | "lists";
+export type SearchStatus = "success" | "no results" | "failed" | "rate-limited" | "not configured";
+export interface SearchHit { title: string; snippet: string; url?: string; doi?: string; authors: string[]; year?: number; source: string; text?: string; oaUrl?: string }
+export interface SourceRun { source: string; label: string; status: SearchStatus | "running"; ms: number; queries: number; results: SearchHit[]; error?: string }
+
+export async function runAllSources(queries: string[], groups: SourceGroup[], korean: boolean, on: (e: { type: "start"; sources: { id: string; label: string }[] } | { type: "source"; run: SourceRun } | { type: "done"; ms: number }) => void, signal?: AbortSignal) {
+  const { postSse } = await import("./sse");
+  await postSse("/api/search", { queries, groups, korean }, (event, data) => {
+    if (event === "start") on({ type: "start", sources: (data as { sources: { id: string; label: string }[] }).sources });
+    else if (event === "source") on({ type: "source", run: data as SourceRun });
+    else if (event === "done") on({ type: "done", ms: (data as { ms: number }).ms });
+  }, signal);
+}
+
 /* ------------------------------ shared ------------------------------ */
 
 /** Sentences of the document body (bibliography and one-line headings left out), with offsets. */
