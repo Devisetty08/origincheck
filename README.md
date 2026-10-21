@@ -13,9 +13,10 @@ Your document is read and compared **in your browser**. Searches send only short
 | Page | What you get |
 |---|---|
 | **Check document** | Add a file (.docx, .pdf, .txt, .md, .html, .rtf) or paste text. Scanned PDFs are read with text recognition (OCR) in your browser. All checks start at once. The overview shows the document's language, three scores and a **What to do next** list with one button per check. |
+| **Write** | origincheck's own editor: every check updates as you type. Its **writing history** records how the text develops (see below). |
 | **Plagiarism check** | A similarity report: your document with matching passages highlighted and numbered by source, a ranked source list, and each source passage side by side. |
 | **Grammar** | Spelling, grammar, punctuation and style, checked on your device. Every suggestion is a card with **Accept** and **Dismiss**. Definitions and synonyms for any word, and recognition of names and technical terms. Plus readability, the tone of your writing, and a corrected .docx. |
-| **Rewrite** | Click a paragraph, pick a mode (Clarity, Concise, Grammar only, Academic tone), compare your original with the suggestion, and keep only the changes you want. |
+| **Rewrite** | Click a paragraph, pick a mode (Clearer, Shorter, More formal, More casual, Plain language, Cut filler), compare your original with the suggestion, and keep only the changes you want. Uses a free model on your own computer by default. |
 | **AI indicator** | Optional. An estimate of how likely the text is machine-written, with a sentence heatmap and the reasons. Never a verdict. |
 | **History** | Every check's scores across drafts, with a chart. |
 | **Settings** | Check options, plus the API keys and services the app uses. |
@@ -26,7 +27,7 @@ Your document is read and compared **in your browser**. Searches send only short
 
 As soon as you add a document, origincheck picks up to 8 short, distinctive phrases from it (skipping quotations, cited sentences and the bibliography) and searches:
 
-- **The internet:** Wikipedia (English, plus Korean for Korean text) and web search through Brave, Jina or Google.
+- **The internet:** Wikipedia (English, plus Korean for Korean text) and web search through Tavily (the default: free plan, no card), or optionally Brave, Jina or Google.
 - **Journals & publications:** Crossref, OpenAlex, PubMed, arXiv, Semantic Scholar, CORE, Europe PMC, DataCite (theses, dissertations and datasets), OSF Preprints (PsyArXiv, SocArXiv…) and INSPIRE-HEP (physics), with Unpaywall finding free legal copies by DOI.
 - **Books:** search inside books on Open Library and Google Books.
 - **Free classic books & poems:** Project Gutenberg and PoetryDB.
@@ -52,11 +53,20 @@ For each match you can **Mark as quoted & cited**, **Rewrite in my own words** (
 
 ### About Rewrite
 
-Rewrite works only on your own document, one passage at a time, and only that passage is sent to the AI provider (Anthropic's Claude, or a free Ollama server on your computer).
+Rewrite works only on your own document, one passage at a time, and only when you press **Rewrite**, never as you type. By default it uses **Phi-4-mini** (Microsoft, MIT licence) running on your own computer through [Ollama](https://ollama.com/): free, and your text stays on the machine. One-time setup: install Ollama, then run `ollama pull phi4-mini` (about 2.5 GB). Anthropic's Claude can be chosen in Settings instead; it is paid per use and capped per month.
 
 - Paragraphs that match a source are **locked**: fix those yourself in the plagiarism check.
-- Changes you keep mark the document **AI-assisted** in the HTML report and the .docx properties.
-- There is no "humanize" or "avoid AI detection" mode, and there won't be.
+- Changes you keep are labelled **AI-assisted** in the writing history, the HTML report and the .docx properties.
+- There is no "humanize" or "avoid AI detection" mode, prompts aren't tuned against detectors, and no "AI humanizer" service is used.
+
+### Writing history
+
+The **Write** page records how a document develops, so an honest author can show their process. It is on by default with a visible **"Writing history is on"** indicator and a switch to turn it off.
+
+- **What it keeps:** a version after every pause of 5 seconds (or when you press **Save version**), stored as differences between versions; where each part of the text came from (**typed**, **pasted** with the size of each paste, **AI-assisted** from Rewrite, or **imported** from an uploaded draft); writing time and sessions.
+- **What you see:** a summary such as "62% typed, 25% pasted, 13% AI-assisted", and a timeline to step through versions with each one's changes.
+- **Export** as PDF or JSON, or **delete** it at any time. The report notes that this is process evidence, not proof of authorship by itself.
+- **What it never does:** record keystrokes, capture the screen, record anything outside origincheck's editor and tools, or send history anywhere. It stays in this browser (IndexedDB).
 
 ## Run it on your computer
 
@@ -77,15 +87,32 @@ To turn on more, open **Settings** in the app, paste a key and press **Save sett
 |---|---|---|
 | Contact email | Fewer rate limits from Wikipedia, Crossref and OpenAlex | Your own email |
 | Unpaywall email | Free legal copies of papers by DOI | Your own email (a real one) |
-| Brave Search API key | Web search, the widest internet coverage | [brave.com/search/api](https://brave.com/search/api/) |
+| Tavily API key (free, no card) | Web search, the default | [tavily.com](https://www.tavily.com/) |
+| Brave Search API key (optional, paid) | More web search; off unless set, capped at 800 searches a month | [brave.com/search/api](https://brave.com/search/api/) |
 | Semantic Scholar API key | Semantic Scholar without constant rate limits | [semanticscholar.org/product/api](https://www.semanticscholar.org/product/api) |
 | CORE API key (free) | CORE's open-access papers (it no longer answers without a key) | [core.ac.uk/services/api](https://core.ac.uk/services/api) |
 | Google Books API key (free) | Search inside millions of books | [Google Cloud console → Books API](https://console.cloud.google.com/apis/library/books.googleapis.com) |
 | LibreTranslate server (and key for libretranslate.com) | English-translation search for documents in other languages | [Self-host it](https://github.com/LibreTranslate/LibreTranslate) for free, or [libretranslate.com](https://libretranslate.com/) |
-| Anthropic API key | Rewrite with Claude | [console.anthropic.com](https://console.anthropic.com/) |
-| Ollama server and model | Rewrite with a free model on your computer | [ollama.com](https://ollama.com/) |
-| Copyleaks email and key | The paid Copyleaks scan | [copyleaks.com](https://copyleaks.com/) |
+| Ollama + `ollama pull phi4-mini` | Rewrite with a free model on your computer (the default) | [ollama.com](https://ollama.com/) |
+| Anthropic API key (optional, paid) | Rewrite with Claude instead; capped at 500 requests a month | [console.anthropic.com](https://console.anthropic.com/) |
+| Copyleaks email and key (optional, paid) | The paid Copyleaks scan; capped at 20 scans a month | [copyleaks.com](https://copyleaks.com/) |
 | AI indicator | The AI-likelihood estimate (off by default) | Switch in Settings |
+
+### Cost safety
+
+No pay-as-you-go API is on by default: each needs its key, and each has a **monthly cap** (Tavily 900 credits, Brave 800 searches, Anthropic 500 requests, Copyleaks 20 scans). The count is checked **before** every call, retries included. When a cap is reached the call isn't made, the service shows **cap reached**, and Settings shows usage against each cap; caps can be changed there. Counts reset each calendar month and are kept in `web/.data/usage.json` (git-ignored).
+
+### Rules of the APIs used
+
+| Service | Attribution | Caching / keeping results | Other terms to know |
+|---|---|---|---|
+| Brave Search | Optional in the terms; if shown it must read "POWERED BY BRAVE" with Brave's logo. origincheck shows "POWERED BY BRAVE" whenever Brave is used; add the official logo from [Brave's brand page](https://brave.com/brand/) if you rely on the free credit. | **Not allowed** beyond transient use, so Brave results are never cached. | Card required; use beyond the monthly free credit is billed automatically. No redistribution, no training AI models on results. |
+| Tavily | Not required | No explicit limit | Free plan stops (doesn't bill) at 1,000 credits. Tavily may keep and use the queries it receives to train its models; origincheck only sends short phrases, and the privacy notice says so. |
+| Wikipedia | Article link and "Wikipedia contributors" (CC BY-SA), shown with every match | Cached 1 hour | Descriptive User-Agent with contact required |
+| CORE | Check [CORE's terms](https://core.ac.uk/terms) (the page couldn't be read automatically) | Cached 1 hour | Free key needed; check the terms before any commercial use |
+| Copyleaks | Not required | Scans set to be deleted after 24 hours, not indexed | Paid credits; results by webhook |
+| Anthropic | Not required | Not cached | Paid per request; only the chosen passage is sent |
+| Other public APIs (Crossref, OpenAlex, PubMed…) | Shown per source in the report | Cached 1 hour | Polite use: contact email, rate limits respected |
 
 ## Privacy
 
@@ -93,13 +120,14 @@ Your document, saved documents, history and settings stay in your browser. Thing
 
 | Feature | What is sent, and where |
 |---|---|
-| Searching sources | Up to 8 phrases of at most 16 words each, to the sources you ticked. The server refuses anything longer. |
+| Searching sources | Up to 8 phrases of at most 16 words each, to the sources you ticked. The server refuses anything longer. (Tavily may keep the phrases it receives.) |
 | Translated search (optional) | The same short phrases, to the LibreTranslate server set up for this app. |
 | Web page and reference import | Only the addresses, DOIs and references you enter (and, for a dead page, the address to the Internet Archive). |
 | Word lookup | The single word you look up, to Datamuse, the Free Dictionary API, Wiktionary and Wikidata. |
 | Scanned PDFs | Nothing. Text recognition runs in your browser; only the recognition engine (about 15 MB) is downloaded once. |
 | Language detection and tone | Nothing. Both run in your browser. |
-| Rewrite | The passage you chose, to Anthropic or your Ollama server. |
+| Rewrite | Nothing with the default local model (Ollama on your computer). With Anthropic chosen: the passage you chose. |
+| Writing history | Nothing. It stays in this browser; you can export or delete it. |
 | LanguageTool (optional) | The document text, to the LanguageTool server you set up. |
 | Copyleaks (optional, on request) | **The whole document.** Compared but not added to any Copyleaks database; deleted after 24 hours. |
 | Check externally | Nothing. You paste the text into the other site yourself. |
