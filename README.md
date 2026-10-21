@@ -1,199 +1,151 @@
 # origincheck
 
-An open-source writing checker. Add a document and three checks run automatically:
+An open-source writing checker for students and teachers. Add a document and origincheck checks it for **plagiarism**, **grammar** and, if you turn it on, **AI-written text**, then helps you fix what it finds: quote and cite, rewrite in your own words, or polish your wording.
 
-- **Similarity**: finds passages that share wording or meaning with your sources and helps you fix them honestly: quote and cite, rewrite in your own words and cite, or remove.
-- **Grammar**: spelling, grammar, punctuation, style and clarity suggestions that you accept one at a time, plus readability.
-- **AI indicator** (off unless the server enables it): an estimate of how likely the text is to be machine-written. It is an indicator only, never proof.
+Your document is read and compared **in your browser**. Searches send only short phrases, never the whole document.
 
-> **Similarity and AI-likelihood scores are signals, not proof.** A match can be a properly quoted passage or common wording; an AI estimate can be wrong, especially on formal, technical or non-native-English writing. Every report says so.
+> **Scores are signals, not proof.** A match can be a properly quoted passage or common wording, and AI detectors are often wrong, especially on formal, technical or non-native-English writing. Every report says so.
 
-It comes in two versions. The **web app** (`web/`) is a Next.js app: documents are read and matched in your browser, and a small server proxies the search APIs so no key ever reaches the browser. The **command-line tool** (`origincheck.py`) does similarity checks for batch work, large source folders and web search. Both use the same matching method and give the same similarity index on the same inputs.
+![The overview: plagiarism, grammar and AI indicator scores with a "What to do next" list](example/screenshot.png)
 
-![The origincheck report: similarity, grammar and AI indicator scores](example/screenshot.png)
+## What it does
 
-## Web app
-
-Drop in a document (.docx, .pdf, .txt, .md, .html, .rtf) or paste text. The checks start in parallel, each in its own Web Worker, and results appear as they finish. The summary shows one card per check, for example "47% similarity · 7 grammar suggestions".
-
-The sidebar is the only navigation: **Check document**, **Plagiarism check**, **Grammar**, **AI indicator**, **Rewrite**, **History** and **Settings**.
-
-- **Check document** is the overview: three score cards, a **What to do next** list with one button per check, and the downloads.
-- **Plagiarism check** shows the report first (highlighted document, matched sources), then **Find more sources**, the optional paid check and **Check externally**.
-- **Grammar** lists every suggestion as a card with **Accept** and **Dismiss**, next to the underlined document.
-- **Rewrite** works like a paraphrasing tool limited to your own document: click a paragraph, pick a mode, compare the original with the suggestion and keep only the changes you want. Paragraphs that match a source are locked.
-- Each tool page explains itself when no document is loaded and accepts one directly.
-
-Searching the internet and publications starts automatically when you add a document, after a one-time privacy notice; turn this off in Settings.
-
-### Sources to compare against
-
-Seven inputs, each with a **Yes/No** switch. Turning one off removes its sources from the check.
-
-| Input | What it adds |
+| Page | What you get |
 |---|---|
-| Files | Source documents you upload |
-| Paste | Text you paste (with an optional name or URL) |
-| Web page | A page you give the address of, fetched by the server |
-| References & DOIs | Your reference list or DOIs, resolved to open-access full text where it exists |
-| Search the web | Wikipedia (English, plus Korean for Korean text) and Brave Search (or Jina, or Google for existing customers) |
-| Books (Open Library) | Open Library's search inside books |
-| Free book lists | Project Gutenberg (Gutendex) and curated lists of free books |
+| **Check document** | Add a file (.docx, .pdf, .txt, .md, .html, .rtf) or paste text. All checks start at once. The overview shows three scores and a **What to do next** list with one button per check. |
+| **Plagiarism check** | A Turnitin-style report: your document with matching passages highlighted and numbered by source, a ranked source list, and each source passage side by side. |
+| **Grammar** | Spelling, grammar, punctuation and style, checked on your device. Every suggestion is a card with **Accept** and **Dismiss**, Grammarly-style. Plus readability and a corrected .docx. |
+| **Rewrite** | Click a paragraph, pick a mode (Clarity, Concise, Grammar only, Academic tone), compare your original with the suggestion, and keep only the changes you want. |
+| **AI indicator** | Optional. An estimate of how likely the text is machine-written, with a sentence heatmap and the reasons. Never a verdict. |
+| **History** | Every check's scores across drafts, with a chart. |
+| **Settings** | Check options, plus the API keys and services the app uses. |
 
-**Run all sources** picks up to 8 short, distinctive 8–12-word passages from your document (skipping quotations, cited sentences and the bibliography), sends only those to every enabled source in parallel, and streams one row per source with its status — `success`, `no results`, `failed`, `rate-limited` or `not configured` — and timing. Publications come from Crossref, OpenAlex, Semantic Scholar, arXiv, CORE and Europe PMC; Unpaywall adds open-access links by DOI. Found sources are added to the check with their authors, year, DOI and link.
+![The plagiarism report: highlighted matches and the source list](example/screenshot-plagiarism.png)
 
-### Similarity
+### Where it looks for matches
 
-- Turnitin-style report: the document with matches highlighted and numbered by source, a ranked source list, the matching source passage side by side, and filters (exclude quotes, the bibliography, small matches, small sources, or a single source).
-- Three match types:
-  - **Verbatim** (solid highlight): identical wording. Only these count toward the similarity index.
-  - **Near-verbatim** (dotted orange underline): lightly edited copying, found with MinHash/LSH and confirmed by edit distance (≥ 75% similar).
-  - **Paraphrase** (double purple underline): the same idea in different words, found with multilingual sentence embeddings (cosine ≥ 0.80). Can be turned off in Settings.
-- For each match: **Mark as quoted & cited**, **Rewrite in my own words**, **Cite this source** or **Remove**. The rewrite editor hides the source by default, re-checks your version as you type and shows a closeness meter. It never writes replacement text.
-- **Copyleaks (paid, optional)**: scans the whole document against the web, journals and Copyleaks' database of submitted papers, which free APIs can't reach. It runs only when you press its button, after a notice that the whole document is sent, and shows Copyleaks' score and matching sources. The document is compared but not added to any Copyleaks database, and Copyleaks deletes the scan after 24 hours. It is a pluggable adapter (`web/src/server/paid/`), shown as **not configured** until its keys are set.
-- **Check externally (optional)**: copies your text to the clipboard and opens Duplichecker or CopyKiller (stronger for Korean) in a new tab. origincheck never sends text to these sites itself; they have no public API.
-- Citations in APA 7, Harvard and IEEE; a citation checker.
+As soon as you add a document, origincheck picks up to 8 short, distinctive phrases from it (skipping quotations, cited sentences and the bibliography) and searches:
 
-### Grammar
+- **The internet:** Wikipedia (English, plus Korean for Korean text) and web search through Brave, Jina or Google.
+- **Journals & publications:** Crossref, OpenAlex, arXiv, Semantic Scholar, CORE and Europe PMC, with Unpaywall finding free legal copies by DOI.
+- **Books:** search inside books on Open Library.
+- **Free classic books:** Project Gutenberg.
 
-- Harper checks English on your device. Text that isn't mostly English is not checked, and the tab says so (for Korean it points to CopyKiller and a Korean spell checker).
-- Click an underline for the message and suggestions: **Apply**, **Dismiss**, **Ignore rule** and, for spelling, **Add to dictionary** (kept in your browser). Definitions and synonyms come from the Free Dictionary API and Datamuse; click a synonym to use it.
-- Optional second opinion from a self-hosted LanguageTool server, when the server enables it.
-- Readability: Flesch reading ease, sentence length, passive voice and repeated words. Download the corrected document as .docx or .txt.
+You can also add your own sources: upload files, paste text, add a web page, paste your reference list (origincheck finds the open-access full texts), or pick from free book lists. Each source type has a tick box to include or leave it out. The page shows which services found something, which found nothing, and which couldn't search and why.
 
-### Improve my writing
+Two optional extras sit at the bottom of the plagiarism page:
 
-On the Grammar tab, select a passage and choose a goal (clarity, concise, grammar only or academic tone). Only the selected passage is sent, through origincheck's server, to Anthropic's Claude or your own Ollama server. The suggestion appears as a word-level diff: click any change to accept or reject it, then **Apply accepted**.
+- **Copyleaks (paid):** scans the whole document against the web, journals and Copyleaks' database of submitted papers. It runs only when you press its button, after a notice that the whole document is sent.
+- **Check externally:** copies your text and opens Duplichecker or CopyKiller (better for Korean) in a new tab. origincheck never sends anything to these sites itself.
 
-- A notice names the provider before the first passage is sent.
-- It is turned off for passages the similarity check flagged: quote and cite those, or rewrite them yourself.
-- Documents with accepted AI edits are labelled **AI-assisted** in the HTML report and in the .docx properties.
-- There is no "humanize" or "avoid detection" mode, and there won't be.
+### Three kinds of match
 
-### AI indicator
+| Shown as | Meaning | Counted in the % |
+|---|---|---|
+| Solid highlight | **Exact match**: identical wording | Yes |
+| Dotted orange underline | **Slightly changed**: a few words swapped or edited | No, listed separately |
+| Double purple underline | **Reworded**: same meaning, different words | No, listed separately |
 
-> AI detection is unreliable. Detectors are probabilistic and produce false positives — formal, technical or non-native-English writing is often misjudged as AI — and they work best on English. Use this as a prompt to review, never as proof, and never as the sole basis for an accusation.
+For each match you can **Mark as quoted & cited**, **Rewrite in my own words** (a closeness meter compares your new wording with the source as you type), **Cite this source** or **Remove** it. Citations come in APA 7, Harvard and IEEE.
 
-Off unless the server sets `ENABLE_AI_LIKELIHOOD=true`. When on, the caveat is always shown with the score, with a sentence-level heatmap and a "Why this score" panel. The models run in the browser.
+### About Rewrite
 
-### History, saved documents and exports
+Rewrite works only on your own document, one passage at a time, and only that passage is sent to the AI provider (Anthropic's Claude, or a free Ollama server on your computer).
 
-- **History** keeps every check's date, version label, scores and source breakdown, with a chart across drafts.
-- **Saved documents** stay in your browser. Mark your earlier work to have matches reported as self-plagiarism.
-- **Download report** saves a standalone HTML file. **Print / PDF** uses print styles.
+- Paragraphs that match a source are **locked**: fix those yourself in the plagiarism check.
+- Changes you keep mark the document **AI-assisted** in the HTML report and the .docx properties.
+- There is no "humanize" or "avoid AI detection" mode, and there won't be.
+
+## Run it on your computer
+
+You need [Node.js 22](https://nodejs.org/).
+
+```
+git clone https://github.com/Devisetty08/origincheck.git
+cd origincheck/web
+npm ci
+npm run dev
+```
+
+Open **http://localhost:3100**. Plagiarism, grammar and the free sources work straight away with no keys.
+
+To turn on more, open **Settings** in the app, paste a key and press **Save settings**. Keys are saved on your computer in `web/.env.local` (never committed to git) and work immediately. After saving, the page only shows whether a key is set, never the key itself.
+
+| Setting | What it turns on | Where to get it |
+|---|---|---|
+| Contact email | Fewer rate limits from Wikipedia, Crossref and OpenAlex | Your own email |
+| Unpaywall email | Free legal copies of papers by DOI | Your own email (a real one) |
+| Brave Search API key | Web search, the widest internet coverage | [brave.com/search/api](https://brave.com/search/api/) |
+| Semantic Scholar API key | Semantic Scholar without constant rate limits | [semanticscholar.org/product/api](https://www.semanticscholar.org/product/api) |
+| CORE API key | Higher limits for open-access papers | [core.ac.uk/services/api](https://core.ac.uk/services/api) |
+| Anthropic API key | Rewrite with Claude | [console.anthropic.com](https://console.anthropic.com/) |
+| Ollama server and model | Rewrite with a free model on your computer | [ollama.com](https://ollama.com/) |
+| Copyleaks email and key | The paid Copyleaks scan | [copyleaks.com](https://copyleaks.com/) |
+| AI indicator | The AI-likelihood estimate (off by default) | Switch in Settings |
+
+## Privacy
+
+Your document, saved documents, history and settings stay in your browser. Things leave it only after a notice naming where they go:
+
+| Feature | What is sent, and where |
+|---|---|
+| Searching sources | Up to 8 phrases of at most 16 words each, to the sources you ticked. The server refuses anything longer. |
+| Web page and reference import | Only the addresses, DOIs and references you enter. |
+| Word lookup | The single word you look up, to Datamuse and the Free Dictionary API. |
+| Rewrite | The passage you chose, to Anthropic or your Ollama server. |
+| LanguageTool (optional) | The document text, to the LanguageTool server you set up. |
+| Copyleaks (optional, on request) | **The whole document.** Compared but not added to any Copyleaks database; deleted after 24 hours. |
+| Check externally | Nothing. You paste the text into the other site yourself. |
+
+The server never logs documents, removes keys from any error it logs, and limits how often each visitor can call it. The web-page fetcher refuses private and internal network addresses, including after redirects, and caps size, time and redirects.
+
+## Put it online (Vercel)
+
+1. Import the repository in [Vercel](https://vercel.com/) and set **Root Directory** to `web`.
+2. Add your keys under **Settings → Environment Variables** (the names are in [`web/.env.example`](web/.env.example)). On Vercel the in-app Settings page is read-only.
+3. Deploy.
+
+Things to know for a public deployment:
+
+- The rate limiter, search cache and pending Copyleaks scans live in memory, so they are per server instance. For heavy public use, put Vercel's firewall in front and move Copyleaks scans to a shared store such as Upstash Redis.
+- Copyleaks sends results to `PUBLIC_BASE_URL`, which defaults to your Vercel production address. When running locally, use a tunnel such as `ngrok http 3100`.
 
 ## How the scores are calculated
 
 | Score | Calculation |
 |---|---|
-| **Similarity index** (0–100%) | Verbatim-matched words ÷ words not excluded (see [How the matching works](#how-the-matching-works)). Near-verbatim and paraphrase matches are listed separately and not counted. Bands: under 15 green, 15–24 amber, 25–39 orange, 40+ red. |
-| **Writing score** (0–100) | `max(0, 100 − weighted issues per 100 words × 2)`, with errors weighing 3, warnings 1 and style suggestions 0.5. |
-| **AI indicator** (0–100) | 60% RoBERTa detector + 40% language-model signal (60% perplexity, 40% variation in perplexity across sentences). Labels: **Low** under 30, **Unclear** 30–70, **High** over 70. Under 150 words: "Not enough text to estimate". Calibration notes are in [`web/src/lib/aiScore.ts`](web/src/lib/aiScore.ts). |
+| **Similarity index** (0–100%) | Exactly matched words ÷ words checked (quotes and the bibliography can be excluded). Under 15% green, 15–24% amber, 25–39% orange, 40%+ red. |
+| **Writing score** (0–100) | `100 − (weighted issues per 100 words × 2)`, with errors weighing 3, warnings 1 and style suggestions 0.5. |
+| **AI indicator** (0–100) | 60% RoBERTa detector + 40% language-model signal (how predictable the wording is, and how much that varies between sentences). Low under 30, Unclear 30–70, High over 70. Needs at least 150 words. |
 
-## Components
+How matching works:
 
-| Part | Component | Runs |
-|---|---|---|
-| Grammar | [Harper](https://github.com/Automattic/harper) (`harper.js`, WebAssembly) | In the browser |
-| Grammar (optional) | [LanguageTool](https://github.com/languagetool-org/languagetool), self-hosted | Your server, through origincheck's proxy |
-| Paraphrase | [Transformers.js](https://github.com/huggingface/transformers.js) with [`Xenova/paraphrase-multilingual-MiniLM-L12-v2`](https://huggingface.co/Xenova/paraphrase-multilingual-MiniLM-L12-v2) (≈118 MB, downloaded once) | In the browser |
-| AI indicator (optional) | Transformers.js with [`onnx-community/roberta-base-openai-detector-ONNX`](https://huggingface.co/onnx-community/roberta-base-openai-detector-ONNX) and [`Xenova/distilgpt2`](https://huggingface.co/Xenova/distilgpt2) | In the browser |
-| Similarity | origincheck's matching engine (`web/src/lib/similarity.ts`, same algorithm as `origincheck.py`) plus `hybrid.ts` / `minhash.ts` | In the browser |
-| Search and import | Route handlers in `web/src/app/api/`, adapters in `web/src/server/adapters/` | On the server |
-| Improve my writing | [Anthropic TypeScript SDK](https://github.com/anthropics/anthropic-sdk-typescript) (default model `claude-opus-5-5`) or Ollama | On the server |
+1. The text is split into words (Latin and Korean) and cut into overlapping 5-word fingerprints.
+2. Every word covered by a fingerprint that also appears in a source is marked; runs shorter than 8 words are dropped.
+3. Each matched word is credited to one source, so the source percentages add up to the index.
+4. On top of that, MinHash/LSH finds candidate sentence pairs. An edit-distance check (75% or more alike) confirms **slightly changed** ones. Multilingual sentence embeddings (cosine 0.80 or more) confirm **reworded** ones.
 
-Licences are listed in [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
+## Limits
 
-## Privacy
+- **Not Turnitin's database.** Turnitin and similar services compare against private databases of web pages, journals and past student papers. origincheck searches public sources, so your institution's report can show matches this doesn't. The paid Copyleaks option narrows the gap.
+- **Searches are sampled.** Up to 8 phrases per document by default. Raise **Passages searched per run** in Settings for long documents.
+- **Paywalled papers** are matched on their abstracts only. Add the file yourself if you have it.
+- **Grammar is English-only** (Harper). Other languages are detected and skipped, with a note.
+- **AI detection is unreliable**, as the app says next to every score.
+- **Scanned PDFs** have no text. Run OCR on them first.
 
-Your document is read and matched in your browser. Saved documents, history, your dictionary and settings are stored in the browser (IndexedDB and localStorage). What leaves the browser, and only after a notice naming the services:
+## If a passage is flagged
 
-| Feature | What is sent, and where |
-|---|---|
-| Run all sources | Up to 8 passages of at most 16 words each (the server rejects anything longer), never the document, to the enabled sources listed above. |
-| Web page, DOI and reference import | Only the addresses, DOIs and references you enter, to the page itself, Crossref, OpenAlex, Unpaywall or Europe PMC. |
-| Word lookup | The single word you look up, to Datamuse and the Free Dictionary API. |
-| LanguageTool (if enabled) | The document text, to the LanguageTool server the operator configured. |
-| Improve my writing (if configured) | The passage you selected, to Anthropic or the operator's Ollama server. |
-| Copyleaks (if configured, on request) | **The whole document**, to Copyleaks. Not indexed; deleted by Copyleaks after 24 hours. |
-| Check externally | Nothing: you paste the text into the other site yourself. |
-
-The server never logs documents or passages, strips keys from any error it logs, and rate-limits its own endpoints per client. The page fetcher blocks private, loopback, link-local and metadata addresses (checked after DNS resolution and on every redirect) and caps size (3 MB), time (10 s) and redirects (4).
-
-## Developing and deploying
-
-```
-cd web
-npm ci
-cp .env.example .env.local   # then fill in what you have; every key is optional
-npm run dev                  # http://localhost:3100
-npm test                     # unit tests (Vitest), external APIs mocked
-npm run build && npx playwright test   # end-to-end tests against the production server, APIs and models mocked
-```
-
-### Keys and settings
-
-All keys are read from environment variables on the server and never sent to the browser. A source without its key shows as **not configured** and is skipped.
-
-The easiest way to set them locally is the **Settings** page in the app: paste a key and save. It is written to `web/.env.local` and applies immediately; afterwards the page only shows whether each key is set, never its value. Saving is allowed only from `localhost` in development (`npm run dev`). With `npm start` set `ALLOW_SETTINGS_WRITE=true` to allow it; on Vercel, use the project's Environment Variables instead.
-
-| Variable | Needed for | Notes |
-|---|---|---|
-| `CONTACT_EMAIL`, `HTTP_USER_AGENT` | Polite access to Wikipedia, Crossref and OpenAlex | Recommended |
-| `UNPAYWALL_EMAIL` | Unpaywall open-access links | Must be a real address; placeholders are rejected |
-| `CROSSREF_MAILTO`, `OPENALEX_MAILTO` | Polite pools | Default to `CONTACT_EMAIL` |
-| `BRAVE_API_KEY` | Web search | [Brave Search API](https://brave.com/search/api/); usage is paid from a monthly credit |
-| `JINA_API_KEY` | Web search fallback | |
-| `CORE_API_KEY`, `SEMANTIC_SCHOLAR_API_KEY` | Higher rate limits | Both work without a key, but Semantic Scholar often returns `rate-limited` without one |
-| `GOOGLE_API_KEY`, `GOOGLE_CSE_ID` | Google Programmable Search | Existing customers only; Google closed it to new customers and shuts it down on 1 January 2027 |
-| `COPYLEAKS_EMAIL`, `COPYLEAKS_KEY` | Paid Copyleaks check | Uses Copyleaks credits. `COPYLEAKS_SANDBOX=true` gives free mock results for testing |
-| `PUBLIC_BASE_URL` | Copyleaks results | Copyleaks delivers results by webhook, so it needs a public address: locally run `ngrok http 3100` and paste the URL; on Vercel it defaults to the production URL |
-| `AI_PROVIDER` | Improve my writing | `anthropic` (default) or `ollama` |
-| `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` | Improve my writing with Claude | Model defaults to `claude-opus-5-5` |
-| `OLLAMA_BASE_URL`, `OLLAMA_MODEL` | Improve my writing with Ollama | |
-| `ENABLE_AI_LIKELIHOOD` | AI indicator | `false` by default |
-| `ENABLE_LANGUAGETOOL`, `LANGUAGETOOL_URL` | LanguageTool second opinion | Point at your own server, for example the `erikvl87/languagetool` Docker image |
-| `SEARCH_MAX_QUERIES` | Passages per run | Default 8, at most 40 |
-
-### Deploying to Vercel
-
-1. Import the repository in Vercel and set **Root Directory** to `web`. The framework is detected as Next.js.
-2. Add the environment variables above under **Settings → Environment Variables**.
-3. Deploy. Search, reference import and Improve my writing run as serverless functions (`maxDuration` 30–60 s, which the Hobby plan allows).
-
-Pending Copyleaks scans are also kept in memory, so the submit, the webhook and the polling must reach the same server process. That holds locally and on a single long-running server; on Vercel, where requests can land on different instances, a result can go missing until the scans are moved to a shared store such as Upstash Redis.
-
-The rate limiter and search cache are in memory, so they are per function instance. That is enough to stop accidental floods, not a determined client; put Vercel's firewall or a shared store in front for a public deployment.
-
-`.github/workflows/ci.yml` runs lint, the type check, the unit tests, the build and the end-to-end tests on every push and pull request. Vercel does the deploying.
-
-### Adding a source adapter
-
-1. Write an `Adapter` in `web/src/server/adapters/` (see `types.ts`): an `id`, a `label`, a `group` (`refs`, `web`, `books` or `lists`), `minIntervalMs` for the API's rate limit, `missing()` returning the name of a missing env var or `null`, and `search(query, { signal })` returning `NormalizedResult[]`. Use `getJson` / `getText` from `../http`, which send the User-Agent and honour the abort signal; throw `HttpError` with `retryAfterMs` on 429 so the orchestrator backs off.
-2. Add it to `ADAPTERS` in `adapters/index.ts`.
-3. Add success, empty, error, 429 and timeout cases to `adapters.test.ts` with a fixture in the API's real response shape.
-
-Only add APIs that are public and allow automated access. Don't scrape sites that forbid it.
+- **Quote and cite**: put the exact words in quotation marks and cite the source.
+- **Rewrite and cite**: explain the idea in your own words and still cite the source.
+- **Cut** it if your work doesn't need it.
 
 ## Command-line tool
 
-### Setup
-
-You need Python 3.9 or later.
+`origincheck.py` checks a document against a folder of sources, for batch work and large source folders. It uses the same matching as the web app and gives the same index on the same inputs.
 
 ```
 pip install -r requirements.txt
-```
-
-### Usage
-
-```
-python origincheck.py <document> -s <sources folder> [options]
-```
-
-Example with the bundled sample:
-
-```
 python origincheck.py example/draft.docx -s example/references --exclude-quotes --exclude-bib
 ```
 
@@ -203,77 +155,55 @@ Similarity index: 47%
    21.0%  ora2pg.pdf
 ```
 
-The command writes `example/draft_similarity.html` (see [example/sample_report.html](example/sample_report.html)). Without the two exclusion flags the same check gives 61% (azure.txt 33%, ora2pg.pdf 28%).
+It writes a colour-coded HTML report (see [example/sample_report.html](example/sample_report.html)).
 
 | Option | What it does |
 |---|---|
-| `-s`, `--sources DIR` | Folder of source documents, read recursively. Repeat it to add more folders. |
-| `-o`, `--out FILE` | Report path. Default `<document>_similarity.html`. |
-| `--ngram N` | Fingerprint (shingle) size in words. Default 5. Lower is stricter. |
-| `--min-words N` | Ignore matches shorter than N words. Default 8. |
-| `--exclude-quotes` | Ignore text inside "…" or “…” (up to 800 characters). |
-| `--exclude-bib` | Ignore everything after the last References / Bibliography / Works cited heading. |
-| `--exclude-source-pct X` | Drop sources contributing less than X% and re-attribute their words. |
-| `--web` | Also search the internet (needs `BRAVE_API_KEY`, see below). |
-| `--web-queries N` | Maximum number of web searches. Default 15. |
-| `--save-to-repo` | Keep this document in `./repository/` so future checks compare against it. |
-| `--no-repo` | Don't compare against `./repository/` for this run. |
-| `--json` | Also write a JSON summary next to the report. |
+| `-s DIR` | Folder of sources, read recursively. Repeat for more folders. |
+| `-o FILE` | Report path (default `<document>_similarity.html`). |
+| `--exclude-quotes`, `--exclude-bib` | Ignore quoted text and the bibliography. |
+| `--min-words N`, `--ngram N` | Shortest match counted (default 8) and fingerprint size (default 5). |
+| `--exclude-source-pct X` | Drop sources contributing under X%. |
+| `--web`, `--web-queries N` | Also search the web with Brave (needs `BRAVE_API_KEY`). |
+| `--save-to-repo`, `--no-repo` | Keep this document for future comparisons, or skip them. |
+| `--json` | Also write a JSON summary. |
 
-### Internet check (optional)
+## Prose Inspector
 
-`--web` picks up to N evenly spaced sentences of at least 12 words, searches the first 24 words of each as a quoted phrase with the [Brave Search API](https://brave.com/search/api/), downloads the top 3 results (HTML or PDF) and adds them as "Internet" sources. Requests are spaced about 1.1 s apart. If no key is set, the web check is skipped with a warning.
+`prose-inspector/` is a small Streamlit app that reports sentence rhythm, stock phrases and repetition in a piece of writing. It only analyses; it doesn't rewrite.
 
 ```
-export BRAVE_API_KEY=your_key            # macOS / Linux
-$env:BRAVE_API_KEY="your_key"            # PowerShell
-set BRAVE_API_KEY=your_key               # Windows cmd
-python origincheck.py "Dissertation.docx" -s references --web --web-queries 25
+pip install -r prose-inspector/requirements.txt
+streamlit run prose-inspector/app.py
 ```
 
-## How the matching works
+## For developers
 
-1. **Tokenize.** Words are matched with `[A-Za-z0-9À-ɏᄀ-ᇿ㄰-㆏가-힣]+(?:['’][A-Za-z]+)?` (Latin and Hangul), lowercased, with `’` normalised to `'`. Each word keeps its character offsets so highlights map back onto the original text.
-2. **Fingerprint.** The text is cut into overlapping 5-word shingles.
-3. **Match.** For each source, every document word covered by a shingle that also appears in that source is marked. Excluded words are skipped.
-4. **Passages.** Marked words are joined into contiguous runs. Runs shorter than `min-words` (default 8) are dropped.
-5. **Attribution.** Each matched word is credited to exactly one source, preferring the source with the most matched words overall, so the source percentages add up to the similarity index.
-6. **Score.** Similarity index = matched words ÷ words not excluded, rounded to a whole percent.
+```
+cd web
+npm test                             # unit tests (Vitest); every external API is mocked
+npm run build && npx playwright test # end-to-end tests, desktop and mobile
+npm run lint
+```
 
-The web app then looks for what verbatim matching misses, without changing the index:
+CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs lint, the type check, unit tests, the build and the end-to-end tests on every push.
 
-7. **Near-verbatim.** Sentences are signed with 64-hash MinHash over 3-word shingles; LSH (16 bands) proposes candidate pairs, and a Levenshtein ratio of 0.75 or more confirms them.
-8. **Paraphrase.** A second LSH pass over content-word stems proposes up to 400 candidate pairs (Jaccard ≥ 0.15); a pair is a paraphrase if its sentence embeddings have cosine similarity of 0.80 or more.
-
-## Limits compared with real Turnitin
-
-- **The database.** Commercial services compare against private databases of web pages, journals and past student papers. origincheck searches public APIs (Wikipedia, scholarly indexes, open-access repositories, Open Library, Gutenberg) and, with a key, a web search API. Search finds pages that share a passage; it is not a commercial index. Your institution's report can show matches this tool doesn't.
-- **Search is sampled.** Only up to 8 passages are searched per run, so a source matching only other parts of the document can be missed. Raise `SEARCH_MAX_QUERIES` for long documents.
-- **Paywalls.** Closed-access papers are matched only on their metadata and abstracts. Add the file yourself if you have it.
-- **Paraphrase detection** is a signal for review. Embeddings also match sentences that state the same common fact.
-- **AI indicator, not AI detection.** See the caveat above. Turnitin's detector uses different, private models, so its result can differ.
-- **Scanned PDFs** have no text layer. Run OCR on them first.
-
-## Fixing flagged passages
-
-For each highlighted passage, do one of these, then check again:
-
-- **Quote and cite**: put the exact words in quotation marks and cite the source.
-- **Rewrite and cite**: explain the idea in your own words and still cite the source.
-- **Cut** it if your work doesn't need it.
-
-## Repository layout
+**Adding a search source:** write an adapter in `web/src/server/adapters/` following `types.ts`. It needs an `id`, `label`, `group`, a minimum interval for the API's rate limit, `missing()` for required keys, and `search(query, { signal })`. Register it in `adapters/index.ts` and add success, empty, error, rate-limit and timeout tests to `adapters.test.ts`. Only add APIs that are public and allow automated access.
 
 ```
 web/                    web app (Next.js)
-  src/app/api/          server routes: search, fetch-url, references, doi, catalog, words, languagetool, improve, config
-  src/server/           adapters, orchestrator, SSRF-safe fetcher, rate limiter, config
+  src/app/api/          server routes: search, fetch-url, references, doi, catalog, words,
+                        languagetool, improve, paid, settings, config
+  src/server/           source adapters, search orchestrator, safe page fetcher, rate limiter,
+                        settings, Copyleaks
   src/lib/              matching engine, hybrid matching, query selection, citations, import, exports
   src/components/       user interface
   src/workers/          embedding worker
-.github/workflows/      CI
 origincheck.py          command-line tool
-prose-inspector/        Streamlit app that reports sentence rhythm, stock phrases and repetition (analysis only)
-requirements.txt        python-docx, pypdf
-example/                sample document, sources, CLI report and screenshot
+prose-inspector/        Streamlit writing-pattern report
+example/                sample document, sources, CLI report and screenshots
 ```
+
+## Credits and licences
+
+origincheck is built on open-source projects including [Harper](https://github.com/Automattic/harper), [Transformers.js](https://github.com/huggingface/transformers.js), [pdf.js](https://github.com/mozilla/pdf.js), [mammoth.js](https://github.com/mwilliamson/mammoth.js), [Readability](https://github.com/mozilla/readability), [Next.js](https://github.com/vercel/next.js) and [React](https://github.com/facebook/react). Matched Wikipedia text is CC BY-SA and is shown with its article link. The full list, with versions and licences, is in [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
