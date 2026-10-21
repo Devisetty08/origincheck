@@ -57,8 +57,8 @@ export const ENV_VARS: EnvVar[] = [
     help: "Default claude-opus-5-5. claude-sonnet-5-5 or claude-haiku-5-5 cost less." },
   { key: "OLLAMA_BASE_URL", group: "Rewrite (Improve my writing)", label: "Ollama server", placeholder: "http://localhost:11434",
     help: "Free, runs on your own computer." },
-  { key: "OLLAMA_MODEL", group: "Rewrite (Improve my writing)", label: "Ollama model", placeholder: "phi4-mini",
-    help: "Default phi4-mini (Microsoft, MIT licence, ~2.5 GB). Install Ollama, then run: ollama pull phi4-mini" },
+  { key: "OLLAMA_MODEL", group: "Rewrite (Improve my writing)", label: "Ollama model", placeholder: "qwen2.5:7b",
+    help: "Default qwen2.5:7b (Alibaba Qwen, Apache-2.0, ~4.7 GB): it kept facts best in our tests. Install Ollama, then run: ollama pull qwen2.5:7b. Smaller models such as phi4-mini are faster but change facts more often." },
 
   { key: "LIBRETRANSLATE_URL", group: "Translation (documents not in English)", label: "LibreTranslate server", placeholder: "https://libretranslate.com",
     help: "Translates your search phrases into English so a document in another language is also checked against English sources. Self-host it for free, or use libretranslate.com with a key.",

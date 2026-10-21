@@ -30,7 +30,7 @@ const KEY = { ANTHROPIC_API_KEY: "sk-test", AI_PROVIDER: "anthropic", USAGE_FILE
 afterEach(() => { vi.unstubAllEnvs(); create.mockReset(); });
 
 describe("/api/improve", () => {
-  it("uses the free local model (Ollama, phi4-mini) by default, sending nothing to Anthropic", async () => {
+  it("uses the free local model (Ollama, qwen2.5:7b) by default, sending nothing to Anthropic", async () => {
     const calls: { url: string; body: { model: string; messages: { content: string }[] } }[] = [];
     vi.stubGlobal("fetch", vi.fn(async (url: string, init: RequestInit) => {
       calls.push({ url, body: JSON.parse(init.body as string) });
@@ -38,9 +38,9 @@ describe("/api/improve", () => {
     }));
     const POST = await route({ AI_PROVIDER: "", OLLAMA_MODEL: "" });
     const r = await POST(post({ text: "The results, they were very clear.", goal: "shorter" }));
-    expect(await r.json()).toMatchObject({ revised: "The results were clear.", provider: "ollama", model: "phi4-mini" });
+    expect(await r.json()).toMatchObject({ revised: "The results were clear.", provider: "ollama", model: "qwen2.5:7b" });
     expect(calls[0].url).toBe("http://localhost:11434/api/chat");
-    expect(calls[0].body.model).toBe("phi4-mini");
+    expect(calls[0].body.model).toBe("qwen2.5:7b");
     expect(create).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
   });

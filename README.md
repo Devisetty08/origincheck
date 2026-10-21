@@ -53,7 +53,7 @@ For each match you can **Mark as quoted & cited**, **Rewrite in my own words** (
 
 ### About Rewrite
 
-Rewrite works only on your own document, one passage at a time, and only when you press **Rewrite**, never as you type. By default it uses **Phi-4-mini** (Microsoft, MIT licence) running on your own computer through [Ollama](https://ollama.com/): free, and your text stays on the machine. One-time setup: install Ollama, then run `ollama pull phi4-mini` (about 2.5 GB). Anthropic's Claude can be chosen in Settings instead; it is paid per use and capped per month.
+Rewrite works only on your own document, one passage at a time, and only when you press **Rewrite**, never as you type. By default it uses **Qwen2.5 7B** (Apache-2.0) running on your own computer through [Ollama](https://ollama.com/): free, and your text stays on the machine. One-time setup: install Ollama, then run `ollama pull qwen2.5:7b` (about 4.7 GB). In side-by-side tests it kept the facts (durations, names, objects) where the smaller Phi-4-mini changed them; any Ollama model can be chosen in Settings. Always check each suggested change. Anthropic's Claude can be chosen in Settings instead; it is paid per use and capped per month.
 
 - Paragraphs that match a source are **locked**: fix those yourself in the plagiarism check.
 - Changes you keep are labelled **AI-assisted** in the writing history, the HTML report and the .docx properties.
@@ -93,7 +93,7 @@ To turn on more, open **Settings** in the app, paste a key and press **Save sett
 | CORE API key (free) | CORE's open-access papers (it no longer answers without a key) | [core.ac.uk/services/api](https://core.ac.uk/services/api) |
 | Google Books API key (free) | Search inside millions of books | [Google Cloud console → Books API](https://console.cloud.google.com/apis/library/books.googleapis.com) |
 | LibreTranslate server (and key for libretranslate.com) | English-translation search for documents in other languages | [Self-host it](https://github.com/LibreTranslate/LibreTranslate) for free, or [libretranslate.com](https://libretranslate.com/) |
-| Ollama + `ollama pull phi4-mini` | Rewrite with a free model on your computer (the default) | [ollama.com](https://ollama.com/) |
+| Ollama + `ollama pull qwen2.5:7b` | Rewrite with a free model on your computer (the default) | [ollama.com](https://ollama.com/) |
 | Anthropic API key (optional, paid) | Rewrite with Claude instead; capped at 500 requests a month | [console.anthropic.com](https://console.anthropic.com/) |
 | Copyleaks email and key (optional, paid) | The paid Copyleaks scan; capped at 20 scans a month | [copyleaks.com](https://copyleaks.com/) |
 | AI indicator | The AI-likelihood estimate (off by default) | Switch in Settings |

@@ -25,7 +25,7 @@ export const config = {
   get anthropicKey() { return env("ANTHROPIC_API_KEY"); },
   get anthropicModel() { return env("ANTHROPIC_MODEL") ?? "claude-opus-5-5"; },
   get ollamaUrl() { return env("OLLAMA_BASE_URL") ?? "http://localhost:11434"; },
-  get ollamaModel() { return env("OLLAMA_MODEL") ?? "phi4-mini"; }, // Microsoft Phi-4-mini, MIT licence
+  get ollamaModel() { return env("OLLAMA_MODEL") ?? "qwen2.5:7b"; }, // Qwen2.5 7B Instruct, Apache-2.0 (kept facts best in tests)
   get aiLikelihood() { return env("ENABLE_AI_LIKELIHOOD") === "true"; },
   get languageTool() { return env("ENABLE_LANGUAGETOOL") === "true"; },
   get languageToolUrl() { return env("LANGUAGETOOL_URL") ?? "http://localhost:8010"; },

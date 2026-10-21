@@ -1,5 +1,5 @@
 // "Improve my writing": revise one passage of the author's own draft. Default engine: a local model through Ollama
-// (Phi-4-mini, MIT), so there is no per-use cost and the text stays on the machine. Optional engine: the Anthropic API,
+// (Qwen2.5 7B, Apache-2.0), so there is no per-use cost and the text stays on the machine. Optional engine: the Anthropic API,
 // only when AI_PROVIDER=anthropic and a key is set, and capped per month. There is deliberately no "humanize" or
 // "avoid detection" mode: the prompt asks for better writing, never for hiding how it was written.
 import "server-only";

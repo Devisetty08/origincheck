@@ -50,7 +50,7 @@ export default function ImproveWriting(p: Props) {
     <Card className="no-print text-[13.5px]" id="improve" aria-label="Rewrite with AI">
       <h3 className="flex items-center gap-1.5 font-semibold"><Sparkles size={15} />Rewrite with AI</h3>
       <p className="mt-1 text-mute" id="improveOff">{p.setupNote ?? "Not set up yet."} Rewrite uses a free model that runs on your own computer
-        (Phi-4-mini through Ollama) — nothing is sent anywhere. You can switch to Anthropic&apos;s Claude in Settings instead.</p>
+        (Qwen2.5 7B through Ollama) — nothing is sent anywhere. You can switch to Anthropic&apos;s Claude in Settings instead.</p>
       <Button size="sm" className="mt-2 w-full" onClick={p.onSetup} id="improveSetup">Open Settings</Button>
     </Card>
   );

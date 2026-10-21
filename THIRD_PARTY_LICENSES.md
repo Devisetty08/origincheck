@@ -21,7 +21,8 @@ origincheck uses the open-source components below. Versions are the ones pinned 
 | [onnx-community/roberta-base-openai-detector-ONNX](https://huggingface.co/onnx-community/roberta-base-openai-detector-ONNX) | MIT (from the original model) | ONNX conversion of [openai-community/roberta-base-openai-detector](https://huggingface.co/openai-community/roberta-base-openai-detector) (MIT). Used quantized (`model_quantized.onnx`, ≈126 MB). |
 | [Xenova/distilgpt2](https://huggingface.co/Xenova/distilgpt2) | Apache-2.0 (from the original model) | ONNX conversion of [distilbert/distilgpt2](https://huggingface.co/distilbert/distilgpt2) (Apache-2.0). Used quantized (`decoder_model_merged_quantized.onnx`, ≈85 MB). |
 | [Xenova/paraphrase-multilingual-MiniLM-L12-v2](https://huggingface.co/Xenova/paraphrase-multilingual-MiniLM-L12-v2) | Apache-2.0 (from the original model) | ONNX conversion of [sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2](https://huggingface.co/sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2) (Apache-2.0). Used quantized (q8, ≈118 MB) for paraphrase detection. |
-| [Phi-4-mini](https://huggingface.co/microsoft/Phi-4-mini-instruct) (`phi4-mini` in [Ollama](https://ollama.com/library/phi4-mini)) | MIT | The default Rewrite model, run locally through Ollama (not bundled; downloaded by `ollama pull phi4-mini`, ≈2.5 GB). |
+| [Qwen2.5-7B-Instruct](https://huggingface.co/Qwen/Qwen2.5-7B-Instruct) (`qwen2.5:7b` in [Ollama](https://ollama.com/library/qwen2.5)) | Apache-2.0 | The default Rewrite model, run locally through Ollama (not bundled; downloaded by `ollama pull qwen2.5:7b`, ≈4.7 GB). |
+| [Phi-4-mini](https://huggingface.co/microsoft/Phi-4-mini-instruct) (`phi4-mini`) | MIT | Optional smaller Rewrite model (set `OLLAMA_MODEL=phi4-mini`). |
 
 ## Documents and files
 
