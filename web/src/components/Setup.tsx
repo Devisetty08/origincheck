@@ -36,7 +36,12 @@ export default function Setup(p: Props) {
   const [importing, setImporting] = useState("");
   const [outcomes, setOutcomes] = useState<ImportOutcome[]>([]);
 
+  const [reading, setReading] = useState(0); // files still being read; checking before they finish would skip them
   const readFiles = async (files: File[], setMsg: (m: string) => void) => {
+    setReading((n) => n + files.length);
+    try { return await readAll(files, setMsg); } finally { setReading((n) => n - files.length); }
+  };
+  const readAll = async (files: File[], setMsg: (m: string) => void) => {
     const ok: (Source & { headings: Map<string, HStyle> })[] = [], errs: string[] = [];
     for (const f of files)
       try {
@@ -236,8 +241,8 @@ export default function Setup(p: Props) {
       </Card>
 
       <div className="mt-5 flex flex-wrap items-center gap-3.5">
-        <Button size="lg" variant="primary" id="runBtn" disabled={!ready || !!p.busy} onClick={p.onRun}>
-          {p.busy || (!p.doc ? "Add your document to start" : !ready ? "Add at least one source" : "Run check")}
+        <Button size="lg" variant="primary" id="runBtn" disabled={!ready || !!p.busy || reading > 0} onClick={p.onRun}>
+          {p.busy || (reading ? `Reading ${plural(reading, "file")}…` : !p.doc ? "Add your document to start" : !ready ? "Add at least one source" : "Run check")}
         </Button>
         {ready && !p.busy && <span className="text-[13.5px] text-mute">{plural(p.sources.length, "source")}{savedOn ? ` + ${p.saved.length} saved` : ""}{p.drafts ? ` + ${plural(p.drafts, "draft")}` : ""}{web ? " + web search" : ""}{books ? " + Open Library" : ""}</span>}
         {p.error && <p role="alert" className="w-full text-[13.5px] text-high">{p.error}</p>}
