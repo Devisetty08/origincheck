@@ -1,8 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MotionConfig } from "motion/react";
-import { BookOpen, Bot, Download, FileCheck, FileSearch, History, Library as LibIcon, Moon, PenLine, Printer, Settings as SettingsIcon, SpellCheck, Sun } from "lucide-react";
-import { Tabs as T } from "radix-ui";
+import { ArrowLeft, BookOpen, Bot, Download, FileCheck, FileSearch, History, Library as LibIcon, Moon, PenLine, Printer, Settings as SettingsIcon, SpellCheck, Sun } from "lucide-react";
 import { type CiteMeta, type Result, type Settings, type Source, type Tok, bibStart, tokenize } from "@/lib/similarity";
 import { plural } from "@/lib/words";
 import { hasHangul, pickQueries } from "@/lib/queries";
@@ -20,7 +19,7 @@ import {
   storeHistory, storeMeta, storePrefs, storeSaved, uid,
 } from "@/lib/store";
 import { Button, Dialog, Logo, type Status, cx } from "./ui";
-import Setup, { RunTable, SettingsCard, SourcesCard } from "./Setup";
+import Setup, { SettingsCard, SourcesCard } from "./Setup";
 import { ServerSettings } from "./SettingsPage";
 import RewriteTab from "./RewriteTab";
 import ExternalCheck from "./ExternalCheck";
@@ -28,7 +27,7 @@ import PaidCheck from "./PaidCheck";
 import Report from "./Report";
 import Drafts from "./Drafts";
 import Library from "./Library";
-import Dashboard, { type Tab } from "./Dashboard";
+import Dashboard, { NextSteps, type Step, type Tab } from "./Dashboard";
 import GrammarTab from "./GrammarTab";
 import ImproveWriting from "./ImproveWriting";
 import AiTab, { type AiState } from "./AiTab";
@@ -70,6 +69,7 @@ const GROUP_SERVICES: Record<SourceGroup, string> = {
   lists: "Project Gutenberg (Gutendex)",
 };
 type View = "check" | "history" | "library" | "settings";
+const TOOL_TITLE: Record<Tab, string> = { similarity: "Plagiarism check", grammar: "Grammar", ai: "AI indicator", rewrite: "Rewrite" };
 type PrivacyKind = "search" | "improve" | "paid";
 const PRIVACY: Record<PrivacyKind, { title: string; description: string; note: string }> = {
   search: { title: "Before searching outside your browser",
@@ -93,7 +93,6 @@ type PendingRecheck = { res: Omit<Resolution, "id" | "at">; at: number; len: num
 
 export default function App() {
   const [view, setView] = useState<View>("check");
-  const [tab, setTab] = useState<Tab>("similarity");
   const [tool, setTool] = useState<"check" | Tab>("check"); // which sidebar tool the user picked
   const [doc, setDoc] = useState<Doc | null>(null);
   const [sources, setSources] = useState<Source[]>([]);
@@ -244,6 +243,15 @@ export default function App() {
     setRunningAll(false);
   };
 
+  // Like Turnitin: the search starts by itself when a document is added (the privacy notice still comes first, once).
+  const autoSearched = useRef<string | null>(null);
+  useEffect(() => {
+    if (!doc || !cfg || prefs.autoSearch === false || autoSearched.current === doc.id) return;
+    autoSearched.current = doc.id;
+    runAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doc?.id, cfg]);
+
   /* ---------- a new document starts all three checks ---------- */
   const openDoc = (d: Omit<Doc, "id"> | null) => {
     if (!d) { setDoc(null); return; }
@@ -271,7 +279,6 @@ export default function App() {
     setSkipIds(new Set(drafts.map((x) => x.id))); // previous drafts are compared but excluded from the index by default
     setRuns(null);
     setHybrid({ status: "queued", near: [], para: [] });
-    setTab(tool === "check" ? "similarity" : tool);
     setView("check");
     startAi(next.text);
     scrollTo(0, 0);
@@ -486,7 +493,7 @@ export default function App() {
     ...(run?.r.passages ?? []).map((x): [number, number] => [x.s, x.end]),
     ...[...hybrid.near, ...hybrid.para].map((m): [number, number] => [m.docStart, m.docEnd]),
   ], [run, hybrid]);
-  const go = (v: View, t?: Tab) => { setView(v); if (t) setTab(t); if (v === "check") setTool(t ?? "check"); scrollTo(0, 0); };
+  const go = (v: View, t?: Tab) => { setView(v); if (v === "check") setTool(t ?? "check"); scrollTo(0, 0); };
   const userSources = sources.length + found.length;
   const toolActive = (t: Tab) => view === "check" && tool === t;
 
@@ -499,12 +506,31 @@ export default function App() {
     { id: "history", label: "History", short: "History", icon: <History size={18} />, on: () => go("history"), active: view === "history" },
     { id: "settings", label: "Settings", short: "Settings", icon: <SettingsIcon size={18} />, on: () => go("settings"), active: view === "settings" },
   ];
-  const improveCard = doc && <ImproveWriting text={doc.text} provider={cfg?.improve ?? null} flagged={flagged}
+  const improveCard = (picked: { s: number; e: number } | null) => doc && <ImproveWriting text={doc.text} picked={picked} provider={cfg?.improve ?? null} flagged={flagged}
     confirmPrivacy={(s) => confirmPrivacy(s, "improve")} onSetup={() => go("settings")}
     onApply={(s, e, t) => {
       setText(doc.text.slice(0, s) + t + doc.text.slice(e));
       setDoc((d) => d && { ...d, aiAssisted: (d.aiAssisted ?? 0) + 1 });
     }} />;
+
+  const matched = (run?.r.passages.length ?? 0) + hybrid.near.length + hybrid.para.length;
+  const nextSteps: Step[] = doc ? [
+    run ? (matched
+      ? { id: "plagiarism", icon: <FileSearch size={18} />, tone: run.r.index >= 25 ? "high" : "mid", title: `${plural(matched, "passage")} match your sources (${run.r.index}% similarity)`,
+          text: "Review each one: quote and cite it, rewrite it in your own words, or remove it.", action: "Review matches", onClick: () => go("check", "similarity") }
+      : { id: "plagiarism", icon: <FileSearch size={18} />, tone: "low", title: "No matching passages found",
+          text: `Compared against ${plural(run.all.length, "source")}. Search more places for a wider check.`, action: "See report", onClick: () => go("check", "similarity") })
+      : { id: "plagiarism", icon: <FileSearch size={18} />, tone: "mute", title: searching ? "Searching the internet and publications…" : "Nothing to compare against yet",
+          text: "Search the internet and publications, or add the papers you used.", action: "Find sources", onClick: () => go("check", "similarity") },
+    { id: "grammar", icon: <SpellCheck size={18} />, tone: grammar.status !== "done" ? "mute" : issues.length ? "mid" : "low",
+      title: grammar.status !== "done" ? "Checking grammar…" : grammar.englishOnly ? "Grammar check is English-only" : issues.length ? `${plural(issues.length, "grammar suggestion")} to review` : "No grammar issues found",
+      text: "Spelling, grammar, punctuation and style. Accept or dismiss each one.", action: "Fix grammar", onClick: () => go("check", "grammar") },
+    { id: "rewrite", icon: <PenLine size={18} />, tone: "mute", title: "Polish your wording",
+      text: cfg?.improve ? "Click a paragraph to get clearer or more concise wording, and keep only the changes you like." : "Clearer, more concise wording with AI. Needs an API key in Settings.",
+      action: "Open Rewrite", onClick: () => go("check", "rewrite") },
+    ...(ai.result ? [{ id: "ai", icon: <Bot size={18} />, tone: "mute" as const, title: `AI indicator: ${ai.result.label} (${ai.result.score}/100)`,
+      text: "A signal only, never proof. See which sentences drove it.", action: "See details", onClick: () => go("check", "ai") }] : []),
+  ] : [];
 
   return (
     <MotionConfig reducedMotion="user">
@@ -560,59 +586,54 @@ export default function App() {
             prefs={prefs} setPrefs={setPrefs} saved={saved} useSaved={useSaved} setUseSaved={setUseSaved} drafts={0}
             cfg={cfg} runs={runs} running={runningAll} canRun={false} onRunAll={runAll} confirmPrivacy={confirmPrivacy} onOpenSettings={() => go("settings")} />}
           {view === "check" && doc && <div className="mx-auto grid max-w-[1400px] grid-cols-[minmax(0,1fr)] gap-4 px-4 pt-5">
-            <Dashboard active={tab} onOpen={setTab} onAddSources={addSourceFiles}
-              sim={{ status: sim.status, index: run?.r.index, sources: run?.all.length ?? allSources.length, note: sim.note ?? (searching ? "Searching…" : undefined) }}
-              grammar={{ status: grammar.status, pct: grammar.pct, score: grammarScore, issues }}
-              ai={{ status: ai.status, pct: ai.pct, stage: ai.stage, mb: ai.mb, result: ai.result, stale: ai.stale }} />
+            {tool === "check" ? <>
+              <div>
+                <h1 className="text-[clamp(21px,3vw,26px)] font-bold leading-tight wrap-anywhere">{doc.name}</h1>
+                <p className="mt-0.5 text-sm text-mute">{doc.toks.length.toLocaleString()} words · Click a result to see the details.</p>
+              </div>
+              <Dashboard onOpen={(t) => go("check", t)} onAddSources={addSourceFiles}
+                sim={{ status: sim.status, index: run?.r.index, sources: run?.all.length ?? allSources.length, note: sim.note ?? (searching ? "Searching…" : undefined) }}
+                grammar={{ status: grammar.status, pct: grammar.pct, score: grammarScore, issues }}
+                ai={{ status: ai.status, pct: ai.pct, stage: ai.stage, mb: ai.mb, result: ai.result, stale: ai.stale }} />
+              <NextSteps steps={nextSteps} />
+              <div className="no-print flex flex-wrap gap-2" aria-label="Downloads">
+                <Button size="sm" onClick={downloadReport} id="dlReport"><Download size={14} />Download report</Button>
+                <Button size="sm" onClick={() => print()} className="max-sm:hidden"><Printer size={14} />Print / PDF</Button>
+                <Button size="sm" onClick={() => downloadCorrected("docx")}><Download size={14} />Corrected .docx</Button>
+                <Button size="sm" onClick={() => downloadCorrected("txt")}><Download size={14} />Corrected .txt</Button>
+              </div>
+            </> : <div className="no-print flex flex-wrap items-center gap-x-3 gap-y-1" id="toolBar">
+              <Button size="sm" variant="ghost" onClick={() => go("check")} id="backOverview"><ArrowLeft size={15} />Overview</Button>
+              <h1 className="text-xl font-bold">{TOOL_TITLE[tool]}</h1>
+              <span className="min-w-0 truncate text-sm text-mute">{doc.name}</span>
+            </div>}
 
-            <div className="no-print flex flex-wrap gap-2">
-              <Button size="sm" onClick={downloadReport} id="dlReport"><Download size={14} />Download report</Button>
-              <Button size="sm" onClick={() => print()} className="max-sm:hidden"><Printer size={14} />Print / PDF</Button>
-              <Button size="sm" onClick={() => downloadCorrected("docx")}><Download size={14} />Corrected .docx</Button>
-              <Button size="sm" onClick={() => downloadCorrected("txt")}><Download size={14} />Corrected .txt</Button>
-            </div>
-
-            <T.Root value={tab} onValueChange={(v) => { setTab(v as Tab); setTool(v as Tab); }}>
-              <T.List aria-label="Report" className="no-print mb-4 flex overflow-x-auto border-b border-line">
-                {([["similarity", "Plagiarism (similarity)"], ["grammar", "Grammar"], ["ai", "AI indicator"], ["rewrite", "Rewrite"]] as const).map(([id, label]) =>
-                  <T.Trigger key={id} value={id} className="shrink-0 cursor-pointer border-b-2 border-transparent px-4 py-2.5 text-sm font-semibold text-mute data-[state=active]:border-accent data-[state=active]:text-accent">{label}</T.Trigger>)}
-              </T.List>
-              <T.Content value="similarity" className="grid gap-4 outline-none">
-                <details className="no-print rounded-xl border border-line bg-panel px-4 py-3" open={sim.status === "needs-sources" || undefined}>
-                  <summary className="cursor-pointer text-sm font-semibold">Sources ({userSources}{saved.length && useSaved ? ` + ${saved.length} saved` : ""}{priorDrafts.length ? ` + ${plural(priorDrafts.length, "draft")}` : ""}) — add more</summary>
-                  <SourcesCard compact sources={sources} setSources={setSources} prefs={prefs} setPrefs={setPrefs}
-                    cfg={cfg} runs={runs} running={runningAll} canRun onRunAll={runAll} confirmPrivacy={confirmPrivacy} />
-                </details>
-                {runs && runs.length > 0 && <section className="no-print rounded-xl border border-line bg-panel px-4 py-3" aria-label="Source status">
-                  <h2 className="mb-2 text-sm font-semibold">Run all sources{webNote ? ` — ${webNote}` : ""}</h2>
-                  <RunTable runs={runs} />
-                </section>}
-                <ExternalCheck text={doc.text} korean={hasHangul(doc.text)} />
-                <PaidCheck text={doc.text} paid={cfg?.paid} confirm={(s) => confirmPrivacy(s, "paid")} onSetup={() => go("settings")} />
-                {run ? <Report doc={doc} run={run} ctx={ctx} webNote={webNote} citeFor={citeFor} prefs={prefs} setPrefs={setPrefs} hybrid={hybrid}
-                    recompute={recompute} applyEdit={applyEdit} undo={undo} saveDoc={saveDoc} saveMeta={saveMeta} saveDraft={saveDraft} />
-                  : <p className="rounded-xl border border-line bg-panel p-5 text-sm" role="status">
-                    {sim.status === "needs-sources" ? "Add sources above to run the similarity check." : sim.status === "error" ? `The similarity check failed: ${sim.error}` : sim.note ?? "Checking similarity…"}</p>}
-              </T.Content>
-              <T.Content value="grammar" className="outline-none">
-                <GrammarTab text={doc.text} issues={issues} busy={grammar.status === "running"} ltOn={ltOn} ltNote={grammar.ltNote ?? grammar.error}
-                  englishOnly={!!grammar.englishOnly} korean={hasHangul(doc.text)}
-                  onAddWord={(w) => setPrefs({ dictionary: [...new Set([...(prefs.dictionary ?? []), w])] })}
-                  onAccept={(i, s) => setText(applySuggestion(doc.text, i, s))}
-                  onIgnore={(i) => setIgnored((x) => new Set(x).add(i.id))}
-                  onIgnoreRule={(r) => setIgnoredRules((x) => new Set(x).add(r))}
-                  onAcceptAllSpelling={() => setText(applyAll(doc.text, issues.filter((i) => i.category === "spelling" && i.severity !== "style")))}
-                  onEditText={setText} onDownload={downloadCorrected}>
-                  {improveCard}
-                </GrammarTab>
-              </T.Content>
-              <T.Content value="rewrite" className="outline-none">
-                <RewriteTab text={doc.text} flagged={flagged} onOpenPlagiarism={() => go("check", "similarity")}>{improveCard}</RewriteTab>
-              </T.Content>
-              <T.Content value="ai" className="outline-none">
-                <AiTab s={ai} available={aiAvailable} onRerun={() => startAi(doc.text)} onEnable={() => { setPrefs({ ai: true }); startAi(doc.text, true); }} />
-              </T.Content>
-            </T.Root>
+            {tool === "similarity" && <>
+              {run ? <Report doc={doc} run={run} ctx={ctx} webNote={webNote} citeFor={citeFor} prefs={prefs} setPrefs={setPrefs} hybrid={hybrid}
+                  recompute={recompute} applyEdit={applyEdit} undo={undo} saveDoc={saveDoc} saveMeta={saveMeta} saveDraft={saveDraft} />
+                : <div className="rounded-xl border border-line bg-panel p-5 text-sm" role="status">
+                    {sim.status === "needs-sources" ? <><b className="text-base">Nothing to compare against yet.</b>
+                      <p className="mt-1 text-mute">Search the internet and publications below, or add the papers and pages you used.</p></>
+                      : sim.status === "error" ? `The plagiarism check failed: ${sim.error}` : sim.note ?? "Checking…"}</div>}
+              <section className="no-print rounded-xl border border-line bg-panel p-5">
+                <SourcesCard compact sources={sources} setSources={setSources} prefs={prefs} setPrefs={setPrefs}
+                  note={`Comparing against ${plural(userSources, "source")}${saved.length && useSaved ? ` and ${plural(saved.length, "saved document")}` : ""}${priorDrafts.length ? ` and ${plural(priorDrafts.length, "earlier draft")}` : ""}. Search more places or add sources you used.`}
+                  cfg={cfg} runs={runs} running={runningAll} canRun onRunAll={runAll} confirmPrivacy={confirmPrivacy} />
+              </section>
+              <PaidCheck text={doc.text} paid={cfg?.paid} confirm={(s) => confirmPrivacy(s, "paid")} onSetup={() => go("settings")} />
+              <ExternalCheck text={doc.text} korean={hasHangul(doc.text)} />
+            </>}
+            {tool === "grammar" && <GrammarTab text={doc.text} issues={issues} busy={grammar.status === "running"} ltOn={ltOn} ltNote={grammar.ltNote ?? grammar.error}
+              englishOnly={!!grammar.englishOnly} korean={hasHangul(doc.text)}
+              onAddWord={(w) => setPrefs({ dictionary: [...new Set([...(prefs.dictionary ?? []), w])] })}
+              onAccept={(i, s) => setText(applySuggestion(doc.text, i, s))}
+              onIgnore={(i) => setIgnored((x) => new Set(x).add(i.id))}
+              onIgnoreRule={(r) => setIgnoredRules((x) => new Set(x).add(r))}
+              onAcceptAllSpelling={() => setText(applyAll(doc.text, issues.filter((i) => i.category === "spelling" && i.severity !== "style")))}
+              onEditText={setText} onDownload={downloadCorrected} />}
+            {tool === "rewrite" && <RewriteTab text={doc.text} flagged={flagged} onOpenPlagiarism={() => go("check", "similarity")}
+              renderPanel={(picked) => improveCard(picked)} />}
+            {tool === "ai" && <AiTab s={ai} available={aiAvailable} onRerun={() => startAi(doc.text)} onEnable={() => { setPrefs({ ai: true }); startAi(doc.text, true); }} />}
           </div>}
         </main>
       </div>

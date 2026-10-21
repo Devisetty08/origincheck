@@ -42,7 +42,7 @@ export default function Setup(p: DocProps & SourcesProps & SettingsProps & { onO
     <div className="mx-auto max-w-[1180px] px-4 pt-7 pb-12">
       <div className="mb-6">
         <h1 className="text-[clamp(23px,4vw,30px)] font-bold leading-tight tracking-tight">Check your writing</h1>
-        <p className="mt-1.5 text-[15.5px] text-mute">Add a document and origincheck checks similarity to your sources and grammar straight away. Then use <b>Run all sources</b> to search publications, the web and books.</p>
+        <p className="mt-1.5 text-[15.5px] text-mute">Add your document. origincheck checks it for plagiarism, grammar and (if turned on) AI-written text, all at once.</p>
         <p className="mt-3 inline-flex items-center gap-2 rounded-full bg-soft px-3 py-1.5 text-[13px]">
           <Lock size={15} className="shrink-0 text-accent" aria-hidden />
           Your document is read and compared in your browser. Searches send only short phrases, never the whole document.
@@ -52,7 +52,7 @@ export default function Setup(p: DocProps & SourcesProps & SettingsProps & { onO
         <DocCard {...p} />
         <SourcesCard {...p} />
       </div>
-      <p className="mt-[18px] text-[13.5px] text-mute">Check options (quotes, bibliography, paraphrase, citation style) and API keys are in{" "}
+      <p className="mt-[18px] text-[13.5px] text-mute">Options such as ignoring quotes and your bibliography, citation style and API keys are in{" "}
         <button className="cursor-pointer text-accent underline" onClick={p.onOpenSettings} id="setupSettings">Settings</button>.</p>
     </div>
   );
@@ -106,19 +106,25 @@ interface SourcesProps {
   confirmPrivacy: (services: string[]) => Promise<boolean>;
 }
 
-const INPUTS: { id: Input; label: string; icon: React.ReactNode; hint: string }[] = [
-  { id: "files", label: "Files", icon: <Files size={15} />, hint: "Upload .txt, .pdf, .docx, .md, .html or .rtf. Read in your browser; nothing is uploaded." },
-  { id: "paste", label: "Paste", icon: <ClipboardPaste size={15} />, hint: "Paste the text of a source." },
-  { id: "url", label: "Web page", icon: <Link2 size={15} />, hint: "Give a web address. origincheck's server fetches the page (safely) and extracts its main text." },
-  { id: "refs", label: "References & DOIs", icon: <Globe size={15} />, hint: "Paste references or DOIs to add open-access full texts. Run all sources also searches scholarly databases." },
-  { id: "web", label: "Search the web", icon: <Search size={15} />, hint: "Run all sources searches distinctive phrases on the web and Wikipedia." },
-  { id: "books", label: "Books (Open Library)", icon: <BookOpen size={15} />, hint: "Run all sources searches inside millions of scanned books." },
-  { id: "lists", label: "Free book lists", icon: <Library size={15} />, hint: "Browse free book catalogues; Run all sources also searches Project Gutenberg." },
+/** Searched automatically from short phrases of your document (each one is a Yes/No input). */
+const SEARCH: { id: Input; label: string; hint: string; icon: React.ReactNode }[] = [
+  { id: "web", label: "The internet", hint: "Wikipedia and web search", icon: <Search size={16} /> },
+  { id: "refs", label: "Journals & publications", hint: "Crossref, OpenAlex, arXiv, Semantic Scholar, CORE, Europe PMC", icon: <Globe size={16} /> },
+  { id: "books", label: "Books", hint: "Inside millions of books (Open Library)", icon: <BookOpen size={16} /> },
+  { id: "lists", label: "Free classic books", hint: "Project Gutenberg", icon: <Library size={16} /> },
+];
+/** Sources you add yourself. */
+const OWN: { id: Input; label: string; icon: React.ReactNode; include: string }[] = [
+  { id: "files", label: "Upload files", icon: <Files size={15} />, include: "Compare against uploaded files" },
+  { id: "paste", label: "Paste text", icon: <ClipboardPaste size={15} />, include: "Compare against pasted text" },
+  { id: "url", label: "Web page", icon: <Link2 size={15} />, include: "Compare against web pages you add" },
+  { id: "refs", label: "Reference list", icon: <Globe size={15} />, include: "Compare against your references and journals" },
+  { id: "lists", label: "Free book lists", icon: <Library size={15} />, include: "Compare against free books" },
 ];
 const SERVER_INPUTS: Input[] = ["refs", "web", "books", "lists"];
 export const inputOn = (prefs: Prefs, i: Input) => prefs.inputs?.[i] !== false;
 
-export function SourcesCard(p: SourcesProps & { compact?: boolean }) {
+export function SourcesCard(p: SourcesProps & { compact?: boolean; note?: string }) {
   const [msg, setMsg] = useState("");
   const [mode, setMode] = useState<Input>("files");
   const [pName, setPName] = useState("");
@@ -168,32 +174,52 @@ export function SourcesCard(p: SourcesProps & { compact?: boolean }) {
     setOutcomes(out);
     addImported(out, "refs");
   };
-  const adapters = (group: Input) => (p.cfg?.sources ?? []).filter((s) => s.group === group);
   const enabledServer = SERVER_INPUTS.filter(on);
-  const cur = INPUTS.find((i) => i.id === mode)!;
+  const cur = OWN.find((i) => i.id === mode)!;
+  const runs = p.runs ?? [];
+  const found = runs.filter((r) => r.status === "success").length;
+  const couldnt = runs.filter((r) => r.status === "failed" || r.status === "rate-limited" || r.status === "not configured").length;
 
   return (
-    <Card aria-labelledby="srcH" className={p.compact ? "border-0 p-0" : undefined}>
-      {!p.compact && <>
-        <h2 id="srcH" className="font-semibold">2. Sources to compare against</h2>
-        <p className="text-[13.5px] text-mute">Papers, articles and web pages you read or used.</p>
-      </>}
-      <div className="mt-3 flex flex-wrap gap-1.5" role="group" aria-label="How to add sources">
-        {INPUTS.map(({ id, label, icon }) => (
-          <Button key={id} size="sm" variant={mode === id ? "primary" : "outline"} aria-pressed={mode === id} onClick={() => { setMode(id); setOutcomes([]); }}
-            className={cx(!on(id) && mode !== id && "opacity-60")}>
-            {icon}{label}{!on(id) && <span className="text-[11px]">(off)</span>}
-          </Button>
+    <Card aria-labelledby="srcH" className={p.compact ? "border-0 p-0" : undefined} id={p.compact ? "moreSources" : "sourcesCard"}>
+      <h2 id="srcH" className="font-semibold">{p.compact ? "Find more sources" : "2. What to compare against"}</h2>
+      <p className="text-[13.5px] text-mute">{p.note ?? "origincheck searches these for you. You can also add papers and pages you used."}</p>
+
+      <fieldset className="mt-3">
+        <legend className="text-[12.5px] font-semibold uppercase tracking-wide text-mute">Search automatically</legend>
+        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+          {SEARCH.map((s) => (
+            <label key={s.id} htmlFor={`in-${s.id}`} className={cx("flex cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2 text-sm", on(s.id) ? "border-accent/50 bg-soft" : "border-line")}>
+              <input id={`in-${s.id}`} type="checkbox" checked={on(s.id)} onChange={(e) => setOn(s.id, e.target.checked)} className="mt-0.5 size-4.5 shrink-0 accent-accent" />
+              <span className="text-accent" aria-hidden>{s.icon}</span>
+              <span className="min-w-0"><b className="font-semibold">{s.label}</b><span className="block text-[12px] text-mute">{s.hint}</span></span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <Button variant="primary" onClick={p.onRunAll} disabled={!p.canRun || p.running || !enabledServer.length} id="runAll">
+          <Play size={15} />{p.running ? "Searching…" : runs.length ? "Search again" : "Search now"}</Button>
+        <span className="text-[12.5px] text-mute">
+          {!p.canRun ? "Starts automatically when you add your document." : !enabledServer.length ? "Tick at least one place to search."
+            : `Sends up to ${p.cfg?.maxQueries ?? 8} short phrases (never your whole document).`}
+        </span>
+      </div>
+      {runs.length > 0 && <div className="mt-2 rounded-lg bg-bg px-3 py-2 text-[13px]" id="searchSummary">
+        <p role="status">{p.running ? `Searching ${runs.length} services…` : `${plural(found, "service")} found sources, ${runs.length - found - couldnt} found nothing${couldnt ? `, ${couldnt} couldn't search (see details)` : ""}.`}</p>
+        <details className="mt-1"><summary className="cursor-pointer text-accent">Details per service</summary><div className="mt-2"><RunTable runs={runs} /></div></details>
+      </div>}
+
+      <h3 className="mt-5 text-[12.5px] font-semibold uppercase tracking-wide text-mute">Add your own sources <span className="normal-case tracking-normal">(optional)</span></h3>
+      <div className="mt-2 flex flex-wrap gap-1.5" role="tablist" aria-label="Add your own sources">
+        {OWN.map(({ id, label, icon }) => (
+          <Button key={id} size="sm" role="tab" aria-selected={mode === id} variant={mode === id ? "primary" : "outline"} onClick={() => { setMode(id); setOutcomes([]); }}
+            className={cx(!on(id) && mode !== id && "opacity-60")} data-mode={id}>{icon}{label}</Button>
         ))}
       </div>
-
-      <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg bg-soft px-3 py-2 text-sm">
-        <span className="font-medium">Use “{cur.label}”</span>
-        <span className="inline-flex overflow-hidden rounded-md border border-line" role="radiogroup" aria-label={`Use ${cur.label}`}>
-          {([true, false] as const).map((v) => <button key={String(v)} role="radio" aria-checked={on(mode) === v} onClick={() => setOn(mode, v)} data-toggle={`${mode}-${v ? "yes" : "no"}`}
-            className={cx("cursor-pointer px-3 py-1 text-[13px] font-semibold", on(mode) === v ? "bg-accent text-accent-ink" : "bg-panel text-mute")}>{v ? "Yes" : "No"}</button>)}
-        </span>
-        <span className="text-[12.5px] text-mute">{cur.hint}</span>
+      <div className="mt-2.5">
+        <Check id={`in-${mode}`} label={cur.include} checked={on(mode)} onChange={(v) => setOn(mode, v)} />
       </div>
 
       {mode === "files" && <Drop id={p.compact ? "srcDrop2" : "srcDrop"} multiple label="Choose source files" onFiles={onSources} icon={<Files aria-hidden />} title="Drop files here or click to browse" sub="Add as many as you like" />}
@@ -210,12 +236,8 @@ export function SourcesCard(p: SourcesProps & { compact?: boolean }) {
         <textarea className={cx(inputCls, "min-h-28")} aria-label="Reference list or DOIs" value={refs} onChange={(e) => setRefs(e.target.value)}
           placeholder={"One reference or DOI per line, e.g.\n10.1038/s41586-020-2649-2\nSmith, J. (2020). Title of the article. Journal, 12(3), 45–67."} />
         <div><Button size="sm" variant="primary" onClick={addRefs} disabled={!!busy || !refs.trim()}>Find open-access full text</Button></div>
-        <AdapterList list={adapters("refs")} />
       </div>}
-      {mode === "web" && <AdapterList list={adapters("web")} note="Korean Wikipedia joins automatically when your text contains Korean." />}
-      {mode === "books" && <AdapterList list={adapters("books")} />}
       {mode === "lists" && <>
-        <AdapterList list={adapters("lists")} />
         <Catalogs onAdd={(item, text) => p.setSources((s) => [...s, {
           id: uid(), name: item.title, kind: "internet", input: "lists", text, toks: tokenize(text), found: { adapter: "Free book lists", url: item.url },
           meta: { authors: [], title: item.title, url: item.url, accessed: new Date().toISOString().slice(0, 10) },
@@ -234,17 +256,9 @@ export function SourcesCard(p: SourcesProps & { compact?: boolean }) {
           name={s.name} words={s.toks.length} off={!!s.input && !on(s.input)} onRemove={() => p.setSources((all) => all.filter((x) => x.id !== s.id))} />)}
       </ul>}
       {msg && <p role="alert" className="mt-2.5 text-[13.5px] text-high">{msg}</p>}
-
-      <div className="mt-4 grid gap-2 border-t border-line pt-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <Button variant="primary" onClick={p.onRunAll} disabled={!p.canRun || p.running || !enabledServer.length} id="runAll"><Play size={15} />{p.running ? "Searching…" : "Run all sources"}</Button>
-          <span className="text-[12.5px] text-mute">
-            {!p.canRun ? "Add your document first." : !enabledServer.length ? "Turn on at least one search input (References, Web, Books or Free book lists)."
-              : `Searches ${enabledServer.map((i) => INPUTS.find((x) => x.id === i)!.label).join(", ")} with up to ${p.cfg?.maxQueries ?? 8} short phrases from your document.`}
-          </span>
-        </div>
-        {p.runs && <RunTable runs={p.runs} />}
-      </div>
+      <details className="mt-4 text-[12.5px] text-mute"><summary className="cursor-pointer">Which services are searched</summary>
+        <AdapterList list={p.cfg?.sources ?? []} note="Korean Wikipedia joins automatically when your text contains Korean." />
+      </details>
     </Card>
   );
 }
@@ -295,9 +309,11 @@ export function SettingsCard(p: SettingsProps & { className?: string }) {
   const s = p.settings, set = (patch: Partial<Settings>) => p.setSettings({ ...s, ...patch });
   return (
     <Card className={p.className} aria-labelledby="setH">
-      <h2 id="setH" className="font-semibold">Settings</h2>
-      <h3 className="mt-3 text-[13px] font-semibold uppercase tracking-wide text-mute">Similarity</h3>
+      <h2 id="setH" className="font-semibold">Check options</h2>
+      <h3 className="mt-3 text-[13px] font-semibold uppercase tracking-wide text-mute">Plagiarism check</h3>
       <div className="mt-2 grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+        <Check id="sAuto" label="Search automatically when I add a document" hint="Searches the internet and publications with short phrases. Turn off to search only when you press Search now."
+          checked={p.prefs.autoSearch !== false} onChange={(v) => p.setPrefs({ autoSearch: v })} />
         <Check id="sQuotes" label="Ignore quotes and cited passages" hint="Excluded from the index and from search queries." checked={s.quotes} onChange={(v) => set({ quotes: v })} />
         <Check id="sBib" label="Exclude bibliography" checked={s.bib} onChange={(v) => set({ bib: v })} />
         <Check id="sPara" label="Detect paraphrase" hint="Compares meaning with an on-device model (downloads about 120 MB once). Reported separately, not in the index." checked={p.prefs.paraphrase !== false} onChange={(v) => p.setPrefs({ paraphrase: v })} />

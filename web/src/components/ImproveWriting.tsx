@@ -28,6 +28,7 @@ export const joinParts = (parts: Part[]) => parts.map((p) => ("keep" in p ? p.ke
 
 interface Props {
   text: string;
+  picked: { s: number; e: number } | null; // the passage chosen on the Rewrite page
   provider: "anthropic" | "ollama" | null;
   flagged: [number, number][]; // char ranges matched by the similarity check
   confirmPrivacy: (services: string[]) => Promise<boolean>;
@@ -43,30 +44,30 @@ export default function ImproveWriting(p: Props) {
   const [busy, setBusy] = useState(false);
 
   if (!p.provider) return (
-    <Card className="no-print text-[13.5px]" id="improve" aria-label="Improve my writing">
-      <h3 className="flex items-center gap-1.5 font-semibold"><Sparkles size={15} />Improve my writing</h3>
+    <Card className="no-print text-[13.5px]" id="improve" aria-label="Rewrite with AI">
+      <h3 className="flex items-center gap-1.5 font-semibold"><Sparkles size={15} />Rewrite with AI</h3>
       <p className="mt-1 text-mute" id="improveOff">Not set up yet. Add an Anthropic API key, or point it at a free Ollama server on your computer, in Settings.</p>
       <Button size="sm" className="mt-2 w-full" onClick={p.onSetup} id="improveSetup">Open Settings</Button>
     </Card>
   );
 
+  const pk = p.picked;
+  const original = pk ? p.text.slice(pk.s, pk.e) : "";
+  const locked = !!pk && p.flagged.some(([a, b]) => a < pk.e && b > pk.s);
+  const showParts = parts && sel && pk && sel.s === pk.s && sel.e === pk.e; // a new pick hides the old suggestion
+
   const run = async () => {
     setParts(null); setMsg("");
-    const picked = window.getSelection()?.toString().trim() ?? "";
-    // ponytail: first occurrence of the selected text; a repeated passage resolves to its first copy.
-    const s = picked ? p.text.indexOf(picked) : -1;
-    if (s < 0) return setMsg("Select a passage in your document first (up to about 600 words).");
-    const e = s + picked.length;
-    if (picked.length > 4000) return setMsg("That selection is too long. Select up to 4,000 characters.");
-    if (p.flagged.some(([a, b]) => a < e && b > s))
-      return setMsg("This passage matches a source. Quote and cite it, or rewrite it in your own words — AI revision is off for flagged passages.");
+    if (!pk || !original.trim()) return setMsg("Click a paragraph on the left first.");
+    if (original.length > 4000) return setMsg("That passage is too long. Select up to 4,000 characters.");
+    if (locked) return setMsg("This passage matches a source. Quote and cite it, or rewrite it in your own words — AI rewriting is off for it.");
     if (!(await p.confirmPrivacy([PROVIDER[p.provider!]]))) return;
-    setBusy(true); setSel({ s, e });
+    setBusy(true); setSel(pk);
     try {
-      const r = await fetch("/api/improve", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: picked, goal }) });
+      const r = await fetch("/api/improve", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: original, goal }) });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) return setMsg(j.error ?? `The revision failed (${r.status}).`);
-      const next = toParts(picked, j.revised);
+      const next = toParts(original, j.revised);
       if (!next.some((x) => "del" in x)) return setMsg("No changes suggested for this passage.");
       setParts(next);
     } catch { setMsg("Couldn't reach the server."); } finally { setBusy(false); }
@@ -78,35 +79,50 @@ export default function ImproveWriting(p: Props) {
     setParts(null); setSel(null); setMsg("Applied. Your document is now marked as AI-assisted in exports.");
   };
   const toggle = (i: number) => setParts((ps) => ps!.map((x, j) => (j === i && "del" in x ? { ...x, on: !x.on } : x)));
+  const setAll = (on: boolean) => setParts((ps) => ps!.map((x) => ("del" in x ? { ...x, on } : x)));
   const changes = parts?.filter((x) => "del" in x) ?? [];
 
   return (
-    <Card className="no-print text-[13.5px]" id="improve" aria-label="Improve my writing">
-      <h3 className="flex items-center gap-1.5 font-semibold"><Sparkles size={15} />Improve my writing</h3>
-      <p className="mt-1 text-[12.5px] text-mute">Select a passage in your document, choose a goal, and review each suggested change.
-        Only the selected passage is sent to {PROVIDER[p.provider]}. Edits you accept mark the document as AI-assisted.</p>
-      <div className="mt-2 flex flex-wrap gap-1" role="radiogroup" aria-label="Goal">
+    <Card className="no-print text-[13.5px]" id="improve" aria-label="Rewrite with AI">
+      <h3 className="flex items-center gap-1.5 font-semibold"><Sparkles size={15} />Rewrite with AI</h3>
+      <div className="mt-2 flex flex-wrap gap-1" role="radiogroup" aria-label="Mode">
         {GOALS.map((g) => <button key={g.id} role="radio" aria-checked={goal === g.id} onClick={() => setGoal(g.id)} data-goal={g.id}
-          className={cx("cursor-pointer rounded-md border px-2 py-0.5 text-[12.5px]", goal === g.id ? "border-accent bg-accent text-accent-ink" : "border-line")}>{g.label}</button>)}
+          className={cx("cursor-pointer rounded-full border px-3 py-1 text-[12.5px] font-medium", goal === g.id ? "border-accent bg-accent text-accent-ink" : "border-line hover:border-accent")}>{g.label}</button>)}
       </div>
-      <Button size="sm" className="mt-2 w-full" onMouseDown={(e) => e.preventDefault()} onClick={run} disabled={busy} id="improveRun">
-        <Sparkles size={14} />{busy ? "Revising…" : "Revise selected passage"}</Button>
+
+      <div className="mt-3 text-[12px] font-semibold uppercase tracking-wide text-mute">Original</div>
+      <div className={cx("mt-1 max-h-48 overflow-auto rounded-lg border p-2.5 font-serif text-[14.5px] leading-[1.7] whitespace-pre-wrap", locked ? "border-close/50 bg-close/5" : "border-line bg-bg")} id="improveOriginal">
+        {original || <span className="font-sans text-[13px] text-mute">Click a paragraph on the left, or select part of one.</span>}
+      </div>
+      {locked && <p className="mt-1 text-[12px] text-close">Matches a source — rewrite this yourself in the plagiarism check.</p>}
+      <Button variant="primary" className="mt-2 w-full" onClick={run} disabled={busy || !pk || locked} id="improveRun">
+        <Sparkles size={14} />{busy ? "Rewriting…" : "Rewrite"}</Button>
       {msg && <p className="mt-2 text-[12.5px]" role="status" id="improveMsg">{msg}</p>}
-      {parts && <div className="mt-3" id="improveDiff">
-        <p className="rounded-lg bg-bg p-2 font-serif text-[14.5px] leading-[1.8] whitespace-pre-wrap">
+
+      {showParts && <div className="mt-3" id="improveDiff">
+        <div className="flex items-center justify-between">
+          <span className="text-[12px] font-semibold uppercase tracking-wide text-mute">Suggestion</span>
+          <span className="flex gap-2 text-[12px]">
+            <button className="cursor-pointer text-accent hover:underline" onClick={() => setAll(true)}>Accept all</button>
+            <button className="cursor-pointer text-accent hover:underline" onClick={() => setAll(false)}>Reject all</button>
+          </span>
+        </div>
+        <p className="mt-1 rounded-lg border border-line bg-bg p-2.5 font-serif text-[14.5px] leading-[1.8] whitespace-pre-wrap">
           {parts.map((x, i) => "keep" in x ? <span key={i}>{x.keep}</span> : (
-            <button key={i} onClick={() => toggle(i)} data-change={i} aria-pressed={x.on}
-              title={x.on ? "Accepted — click to keep your original" : "Rejected — click to accept the change"} className="cursor-pointer">
+            <span key={i} role="button" tabIndex={0} onClick={() => toggle(i)} data-change={i} aria-pressed={x.on}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(i); } }}
+              title={x.on ? "Kept — click to undo this change" : "Undone — click to keep this change"} className="cursor-pointer rounded hover:bg-soft">
               {x.del && <del className={x.on ? "text-high" : "no-underline"}>{x.del}</del>}
-              {x.add && <ins className={x.on ? "text-low" : "text-mute line-through opacity-50"}>{x.add}</ins>}
-            </button>))}
+              {x.add && <ins className={x.on ? "text-low no-underline bg-low/10" : "text-mute line-through opacity-50"}>{x.add}</ins>}
+            </span>))}
         </p>
-        <p className="mt-1 text-[12px] text-mute">{changes.filter((x) => "on" in x && x.on).length} of {changes.length} changes accepted. Click a change to accept or reject it.</p>
+        <p className="mt-1 text-[12px] text-mute">{changes.filter((x) => "on" in x && x.on).length} of {changes.length} changes kept. Click any change to keep or undo it.</p>
         <div className="mt-2 flex gap-2">
-          <Button size="sm" variant="primary" onClick={apply} id="improveApply">Apply accepted</Button>
+          <Button size="sm" variant="primary" onClick={apply} id="improveApply">Use in my document</Button>
           <Button size="sm" onClick={() => setParts(null)} id="improveDiscard">Discard</Button>
         </div>
       </div>}
+      <p className="mt-3 text-[11.5px] text-mute">Only the chosen passage is sent to {PROVIDER[p.provider]}. Changes you use mark your document as AI-assisted in exports.</p>
     </Card>
   );
 }

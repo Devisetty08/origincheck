@@ -121,7 +121,7 @@ export default function GrammarTab(p: Props) {
         </p>
         {p.englishOnly && <p className="mb-3 rounded-lg bg-soft p-3 text-sm" role="status" id="englishOnly">
           <b>Grammar checking is English-only.</b> This text isn&apos;t mostly English, so Harper wasn&apos;t run.
-          {p.korean && " For Korean, CopyKiller (under “Check externally” on the Similarity tab) and a Korean spell checker are better options."}
+          {p.korean && " For Korean, CopyKiller (under “Check externally” on the Plagiarism check page) and a Korean spell checker are better options."}
         </p>}
         {editing
           ? <EditBox text={p.text} onChange={p.onEditText} />
@@ -129,21 +129,26 @@ export default function GrammarTab(p: Props) {
       </article>
 
       <aside className="grid min-w-0 gap-3.5 min-[1000px]:sticky min-[1000px]:top-[72px]" aria-label="Grammar issues">
-        <Card>
+        <Card className="p-4">
           <div className="flex items-center justify-between">
-            <h3 className="font-semibold">{plural(p.issues.length, "suggestion")}</h3>
+            <h3 className="font-semibold">{p.issues.length ? plural(p.issues.length, "suggestion") : "All clear"}</h3>
             <div className="flex gap-1">
               <Button size="sm" aria-label="Previous issue" onClick={() => step(-1)} id="gPrev"><ChevronLeft size={16} /></Button>
               <Button size="sm" aria-label="Next issue" onClick={() => step(1)} id="gNext"><ChevronRight size={16} /></Button>
             </div>
           </div>
-          <ul className="mt-2 grid gap-1" aria-label="Issues by category">
-            <CatRow label="All" n={p.issues.length} active={cat === "all"} onClick={() => setCat("all")} />
-            {CATEGORIES.map((c) => <CatRow key={c} label={CAT_LABEL[c]} n={counts[c]} active={cat === c} onClick={() => setCat(c)} />)}
-          </ul>
+          <div className="mt-2 flex flex-wrap gap-1" role="group" aria-label="Issues by category">
+            <CatChip label="All" n={p.issues.length} active={cat === "all"} onClick={() => setCat("all")} />
+            {CATEGORIES.filter((c) => counts[c]).map((c) => <CatChip key={c} label={CAT_LABEL[c]} n={counts[c]} active={cat === c} onClick={() => setCat(c)} />)}
+          </div>
           {spellingFixes > 0 && <Button size="sm" className="mt-3 w-full" onClick={p.onAcceptAllSpelling} id="acceptSpelling">
             <CheckIcon size={14} />Accept all spelling fixes ({spellingFixes})</Button>}
-          <p className="mt-2 text-[12px] text-mute">Checked on your device by Harper{p.ltOn ? " and LanguageTool (online)" : ""}. Style suggestions are reviewed one at a time.{p.ltNote ? ` ${p.ltNote}` : ""}</p>
+          <ul className="mt-3 grid max-h-[55vh] gap-2 overflow-auto pr-0.5" aria-label="Suggestions" id="gCards">
+            {shown.map((i) => <SuggestionCard key={i.id} i={i} text={p.text} active={open === i.id} onOpen={() => focusIssue(i)}
+              onAccept={(s) => p.onAccept(i, s)} onDismiss={() => p.onIgnore(i)} />)}
+            {!shown.length && <li className="py-4 text-center text-sm text-mute">{p.busy ? "Checking…" : "No suggestions here."}</li>}
+          </ul>
+          <p className="mt-2 text-[12px] text-mute">Checked on your device by Harper{p.ltOn ? " and LanguageTool (online)" : ""}.{p.ltNote ? ` ${p.ltNote}` : ""}</p>
         </Card>
         <Card className="text-[13.5px]" aria-label="Readability">
           <h3 className="font-semibold">Readability</h3>
@@ -194,13 +199,34 @@ export default function GrammarTab(p: Props) {
   );
 }
 
-function CatRow({ label, n, active, onClick }: { label: string; n: number; active: boolean; onClick: () => void }) {
+function CatChip({ label, n, active, onClick }: { label: string; n: number; active: boolean; onClick: () => void }) {
   return (
-    <li>
-      <button onClick={onClick} aria-pressed={active}
-        className={cx("flex w-full cursor-pointer items-center justify-between rounded-md px-2 py-1.5 text-left text-sm hover:bg-soft", active && "bg-soft font-semibold text-accent")}>
-        <span>{label}</span><span className="rounded-full bg-bg px-2 text-[12px]">{n}</span>
+    <button onClick={onClick} aria-pressed={active}
+      className={cx("cursor-pointer rounded-full border px-2.5 py-0.5 text-[12.5px]", active ? "border-accent bg-accent text-accent-ink" : "border-line hover:border-accent")}>
+      {label} <b>{n}</b>
+    </button>
+  );
+}
+
+const SEV_BAR: Record<Issue["severity"], string> = { error: "border-l-high", warning: "border-l-mid", style: "border-l-accent" };
+
+/** One suggestion, Grammarly-style: what's wrong, the fix, and Accept / Dismiss without hunting for the underline. */
+function SuggestionCard({ i, text, active, onOpen, onAccept, onDismiss }: {
+  i: Issue; text: string; active: boolean; onOpen: () => void; onAccept: (s: Issue["suggestions"][number]) => void; onDismiss: () => void;
+}) {
+  const s = i.suggestions[0];
+  const was = text.slice(i.start, i.end);
+  return (
+    <li className={cx("rounded-lg border border-l-4 bg-panel p-2.5 text-[13px]", SEV_BAR[i.severity], active ? "border-accent ring-1 ring-accent" : "border-line")} data-card-issue={i.id}>
+      <button className="block w-full cursor-pointer text-left" onClick={onOpen}>
+        <span className="text-[11.5px] font-semibold uppercase tracking-wide text-mute">{CAT_LABEL[i.category]}</span>
+        {s && <span className="mt-0.5 block text-[14px]"><s className="text-mute">{was || "␣"}</s> → <b className="text-low">{s.kind === "remove" ? "(remove)" : s.text || "(remove)"}</b></span>}
+        <span className="mt-0.5 block text-mute">{i.message}</span>
       </button>
+      <span className="mt-1.5 flex gap-2">
+        {s && <Button size="sm" variant="primary" onClick={() => onAccept(s)} data-card-accept>Accept</Button>}
+        <Button size="sm" variant="ghost" onClick={onDismiss}>Dismiss</Button>
+      </span>
     </li>
   );
 }

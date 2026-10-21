@@ -16,7 +16,15 @@ It comes in two versions. The **web app** (`web/`) is a Next.js app: documents a
 
 Drop in a document (.docx, .pdf, .txt, .md, .html, .rtf) or paste text. The checks start in parallel, each in its own Web Worker, and results appear as they finish. The summary shows one card per check, for example "47% similarity · 7 grammar suggestions".
 
-The sidebar has a page per tool: **Check document** (everything at once), **Plagiarism check**, **Grammar**, **AI indicator**, **Rewrite**, **History** and **Settings**. Each tool page explains itself and accepts a document directly, then opens on that tool's results.
+The sidebar is the only navigation: **Check document**, **Plagiarism check**, **Grammar**, **AI indicator**, **Rewrite**, **History** and **Settings**.
+
+- **Check document** is the overview: three score cards, a **What to do next** list with one button per check, and the downloads.
+- **Plagiarism check** shows the report first (highlighted document, matched sources), then **Find more sources**, the optional paid check and **Check externally**.
+- **Grammar** lists every suggestion as a card with **Accept** and **Dismiss**, next to the underlined document.
+- **Rewrite** works like a paraphrasing tool limited to your own document: click a paragraph, pick a mode, compare the original with the suggestion and keep only the changes you want. Paragraphs that match a source are locked.
+- Each tool page explains itself when no document is loaded and accepts one directly.
+
+Searching the internet and publications starts automatically when you add a document, after a one-time privacy notice; turn this off in Settings.
 
 ### Sources to compare against
 

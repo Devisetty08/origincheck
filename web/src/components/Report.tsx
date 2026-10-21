@@ -24,12 +24,12 @@ interface Props {
   saveDraft: (label: string) => Promise<void>;
   hybrid: Hybrid;
 }
-/** m = verbatim (counted), c = stricter mode, n = near-verbatim, p = paraphrase (n, c and p are not counted in the index). */
+/** m = verbatim (counted), c = stricter mode, n = near-verbatim, p = paraphrase (n, c and p are not counted in the %). */
 type MKind = "m" | "c" | "n" | "p";
 type Sel = { kind: MKind; sid: number; idx: number } | null;
 type Remedy = "quote" | "paraphrase" | "remove" | "cite";
 type HPassage = Passage & { type: "near-verbatim" | "paraphrase"; similarity: number; srcStart: number; srcEnd: number };
-const MATCH_LABEL: Record<MKind, string> = { m: "Verbatim", c: "Possible close paraphrase (stricter mode)", n: "Near-verbatim", p: "Paraphrase" };
+const MATCH_LABEL: Record<MKind, string> = { m: "Exact match", c: "Possibly reworded (stricter mode)", n: "Slightly changed", p: "Reworded (same meaning)" };
 
 const words = (s: string) => s.split(/\s+/).filter(Boolean);
 const excerpt = (s: string, n = 16) => { const w = words(s); return w.slice(0, n).join(" ") + (w.length > n ? " …" : ""); };
@@ -89,7 +89,7 @@ export default function Report(p: Props) {
         const k = h.type === "near-verbatim" ? "n" : "p";
         out.push(text.slice(pos, h.s));
         out.push(<span key={h.id} className={k === "n" ? "nv" : "pp"} data-pid={h.id} tabIndex={0} data-sid={h.sid} data-kind={k}
-          title={`${MATCH_LABEL[k]} of ${all[h.sid].name} (${Math.round(100 * h.similarity)}% similar) — not counted in the index`}>{text.slice(h.s, h.end)}</span>);
+          title={`${MATCH_LABEL[k]} of ${all[h.sid].name} (${Math.round(100 * h.similarity)}% similar) — not counted in the %`}>{text.slice(h.s, h.end)}</span>);
         pos = h.end; i = h.e;
       } else if (m) {
         out.push(text.slice(pos, m.s));
@@ -179,12 +179,12 @@ export default function Report(p: Props) {
 
       <div className="mt-4 rounded-lg bg-soft p-3 text-[13px]" id="matchTypes" aria-label="Match types">
         <div className="flex flex-wrap gap-x-4 gap-y-1">
-          <span><b>{r.passages.length}</b> verbatim <span className="text-mute">(in the index)</span></span>
-          <span><span className="nv">{hyb.n.length}</span> near-verbatim</span>
-          <span><span className="pp">{hyb.p.length}</span> paraphrase</span>
-          {r.close.length > 0 && <span><span className="cp">{r.close.length}</span> stricter-mode</span>}
+          <span><b>{r.passages.length}</b> exact <span className="text-mute">(counted in the %)</span></span>
+          <span><span className="nv">{hyb.n.length}</span> slightly changed</span>
+          <span><span className="pp">{hyb.p.length}</span> reworded</span>
+          {r.close.length > 0 && <span><span className="cp">{r.close.length}</span> possibly reworded</span>}
         </div>
-        {(p.hybrid.status === "running" || p.hybrid.note) && <p className="mt-1 text-mute" role="status">{p.hybrid.note ?? "Checking for paraphrase…"}</p>}
+        {(p.hybrid.status === "running" || p.hybrid.note) && <p className="mt-1 text-mute" role="status">{p.hybrid.note ?? "Checking for reworded passages…"}</p>}
         <p className="mt-1 text-mute">Similarity does not prove plagiarism. Quoted or properly cited text may still be flagged.</p>
       </div>
 
@@ -195,7 +195,7 @@ export default function Report(p: Props) {
         {skippedWithRuns.map((s) => <SourceRow key={s} s={s} off />)}
         {!r.order.length && !skippedWithRuns.length && <li className="border-t border-line px-5 py-3 text-sm text-mute">No matching passages found.</li>}
         {(["n", "p", "c"] as const).map((k) => listOf(k).length > 0 && <li key={k} className="border-t border-line px-5 py-3" data-list={k}>
-          <div className="text-sm font-semibold"><span className={k === "n" ? "nv" : k === "p" ? "pp" : "cp"}>{MATCH_LABEL[k]}</span> · not counted in the index</div>
+          <div className="text-sm font-semibold"><span className={k === "n" ? "nv" : k === "p" ? "pp" : "cp"}>{MATCH_LABEL[k]}</span> · not counted in the %</div>
           <ul className="mt-1.5 grid gap-1">
             {listOf(k).map((c) => <li key={c.id}>
               <button className="w-full truncate text-left text-[13px] text-accent hover:underline cursor-pointer" onClick={() => select(c.sid, k, bySource(c.sid, k).indexOf(c))}>
@@ -242,7 +242,7 @@ export default function Report(p: Props) {
           <div className="min-w-0 flex-1">
             <h3 className="truncate text-sm font-semibold" title={src.name}>{sel.kind === "m" && num.get(sel.sid) ? `${num.get(sel.sid)}. ` : ""}{src.name}</h3>
             <div className="text-[12.5px] text-mute" id="dType">
-              <b className="text-ink">{MATCH_LABEL[sel.kind]}</b>{sim != null ? ` · ${Math.round(100 * sim)}% similar` : ""}{sel.kind !== "m" ? " · not counted in the index" : ""}
+              <b className="text-ink">{MATCH_LABEL[sel.kind]}</b>{sim != null ? ` · ${Math.round(100 * sim)}% similar` : ""}{sel.kind !== "m" ? " · not counted in the %" : ""}
               {src.found ? ` · found by ${src.found.adapter}` : ` · ${KIND_LABEL[src.kind]}`}
             </div>
             <SourceMeta src={src} />

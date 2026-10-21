@@ -7,7 +7,7 @@ import { band } from "@/lib/exporters";
 import { AI_CAVEAT, type AiResult } from "@/lib/aiScore";
 import type { Issue, Severity } from "@/lib/grammar";
 import { plural } from "@/lib/words";
-import { Button, Ring, type Status, StatusPill, cx } from "./ui";
+import { Button, Ring, type Status, cx } from "./ui";
 
 export type Tab = "similarity" | "grammar" | "ai" | "rewrite";
 
@@ -21,7 +21,7 @@ interface Props {
   ai: { status: Status; pct?: number; stage?: string; mb?: number; result: AiResult | null; stale?: boolean };
   onOpen: (t: Tab) => void;
   onAddSources: (files: File[]) => void;
-  active: Tab;
+  active?: Tab;
 }
 
 export function summaryLine(p: Pick<Props, "sim" | "grammar" | "ai">) {
@@ -43,7 +43,7 @@ export default function Dashboard(p: Props) {
   return (
     <section aria-label="Summary" className="grid gap-3">
       <div className="grid gap-3 md:grid-cols-3">
-        <ScoreCard tab="similarity" active={p.active} onOpen={p.onOpen} icon={<FileSearch size={16} />} title="Similarity" delay={0}>
+        <ScoreCard tab="similarity" active={p.active} onOpen={p.onOpen} icon={<FileSearch size={16} />} title="Plagiarism (similarity)" delay={0}>
           {p.sim.index != null && sb ? <>
             <Ring value={p.sim.index} display={`${p.sim.index}%`} color={sb.color} label={`Similarity index ${p.sim.index}%`} id="simRing" />
             <div className="min-w-0"><b style={{ color: sb.color }}>{sb.label}</b><div className="text-[13px] text-mute">{plural(p.sim.sources, "source")} compared</div></div>
@@ -77,25 +77,45 @@ export default function Dashboard(p: Props) {
             : <Pending status={p.ai.status} pct={p.ai.pct} note={p.ai.stage === "download" ? `Downloading models${p.ai.mb ? ` (${p.ai.mb} MB, first time only)` : ""}` : undefined} />}
         </ScoreCard>
       </div>
-      <p className="text-sm font-medium" id="summaryLine">{summaryLine(p)}</p>
-      <div className="flex flex-wrap gap-2" aria-label="Check progress" role="status">
-        <StatusPill label="Similarity" status={p.sim.status} pct={p.sim.pct} />
-        <StatusPill label="Grammar" status={p.grammar.status} pct={p.grammar.pct} />
-        <StatusPill label="AI indicator" status={p.ai.status} pct={p.ai.pct} />
-      </div>
+      <p className="text-sm font-medium" id="summaryLine" role="status">{summaryLine(p)}</p>
       {p.ai.result && <p className="sr-only">{AI_CAVEAT}</p>}
     </section>
   );
 }
 
+export interface Step { id: string; icon: React.ReactNode; title: string; text: string; action: string; onClick: () => void; tone?: "high" | "mid" | "low" | "mute" }
+
+/** "What to do next": one line per check with the single action that helps most, Turnitin/Grammarly style. */
+export function NextSteps({ steps }: { steps: Step[] }) {
+  return (
+    <section className="rounded-xl border border-line bg-panel p-4 sm:p-5" aria-labelledby="nextH" id="nextSteps">
+      <h2 id="nextH" className="font-semibold">What to do next</h2>
+      <ol className="mt-2 grid gap-2">
+        {steps.map((s) => (
+          <li key={s.id} className="flex flex-wrap items-center gap-3 rounded-lg border border-line px-3 py-2.5" data-step={s.id}>
+            <span className={cx("grid size-9 shrink-0 place-items-center rounded-lg", s.tone === "high" ? "bg-high/12 text-high" : s.tone === "mid" ? "bg-mid/12 text-mid"
+              : s.tone === "low" ? "bg-low/12 text-low" : "bg-soft text-mute")} aria-hidden>{s.icon}</span>
+            <div className="min-w-0 flex-1">
+              <div className="text-[14.5px] font-semibold">{s.title}</div>
+              <div className="text-[13px] text-mute">{s.text}</div>
+            </div>
+            <Button size="sm" variant="primary" onClick={s.onClick}>{s.action}</Button>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
 function ScoreCard({ tab, active, onOpen, icon, title, children, delay }:
-  { tab: Tab; active: Tab; onOpen: (t: Tab) => void; icon: React.ReactNode; title: string; children: React.ReactNode; delay: number }) {
+  { tab: Tab; active?: Tab; onOpen: (t: Tab) => void; icon: React.ReactNode; title: string; children: React.ReactNode; delay: number }) {
   return (
     <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay }}
-      role="button" tabIndex={0} aria-pressed={active === tab} aria-label={`${title}: open the ${title} tab`} data-card={tab}
+      role="button" tabIndex={0} aria-label={`${title}: open details`} data-card={tab}
       onClick={() => onOpen(tab)} onKeyDown={(e) => { if (e.key === "Enter") onOpen(tab); }} onKeyUp={(e) => { if (e.key === " ") onOpen(tab); }}
       className={cx("cursor-pointer rounded-xl border bg-panel p-4 text-left transition hover:border-accent", active === tab ? "border-accent ring-1 ring-accent" : "border-line")}>
-      <div className="mb-2 flex items-center gap-1.5 text-[13px] font-semibold uppercase tracking-wide text-mute">{icon}{title}</div>
+      <div className="mb-2 flex items-center gap-1.5 text-[13px] font-semibold uppercase tracking-wide text-mute">{icon}{title}
+        <span className="ml-auto text-[12px] font-medium normal-case tracking-normal text-accent">Details →</span></div>
       <div className="flex min-h-24 items-center gap-3">{children}</div>
     </motion.div>
   );

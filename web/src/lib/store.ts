@@ -33,6 +33,7 @@ export interface Prefs {
   privacyAck?: string;
   ai?: boolean; // AI-likelihood signal (only when the server enables it); on by default when available
   paraphrase?: boolean; // paraphrase detection with the on-device embedding model; on by default
+  autoSearch?: boolean; // search the internet and publications as soon as a document is added; on by default
   lt?: boolean; // LanguageTool second opinion (only when the server enables it); off by default
   ltLang?: string;
   dictionary?: string[]; // words added to the grammar dictionary
