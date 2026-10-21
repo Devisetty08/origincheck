@@ -126,6 +126,47 @@ async function fullText(doi: string, opts: NetOpts): Promise<{ text?: string; li
     : { why: "No open-access full text found. Add the PDF yourself if you have access." };
 }
 
+/* ------------------------------ web search (Req 1.1) ------------------------------ */
+
+/** Up to n evenly spaced sentences of 12+ words, cut to their first 24 words — the same choice the CLI's --web makes. */
+export function pickPhrases(text: string, n: number) {
+  const sentences = text.split(/(?<=[.!?])\s+/).map((s) => s.trim().replace(/\s+/g, " ")).filter((s) => s.split(" ").length >= 12);
+  const k = Math.min(n, sentences.length);
+  return Array.from({ length: k }, (_, i) => sentences[Math.floor((i * sentences.length) / k)].split(" ").slice(0, 24).join(" "));
+}
+
+/**
+ * Search each phrase on the web through Jina Search (it allows browser calls and returns page text).
+ * Sends only the short phrases — never the document.
+ */
+export async function webSearch(text: string, key: string, n: number, onProgress?: (done: number, total: number) => void) {
+  const phrases = pickPhrases(text, n);
+  const found = new Map<string, Imported>();
+  let failed = 0;
+  for (const [i, q] of phrases.entries()) {
+    onProgress?.(i, phrases.length);
+    const r = await fetch(`https://s.jina.ai/?q=${encodeURIComponent(`"${q}"`)}`, {
+      headers: { Accept: "application/json", Authorization: `Bearer ${key}` },
+    }).catch(() => null);
+    if (r?.status === 401 || r?.status === 403) throw new Error("The search API key was rejected. Check it on the Sources → Search the web panel.");
+    if (r?.status === 402) throw new Error("The search API key has run out of credit.");
+    if (!r?.ok) { failed++; continue; }
+    const j = await r.json().catch(() => null);
+    for (const hit of (j?.data ?? []).slice(0, 3) as { title?: string; url?: string; content?: string }[]) {
+      if (!hit.url || found.has(hit.url) || (hit.content ?? "").split(/\s+/).length < 50) continue;
+      const host = new URL(hit.url).hostname.replace(/^www\./, "");
+      found.set(hit.url, {
+        name: hit.title ? `${hit.title} (${host})` : hit.url,
+        text: hit.content!,
+        url: hit.url,
+        meta: { authors: [], title: hit.title || host, container: host, url: hit.url, accessed: today() },
+      });
+    }
+  }
+  onProgress?.(phrases.length, phrases.length);
+  return { sources: [...found.values()], searched: phrases.length, failed };
+}
+
 /** Import a pasted reference list or list of DOIs, one entry per line. */
 export async function importReferences(input: string, opts: NetOpts, onProgress?: (done: number, total: number) => void) {
   const entries = input.split(/\n+/).map((l) => l.trim()).filter((l) => l.length > 6);

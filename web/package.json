@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "predev": "node -e \"require('fs').copyFileSync('node_modules/pdfjs-dist/build/pdf.worker.min.mjs','public/pdf.worker.min.mjs')\"",
-    "dev": "next dev",
+    "dev": "next dev -p 3100",
     "prebuild": "node -e \"require('fs').copyFileSync('node_modules/pdfjs-dist/build/pdf.worker.min.mjs','public/pdf.worker.min.mjs')\"",
     "build": "next build",
     "lint": "eslint",

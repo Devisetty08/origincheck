@@ -1,7 +1,9 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BookOpen, Download, History, Library as LibIcon, Moon, Printer, Sun } from "lucide-react";
-import { type CiteMeta, type Result, type Settings, type Source, type Tok, check, tokenize } from "@/lib/engine";
+import { type CiteMeta, type Result, type Settings, type Source, type Tok, bibStart, check, tokenize } from "@/lib/engine";
+import { webSearch } from "@/lib/importer";
+import { plural } from "@/lib/words";
 import { type Style, inText } from "@/lib/citations";
 import { closeness, type Closeness } from "@/lib/closeness";
 import { download, reportHtml, baseName } from "@/lib/exporters";
@@ -47,6 +49,8 @@ export default function App() {
   const [run, setRun] = useState<RunState | null>(null);
   const [citeOrder, setCiteOrder] = useState<string[]>([]);
   const [busy, setBusy] = useState("");
+  const [runError, setRunError] = useState("");
+  const [webNote, setWebNote] = useState("");
 
   useEffect(() => {
     Promise.all([loadSaved(), loadHistory(), loadMeta()]).then(([s, h, m]) => {
@@ -93,10 +97,24 @@ export default function App() {
   /* ---------- checking ---------- */
   const startCheck = async () => {
     if (!doc) return;
+    setRunError("");
+    const all: Source[] = sources.map((s) => ({ ...s, meta: meta[s.name] ?? s.meta }));
+    if (webOn(prefs)) {
+      try {
+        const b0 = settings.bib ? bibStart(doc.text) : -1; // don't search the reference list
+        const res = await webSearch(b0 >= 0 ? doc.text.slice(0, b0) : doc.text, prefs.searchKey!.trim(), prefs.webQueries ?? 10,
+          (d, t) => setBusy(`Searching the web ${Math.min(d + 1, t)} of ${t}…`));
+        for (const s of res.sources) all.push({ id: uid(), name: s.name, kind: "internet", text: s.text, toks: tokenize(s.text), meta: meta[s.name] ?? s.meta });
+        setWebNote(`Web search: ${plural(res.searched, "phrase")} searched, ${plural(res.sources.length, "page")} compared${res.failed ? `, ${res.failed} search(es) failed` : ""}.`);
+      } catch (e) {
+        setBusy("");
+        setRunError((e as Error).message);
+        return;
+      }
+    } else setWebNote("");
     setBusy("Checking…");
     await new Promise((r) => setTimeout(r, 30)); // let the busy state paint
     const project = projectKey(doc.name);
-    const all: Source[] = sources.map((s) => ({ ...s, meta: meta[s.name] ?? s.meta }));
     if (useSaved)
       for (const d of saved)
         if (d.text !== doc.text) all.push({ id: d.id, name: d.name, kind: d.own ? "own" : "saved", text: d.text, toks: tokenize(d.text), meta: meta[d.name] });
@@ -220,18 +238,20 @@ export default function App() {
       {view === "library" && <Library saved={saved} setSaved={(s) => { setSaved(s); storeSaved(s); }}
         onDeletedAll={() => { setSaved([]); setHistory([]); setMeta({}); setPrefsState({}); delete document.documentElement.dataset.theme; }} />}
       {view === "check" && (run && doc
-        ? <Report doc={doc} run={run} ctx={ctx} citeFor={citeFor} prefs={prefs} setPrefs={setPrefs}
+        ? <Report doc={doc} run={run} ctx={ctx} webNote={webNote} citeFor={citeFor} prefs={prefs} setPrefs={setPrefs}
             recompute={recompute} applyEdit={applyEdit} undo={undo} saveDoc={saveDoc} saveMeta={saveMeta}
             saveDraft={(label) => addDraft(doc, run.r, run.all, run.project, new Date(), label)} />
         : <Setup doc={doc} setDoc={setDoc} sources={sources} setSources={setSources} settings={settings} setSettings={setSettings}
             prefs={prefs} setPrefs={setPrefs} saved={saved} useSaved={useSaved} setUseSaved={setUseSaved}
             drafts={doc ? new Set(history.filter((h) => h.project === projectKey(doc.name) && h.text !== doc.text).map((h) => h.text)).size : 0}
-            onRun={startCheck} busy={busy} />)}
+            onRun={startCheck} busy={busy} error={runError} />)}
     </>
   );
 }
 
-export const passageKey = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+export const webOn = (p: Prefs) => !!(p.internet && p.webSearch && p.searchKey?.trim());
+
+export const passageKey =(t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 
 function TopBtn({ onClick, label, short, icon, iconOnly, pressed, className }:
   { onClick: () => void; label: string; short?: string; icon?: React.ReactNode; iconOnly?: boolean; pressed?: boolean; className?: string }) {

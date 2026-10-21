@@ -14,7 +14,7 @@ import { CitationDialog, ParaphraseDialog } from "./Dialogs";
 
 export interface Ctx { style: Style; metaFor: (s: Source) => CiteMeta | undefined; ieeeN: (name: string) => number }
 interface Props {
-  doc: Doc; run: RunState; ctx: Ctx; prefs: Prefs; setPrefs: (p: Partial<Prefs>) => void;
+  doc: Doc; run: RunState; ctx: Ctx; prefs: Prefs; webNote: string; setPrefs: (p: Partial<Prefs>) => void;
   citeFor: (s: Source, fresh?: CiteMeta, commit?: boolean) => string;
   recompute: (patch: Partial<Pick<RunState, "settings" | "skip">>) => void;
   applyEdit: (s: number, e: number, rep: string, res: Omit<Resolution, "id" | "at">, recheckOf?: { sid: number; mine?: string; sourcePassage?: string }) => void;
@@ -432,6 +432,7 @@ export default function Report(p: Props) {
         <Card className="text-[12.5px] text-mute">
           <p>Highlights show shared wording only — not proof of plagiarism. For each match, quote it and cite the source, or rewrite it in your own words and still cite it.</p>
           <p className="mt-2" id="settingsUsed">Settings: {settingsText(run.settings)}. {plural(all.length, "source")} compared.</p>
+          {p.webNote && <p className="mt-2" id="webNote">{p.webNote}</p>}
           <p className="mt-2">Made with <a className="text-accent underline" href="https://github.com/Devisetty08/origincheck">origincheck</a> (open source).</p>
         </Card>
       </aside>

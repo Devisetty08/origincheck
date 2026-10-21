@@ -33,13 +33,14 @@ Open https://devisetty08.github.io/origincheck/, add your document and your sour
 **More**
 - **Draft history**: every check is saved with its date, label, index and sources, with a chart across drafts and a list of passages resolved or introduced between two drafts. Earlier drafts of the same document are compared automatically and excluded from the index by default.
 - **Self-plagiarism check**: mark saved documents as your own earlier work, and their matches are reported as a separate category.
+- **Web search** (optional): like the CLI's `--web`, picks evenly spaced 24-word phrases from your document, searches each as an exact phrase with [Jina Search](https://jina.ai/) (free API key with trial credit, stored only in your browser) and compares the top pages as "Internet" sources. The bibliography is never searched.
 - **Source import** (optional internet features): paste a reference list or DOIs to fetch open-access full text (Crossref, OpenAlex, Unpaywall, Europe PMC), or add a web page by URL. Entries that couldn't be retrieved are listed with a link.
 - **Writing feedback** (advisory): reading ease, long sentences, passive voice, repeated words and inconsistent terminology.
 - **Exports**: standalone HTML report, print or save as PDF, the revised document as **.docx** (headings kept, citations and missing reference entries added), and a **self-check summary PDF** recording what you reviewed and resolved.
 - A short **guide to avoiding plagiarism**: when to quote, how to paraphrase and how to cite.
 - Light and dark themes, keyboard accessible, works on phone-width screens.
 
-**Privacy.** Documents are processed on your device. Saved documents, draft history and citation details stay in your browser (IndexedDB). You can export them to a file or delete them all in one step. Internet features are off by default. When on, they send only the DOIs, references and web addresses you enter, never your document. If a site blocks in-browser downloads, an optional reader service (r.jina.ai) is given the page address only.
+**Privacy.** Documents are processed on your device. Saved documents, draft history and citation details stay in your browser (IndexedDB). You can export them to a file or delete them all in one step. Internet features are off by default. When on, they send only the DOIs, references and web addresses you enter, plus the short search phrases if web search is on. They never send your whole document. If a site blocks in-browser downloads, an optional reader service (r.jina.ai) is given the page address only.
 
 **Not included, by design.** origincheck doesn't rewrite or "spin" text to lower the score, doesn't "humanize" AI-generated text, and doesn't do AI-writing detection (current detectors are unreliable and flag human writing).
 
@@ -50,7 +51,7 @@ Built with Next.js (static export), TypeScript, Tailwind CSS, Radix-based compon
 ```
 cd web
 npm ci
-npm run dev        # http://localhost:3000
+npm run dev        # http://localhost:3100
 npm run build      # static site in web/out
 ```
 
@@ -149,7 +150,7 @@ Quotes, the bibliography, small matches and small sources can be excluded, as in
 ## Limits compared with real Turnitin
 
 - **The database.** Commercial services compare against billions of web pages, journals and past student papers in private databases that origincheck can't search. origincheck only knows the sources you give it, your saved documents and drafts, imported open-access papers and, in the CLI, what the web search finds. Your institution's report can show matches this tool doesn't.
-- **Internet search in the web app.** A static site can't call a search API without exposing a key, so the web app adds internet sources by DOI, reference or URL instead. The CLI's `--web` option searches the web.
+- **Internet search.** origincheck searches the open web with a search API (Jina in the web app, Brave in the CLI), using a key you supply. Google's Custom Search API is closed to new users and shuts down on 1 January 2027. Search finds pages that contain the same phrases, not a commercial service's private index.
 - **Blocked downloads.** Many publishers and websites block in-browser downloads. The optional reader service gets around most of these. Anything still blocked is listed so you can download it and add the file.
 - **Copied wording, not heavy paraphrase.** It catches copied or lightly edited text. Turnitin's main score works the same way.
 - **No AI-writing detection.** AI detectors are unreliable and flag human writing as AI-generated, so origincheck doesn't include one.

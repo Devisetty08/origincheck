@@ -1,6 +1,6 @@
 "use client";
 import { useRef, useState } from "react";
-import { ClipboardPaste, FileUp, Files, Globe, Link2, Lock, X } from "lucide-react";
+import { ClipboardPaste, FileUp, Files, Globe, Link2, Lock, Search, X } from "lucide-react";
 import { type CiteMeta, type Settings, type Source, tokenize } from "@/lib/engine";
 import { SUPPORTED, extract } from "@/lib/extract";
 import { type ImportOutcome, importReferences, importUrl } from "@/lib/importer";
@@ -9,7 +9,7 @@ import type { Prefs, SavedDoc } from "@/lib/store";
 import { uid } from "@/lib/store";
 import { plural } from "@/lib/words";
 import { Button, Card, Check, NumberField, cx, inputCls } from "./ui";
-import type { Doc, HStyle } from "./App";
+import { type Doc, type HStyle, webOn } from "./App";
 
 interface Props {
   doc: Doc | null; setDoc: (d: Doc | null) => void;
@@ -17,7 +17,7 @@ interface Props {
   settings: Settings; setSettings: (s: Settings) => void;
   prefs: Prefs; setPrefs: (p: Partial<Prefs>) => void;
   saved: SavedDoc[]; useSaved: boolean; setUseSaved: (v: boolean) => void;
-  drafts: number; onRun: () => void; busy: string;
+  drafts: number; onRun: () => void; busy: string; error: string;
 }
 
 const ext = (name: string) => (name.match(/\.([^.]+)$/)?.[1] ?? "txt").slice(0, 4);
@@ -27,7 +27,7 @@ const fillMeta = (m: Partial<CiteMeta> | undefined, name: string): CiteMeta | un
 export default function Setup(p: Props) {
   const [docMsg, setDocMsg] = useState("");
   const [srcMsg, setSrcMsg] = useState("");
-  const [mode, setMode] = useState<"files" | "paste" | "url" | "refs">("files");
+  const [mode, setMode] = useState<"files" | "paste" | "url" | "refs" | "web">("files");
   const [pasteDoc, setPasteDoc] = useState<string | null>(null);
   const [pName, setPName] = useState("");
   const [pText, setPText] = useState("");
@@ -95,7 +95,8 @@ export default function Setup(p: Props) {
 
   const s = p.settings, set = (patch: Partial<Settings>) => p.setSettings({ ...s, ...patch });
   const savedOn = p.saved.length > 0 && p.useSaved;
-  const ready = !!p.doc && (p.sources.length > 0 || savedOn || p.drafts > 0);
+  const web = webOn(p.prefs);
+  const ready = !!p.doc && (p.sources.length > 0 || savedOn || p.drafts > 0 || web);
   const internet = !!p.prefs.internet;
 
   return (
@@ -135,7 +136,7 @@ export default function Setup(p: Props) {
           <h2 id="srcH" className="font-semibold">2. Sources to compare against</h2>
           <p className="text-[13.5px] text-mute">Papers, articles and web pages you read or used.</p>
           <div className="mt-3 flex flex-wrap gap-1.5" role="group" aria-label="How to add sources">
-            {([["files", "Files", <Files key="i" size={15} />], ["paste", "Paste", <ClipboardPaste key="i" size={15} />], ["url", "Web page", <Link2 key="i" size={15} />], ["refs", "References & DOIs", <Globe key="i" size={15} />]] as const)
+            {([["files", "Files", <Files key="i" size={15} />], ["paste", "Paste", <ClipboardPaste key="i" size={15} />], ["url", "Web page", <Link2 key="i" size={15} />], ["refs", "References & DOIs", <Globe key="i" size={15} />], ["web", "Search the web", <Search key="i" size={15} />]] as const)
               .map(([id, label, icon]) => (
                 <Button key={id} size="sm" variant={mode === id ? "primary" : "outline"} aria-pressed={mode === id} onClick={() => { setMode(id); setOutcomes([]); }}>{icon}{label}</Button>
               ))}
@@ -146,8 +147,8 @@ export default function Setup(p: Props) {
             <textarea className={cx(inputCls, "min-h-28")} aria-label="Source text" placeholder="Paste the source text here" value={pText} onChange={(e) => setPText(e.target.value)} />
             <div><Button size="sm" variant="primary" onClick={addPasted}>Add source</Button></div>
           </div>}
-          {(mode === "url" || mode === "refs") && !internet && <div className="mt-3 rounded-lg bg-soft p-3 text-sm">
-            <p>Adding sources from the web sends {mode === "url" ? "the address you enter" : "the references and DOIs you paste"} to look them up. Your document is never sent.</p>
+          {(mode === "url" || mode === "refs" || mode === "web") && !internet && <div className="mt-3 rounded-lg bg-soft p-3 text-sm">
+            <p>{mode === "web" ? "Searching the web sends short phrases from your document (not the whole document) to a search service." : `Adding sources from the web sends ${mode === "url" ? "the address you enter" : "the references and DOIs you paste"} to look them up. Your document is never sent.`}</p>
             <Button size="sm" variant="primary" className="mt-2" onClick={() => p.setPrefs({ internet: true })}>Turn on internet features</Button>
           </div>}
           {mode === "url" && internet && <div className="mt-3 grid gap-2">
@@ -161,7 +162,18 @@ export default function Setup(p: Props) {
               placeholder={"One reference or DOI per line, e.g.\n10.1038/s41586-020-2649-2\nSmith, J. (2020). Title of the article. Journal, 12(3), 45–67."} />
             <div><Button size="sm" variant="primary" onClick={addRefs} disabled={!!importing || !refs.trim()}>Find open-access full text</Button></div>
           </div>}
-          {importing && <p className="mt-2 text-sm text-mute" role="status">{importing}</p>}
+          {mode === "web" && internet && <div className="mt-3 grid gap-3 text-sm">
+            <Check id="sWeb" checked={!!p.prefs.webSearch} onChange={(v) => p.setPrefs({ webSearch: v })}
+              label="Search the web for matching text when I run the check"
+              hint="Like the CLI's --web: picks evenly spaced 24-word phrases from your document, searches each as an exact phrase and compares the top pages." />
+            <label className="grid gap-1">Search API key (Jina)
+              <input className={inputCls} type="password" autoComplete="off" value={p.prefs.searchKey ?? ""} onChange={(e) => p.setPrefs({ searchKey: e.target.value })} placeholder="jina_…" id="searchKey" />
+              <span className="text-[12.5px] text-mute">Free key with trial credit at <a className="text-accent underline" href="https://jina.ai/api-dashboard" target="_blank" rel="noreferrer">jina.ai</a>. Stored only in this browser. Google&apos;s search API is closed to new users, and Brave&apos;s can&apos;t be called from a web page.</span>
+            </label>
+            <NumberField id="sQueries" label="Phrases to search" value={p.prefs.webQueries ?? 10} min={1} max={40} onChange={(v) => p.setPrefs({ webQueries: v })} />
+            <p className="text-[12.5px] text-mute">Sends only those phrases — never your whole document. Each phrase is one search, and fewer phrases use less credit.</p>
+            {p.prefs.webSearch && !p.prefs.searchKey?.trim() && <p className="text-[13px] text-high">Add an API key to turn web search on.</p>}
+          </div>}          {importing && <p className="mt-2 text-sm text-mute" role="status">{importing}</p>}
           {outcomes.length > 0 && <ul className="mt-3 grid gap-1.5 text-[13px]" aria-label="Import results">
             {outcomes.map((o, i) => <li key={i} className={cx("rounded-md border-l-4 bg-bg px-2.5 py-1.5", o.ok ? "border-low" : "border-high")}>
               <div className="truncate font-medium" title={o.entry}>{o.entry}</div>
@@ -215,7 +227,8 @@ export default function Setup(p: Props) {
         <Button size="lg" variant="primary" id="runBtn" disabled={!ready || !!p.busy} onClick={p.onRun}>
           {p.busy || (!p.doc ? "Add your document to start" : !ready ? "Add at least one source" : "Run check")}
         </Button>
-        {ready && !p.busy && <span className="text-[13.5px] text-mute">{plural(p.sources.length, "source")}{savedOn ? ` + ${p.saved.length} saved` : ""}{p.drafts ? ` + ${plural(p.drafts, "draft")}` : ""}</span>}
+        {ready && !p.busy && <span className="text-[13.5px] text-mute">{plural(p.sources.length, "source")}{savedOn ? ` + ${p.saved.length} saved` : ""}{p.drafts ? ` + ${plural(p.drafts, "draft")}` : ""}{web ? " + web search" : ""}</span>}
+        {p.error && <p role="alert" className="w-full text-[13.5px] text-high">{p.error}</p>}
       </div>
     </main>
   );

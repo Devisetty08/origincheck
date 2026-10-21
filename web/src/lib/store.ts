@@ -28,6 +28,9 @@ export interface Prefs {
   internet?: boolean;
   proxy?: boolean;
   email?: string;
+  webSearch?: boolean; // search the web for matching phrases on each check
+  searchKey?: string; // the user's own Jina API key, kept in this browser only
+  webQueries?: number;
 }
 
 async function safeGet<T>(key: string, fallback: T): Promise<T> {
