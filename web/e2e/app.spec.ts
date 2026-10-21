@@ -266,6 +266,24 @@ test("Rewrite shows a diff for a clicked sentence, applies kept changes and labe
   expect(readFileSync(await (await report).path(), "utf8")).toContain("AI-assisted");
 });
 
+test("Rewrite highlights sentences that match a source and fixes one by quoting and citing it", async ({ page }) => {
+  await upload(page);
+  await expect(page.locator("#simRing text")).toHaveText("47%", { timeout: 30_000 });
+  await openTool(page, "rewrite");
+  await expect(page.locator("#rewriteFlagged")).toContainText("Similarity 47%");
+  const matched = page.locator('#rwDoc [data-sent][title^="Matches a source"]');
+  const count = await matched.count();
+  await matched.first().click();
+  await expect(page.locator("#fixMatch [data-source-text]").first()).not.toBeEmpty(); // the source wording, next to yours
+  await expect(page.locator("#improve")).toHaveCount(0); // no AI rewrite for copied text
+  await page.locator('#fixMatch [data-remedy="quote"]').first().click();
+  await page.locator("#citeSave").click(); // the source has no citation details yet: the title is prefilled
+  await expect(page.locator("#recheck")).toContainText("Citation present");
+  await expect(page.locator("#fixMatch")).toHaveCount(0); // the pick clears after the edit
+  await expect(page.locator("#rwDoc")).toContainText("“");
+  await expect.poll(() => matched.count()).toBeLessThan(count);
+});
+
 test("each tool in the sidebar has its own page and opens on its results", async ({ page }) => {
   await page.goto("./");
   await page.waitForLoadState("networkidle");

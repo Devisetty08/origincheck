@@ -1,7 +1,7 @@
 "use client";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Copy, FileDown, Quote, PenLine, Trash2, Undo2, CheckCircle2, AlertTriangle, Info } from "lucide-react";
-import { type CiteMeta, type Passage, type Settings, type Source, KIND_LABEL, bibStart, sourceSpan } from "@/lib/similarity";
+import { type CiteMeta, type Passage, type Settings, type Source, KIND_LABEL, bibStart } from "@/lib/similarity";
 import { type Style, STYLE_LABEL, checkCitations, findCitations, findEntries, orderForList, reference, segText } from "@/lib/citations";
 import { closeness } from "@/lib/closeness";
 import { PALETTE, band, exportDocx, exportSummaryPdf, pctText, settingsText } from "@/lib/exporters";
@@ -9,8 +9,7 @@ import type { Prefs } from "@/lib/store";
 import { plural } from "@/lib/words";
 import { Button, Card, Check, NumberField, Tabs, cx } from "./ui";
 import type { Doc, Hybrid, Recheck, Resolution, RunState } from "./App";
-import type { PassageMatch } from "@/lib/hybrid";
-import { CitationDialog, ParaphraseDialog } from "./Dialogs";
+import { type HPassage, excerpt, useHybridPassages, useRemedies } from "./remedies";
 
 export interface Ctx { style: Style; metaFor: (s: Source) => CiteMeta | undefined; ieeeN: (name: string) => number }
 interface Props {
@@ -27,35 +26,19 @@ interface Props {
 /** m = verbatim (counted), c = stricter mode, n = near-verbatim, p = paraphrase (n, c and p are not counted in the %). */
 type MKind = "m" | "c" | "n" | "p";
 type Sel = { kind: MKind; sid: number; idx: number } | null;
-type Remedy = "quote" | "paraphrase" | "remove" | "cite";
-type HPassage = Passage & { type: "near-verbatim" | "paraphrase"; similarity: number; srcStart: number; srcEnd: number };
 const MATCH_LABEL: Record<MKind, string> = { m: "Exact match", c: "Possibly reworded (stricter mode)", n: "Slightly changed", p: "Reworded (same meaning)" };
 
-const words = (s: string) => s.split(/\s+/).filter(Boolean);
-const excerpt = (s: string, n = 16) => { const w = words(s); return w.slice(0, n).join(" ") + (w.length > n ? " …" : ""); };
 
 export default function Report(p: Props) {
   const { doc, run } = p, { r, all } = run;
   const [tab, setTab] = useState("overview");
   const [sel, setSel] = useState<Sel>(null);
-  const [para, setPara] = useState<Passage | null>(null);
-  const [citeEdit, setCiteEdit] = useState<{ sid: number; then?: { remedy: Remedy; p: Passage } } | null>(null);
   const docRef = useRef<HTMLDivElement>(null);
+  const { remedy, sourcePassage, editCitation, dialogs } = useRemedies(p);
+  const hyb = useHybridPassages(doc.toks, r, p.hybrid);
 
   const num = useMemo(() => new Map(r.order.map((s, i) => [s, i + 1])), [r.order]);
   const color = useMemo(() => new Map(r.order.map((s, i) => [s, PALETTE[i % PALETTE.length]])), [r.order]);
-  // Hybrid matches (near-verbatim, paraphrase) as passages; any that overlap a verbatim or stricter-mode match are dropped.
-  const hyb = useMemo(() => {
-    const taken = new Set<number>();
-    for (const x of [...r.passages, ...r.close]) for (let k = x.b; k < x.e; k++) taken.add(k);
-    const conv = (ms: PassageMatch[], pre: "n" | "p"): HPassage[] => ms.flatMap((m) => {
-      const idx = doc.toks.map((t, i) => [t, i] as const).filter(([t]) => t.s >= m.docStart && t.e <= m.docEnd).map(([, i]) => i);
-      if (!idx.length || idx.some((i) => taken.has(i))) return [];
-      const b = idx[0], e = idx[idx.length - 1] + 1;
-      return [{ id: `${pre}${m.sid}:${b}`, sid: m.sid, b, e, s: doc.toks[b].s, end: doc.toks[e - 1].e, type: m.type as HPassage["type"], similarity: m.similarity, srcStart: m.srcStart, srcEnd: m.srcEnd }];
-    });
-    return { n: conv(p.hybrid.near, "n"), p: conv(p.hybrid.para, "p") };
-  }, [p.hybrid, r, doc.toks]);
   const listOf = (kind: MKind): Passage[] => (kind === "m" ? r.passages : kind === "c" ? r.close : hyb[kind]);
   const bySource = (sid: number, kind: MKind) => listOf(kind).filter((x) => x.sid === sid);
   const selected = sel ? bySource(sel.sid, sel.kind)[sel.idx] : undefined;
@@ -119,42 +102,6 @@ export default function Report(p: Props) {
     select(sid, kind, bySource(sid, kind).findIndex((x) => x.id === m.dataset.pid));
   };
 
-  /* ---------- remedies ---------- */
-  const sourcePassage = (x: Passage, ctxWords = 0) => {
-    const src = all[x.sid], st = src.toks, h = x as Partial<HPassage>;
-    let j0: number, j1: number;
-    if (h.srcStart != null && h.srcEnd != null) { // hybrid matches carry their source offsets
-      j0 = Math.max(0, st.findIndex((t) => t.s >= h.srcStart!));
-      const last = st.findLastIndex((t) => t.e <= h.srcEnd!);
-      j1 = Math.max(j0, last);
-    } else [j0, j1] = sourceSpan(r, x, src);
-    const a = Math.max(0, j0 - ctxWords), z = Math.min(st.length - 1, j1 + ctxWords);
-    return { before: (a > 0 ? "… " : "") + src.text.slice(st[a].s, st[j0].s), match: src.text.slice(st[j0].s, st[j1].e), after: src.text.slice(st[j1].e, st[z].e) + (z < st.length - 1 ? " …" : "") };
-  };
-  const remedy = (kind: Remedy, x: Passage, fresh?: CiteMeta) => {
-    const src = all[x.sid];
-    if (kind === "remove") {
-      return p.applyEdit(x.s, x.end, "", { action: "removed", source: src.name, excerpt: excerpt(doc.text.slice(x.s, x.end)) });
-    }
-    if (!fresh && !p.ctx.metaFor(src)?.title) return setCiteEdit({ sid: x.sid, then: { remedy: kind, p: x } });
-    if (kind === "paraphrase") return setPara(x);
-    const cite = p.citeFor(src, fresh);
-    const t = doc.text.slice(x.s, x.end);
-    if (kind === "cite") { // a paraphrase keeps its wording but credits the source
-      const end = /[.!?]["”’)]*$/.test(t) ? t.replace(/([.!?]["”’)]*)$/, ` ${cite}$1`) : `${t} ${cite}`;
-      return p.applyEdit(x.s, x.end, end, { action: "cited", source: src.name, excerpt: excerpt(t) });
-    }
-    p.applyEdit(x.s, x.end, `“${t}” ${cite}`, { action: "cited", source: src.name, excerpt: excerpt(t) });
-  };
-  const savePara = (x: Passage, mine: string) => {
-    const src = all[x.sid], cite = p.citeFor(src);
-    let body = mine.trim().replace(/\s*\n+\s*/g, " ");
-    const next = doc.text[x.end] ?? "";
-    body = /[.!?]/.test(next) ? `${body.replace(/[.!?]+$/, "")} ${cite}` : /[.!?]$/.test(body) ? body.replace(/([.!?])$/, ` ${cite}$1`) : `${body} ${cite}`;
-    p.applyEdit(x.s, x.end, body, { action: "rewritten", source: src.name, excerpt: excerpt(doc.text.slice(x.s, x.end)) },
-      { sid: x.sid, mine, sourcePassage: sourcePassage(x).match });
-    setPara(null);
-  };
 
   const b = band(r.index);
   const byKind: Record<string, number> = {};
@@ -392,7 +339,7 @@ export default function Report(p: Props) {
               <div className="truncate font-medium" title={s.name}>{s.name}</div>
               <div className="truncate text-mute">{p.ctx.metaFor(s)?.title ? segText(reference(p.ctx.metaFor(s)!, p.ctx.style, p.ctx.ieeeN(s.name))) : "No citation details yet"}</div>
             </div>
-            <Button size="sm" onClick={() => setCiteEdit({ sid: i })}>{p.ctx.metaFor(s)?.title ? "Edit" : "Add details"}</Button>
+            <Button size="sm" onClick={() => editCitation(i)}>{p.ctx.metaFor(s)?.title ? "Edit" : "Add details"}</Button>
           </li>)}
         </ul>
       </div>
@@ -471,19 +418,7 @@ export default function Report(p: Props) {
         </Card>
       </aside>
 
-      {para && <ParaphraseDialog open onClose={() => setPara(null)} sourceName={all[para.sid].name} original={doc.text.slice(para.s, para.end)}
-        sourcePassage={sourcePassage(para).match} cite={p.citeFor(all[para.sid], undefined, false)} onSave={(mine) => savePara(para, mine)} />}
-      {citeEdit && <CitationDialog open onClose={() => setCiteEdit(null)} source={all[citeEdit.sid]} initial={p.ctx.metaFor(all[citeEdit.sid])}
-        style={p.ctx.style} internet
-        onSave={(m) => {
-          p.saveMeta(all[citeEdit.sid].name, m);
-          const then = citeEdit.then;
-          setCiteEdit(null);
-          if (then) {
-            if (then.remedy === "paraphrase") setPara(then.p);
-            else remedy(then.remedy, then.p, m);
-          }
-        }} />}
+      {dialogs}
     </div>
   );
 }
@@ -519,7 +454,7 @@ function ScoreRing({ index, color }: { index: number; color: string }) {
   );
 }
 
-function RecheckCard({ rc }: { rc: Recheck }) {
+export function RecheckCard({ rc }: { rc: Recheck }) {
   const ok = !rc.stillMatches && (rc.cited || rc.action === "removed") && rc.meter?.level !== "too-close";
   return (
     <div className={cx("rounded-lg border-l-4 bg-bg p-3 text-[13px]", ok ? "border-low" : "border-mid")} role="status" id="recheck">

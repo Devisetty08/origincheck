@@ -29,7 +29,8 @@ import RewriteTab from "./RewriteTab";
 import WritePage from "./WritePage";
 import ExternalCheck from "./ExternalCheck";
 import PaidCheck from "./PaidCheck";
-import Report from "./Report";
+import Report, { RecheckCard } from "./Report";
+import { FixMatches } from "./remedies";
 import Drafts from "./Drafts";
 import Library from "./Library";
 import Dashboard, { NextSteps, type Step, type Tab } from "./Dashboard";
@@ -732,8 +733,13 @@ export default function App() {
               onEdit={() => go("check", "write")} onDownload={downloadCorrected} />}
             {tool === "write" && <WritePage title={doc.name} text={doc.text} onChange={(t, origin) => setText(t, origin)} history={wh}
               on={whOn} setOn={(v) => setPrefs({ writingHistory: v })} onSnapshot={saveSnapshot} onDelete={clearHistory} />}
-            {tool === "rewrite" && <RewriteTab text={doc.text} flagged={flagged} onOpenPlagiarism={() => go("check", "similarity")}
-              renderPanel={(picked) => improveCard(picked)} />}
+            {tool === "rewrite" && <RewriteTab text={doc.text} flagged={flagged} index={run?.r.index} onOpenPlagiarism={() => go("check", "similarity")}
+              renderPanel={(picked) => <>
+                {run?.recheck && <RecheckCard rc={run.recheck} />}
+                {picked && run && flagged.some(([a, b]) => a < picked.e && b > picked.s)
+                  ? <FixMatches picked={picked} hybrid={hybrid} doc={doc} run={run} ctx={ctx} citeFor={citeFor} applyEdit={applyEdit} saveMeta={saveMeta} />
+                  : improveCard(picked)}
+              </>} />}
             {tool === "ai" && <AiTab s={ai} available={aiAvailable} onRerun={() => startAi(doc.text)} onEnable={() => { setPrefs({ ai: true }); startAi(doc.text, true); }} />}
           </div>}
         </main>
