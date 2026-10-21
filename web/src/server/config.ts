@@ -1,6 +1,7 @@
 // Server-only configuration. Keys are read from the environment and never sent to the browser.
 // Getters, so values saved from the Settings page apply without a restart.
 import "server-only";
+import { copyleaks } from "./paid/copyleaks";
 
 const env = (k: string) => process.env[k]?.trim() || undefined;
 
@@ -24,6 +25,14 @@ export const config = {
   get aiLikelihood() { return env("ENABLE_AI_LIKELIHOOD") === "true"; },
   get languageTool() { return env("ENABLE_LANGUAGETOOL") === "true"; },
   get languageToolUrl() { return env("LANGUAGETOOL_URL") ?? "http://localhost:8010"; },
+  get copyleaksEmail() { return env("COPYLEAKS_EMAIL"); },
+  get copyleaksKey() { return env("COPYLEAKS_KEY"); },
+  get copyleaksSandbox() { return env("COPYLEAKS_SANDBOX") === "true"; },
+  /** Public address Copyleaks can reach for its webhook (an ngrok tunnel locally); Vercel's production URL by default. */
+  get publicBaseUrl() {
+    const v = env("PUBLIC_BASE_URL") ?? (env("VERCEL_PROJECT_PRODUCTION_URL") ? `https://${env("VERCEL_PROJECT_PRODUCTION_URL")}` : undefined);
+    return v?.replace(/\/$/, "");
+  },
   get maxQueries() { return Math.max(1, Math.min(40, Number(env("SEARCH_MAX_QUERIES") ?? 8) || 8)); },
 };
 
@@ -35,13 +44,14 @@ export function publicConfig() {
     languageTool: config.languageTool,
     improve: improve ? config.aiProvider : null,
     maxQueries: config.maxQueries,
+    paid: { label: copyleaks.label, missing: copyleaks.missing(), sandbox: config.copyleaksSandbox },
   };
 }
 
 /** Strip anything that looks like a secret before it reaches a log line. */
 export function redact(s: string) {
   let out = s;
-  for (const v of [config.braveKey, config.jinaKey, config.coreKey, config.semanticScholarKey, config.googleKey, config.anthropicKey])
+  for (const v of [config.braveKey, config.jinaKey, config.coreKey, config.semanticScholarKey, config.googleKey, config.anthropicKey, config.copyleaksKey])
     if (v) out = out.split(v).join("[redacted]");
   return out.replace(/(api[_-]?key|token|key|authorization)=([^&\s]+)/gi, "$1=[redacted]");
 }

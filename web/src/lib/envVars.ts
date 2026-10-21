@@ -30,6 +30,15 @@ export const ENV_VARS: EnvVar[] = [
   { key: "CORE_API_KEY", group: "Publications", label: "CORE API key", secret: true, link: "https://core.ac.uk/services/api",
     help: "Raises CORE's rate limit for open-access papers." },
 
+  { key: "COPYLEAKS_EMAIL", group: "Paid plagiarism check (Copyleaks)", label: "Copyleaks account email", placeholder: "you@university.edu",
+    help: "Scans the whole document against the web, journals and Copyleaks' database of submitted papers. Uses paid credits." },
+  { key: "COPYLEAKS_KEY", group: "Paid plagiarism check (Copyleaks)", label: "Copyleaks API key", secret: true, link: "https://api.copyleaks.com/",
+    help: "From your Copyleaks account's API dashboard." },
+  { key: "COPYLEAKS_SANDBOX", group: "Paid plagiarism check (Copyleaks)", label: "Sandbox mode", kind: "bool",
+    help: "Free mock results for testing; no credits used. Turn off for real scans." },
+  { key: "PUBLIC_BASE_URL", group: "Paid plagiarism check (Copyleaks)", label: "Public address of this app", placeholder: "https://abc123.ngrok-free.app",
+    help: "Copyleaks sends results to this address. Locally, run a tunnel such as ngrok http 3100 and paste its URL. On Vercel it defaults to your production URL." },
+
   { key: "AI_PROVIDER", group: "Rewrite (Improve my writing)", label: "Provider", kind: "select", options: ["anthropic", "ollama"],
     help: "Who revises the passages you select." },
   { key: "ANTHROPIC_API_KEY", group: "Rewrite (Improve my writing)", label: "Anthropic API key", secret: true, link: "https://console.anthropic.com/",

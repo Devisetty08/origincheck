@@ -24,6 +24,7 @@ import Setup, { RunTable, SettingsCard, SourcesCard } from "./Setup";
 import { ServerSettings } from "./SettingsPage";
 import RewriteTab from "./RewriteTab";
 import ExternalCheck from "./ExternalCheck";
+import PaidCheck from "./PaidCheck";
 import Report from "./Report";
 import Drafts from "./Drafts";
 import Library from "./Library";
@@ -57,6 +58,7 @@ export interface ServerConfig {
   languageTool: boolean;
   improve: "anthropic" | "ollama" | null;
   maxQueries: number;
+  paid?: { label: string; missing: string | null; sandbox: boolean };
   sources: { id: string; label: string; group: string; missing: string | null }[];
 }
 export interface Hybrid { status: Status; note?: string; near: PassageMatch[]; para: PassageMatch[] }
@@ -68,6 +70,18 @@ const GROUP_SERVICES: Record<SourceGroup, string> = {
   lists: "Project Gutenberg (Gutendex)",
 };
 type View = "check" | "history" | "library" | "settings";
+type PrivacyKind = "search" | "improve" | "paid";
+const PRIVACY: Record<PrivacyKind, { title: string; description: string; note: string }> = {
+  search: { title: "Before searching outside your browser",
+    description: "Your document stays in your browser. To search, origincheck sends short excerpts (at most 16 words each) or the addresses you enter to:",
+    note: "You can turn each input off with its Yes/No switch in “Sources to compare against”." },
+  improve: { title: "Before revising with AI",
+    description: "The passage you selected (not the rest of your document) is sent through origincheck's server to:",
+    note: "Each passage you revise is sent again. Accepted AI edits are labelled “AI-assisted” in your exports." },
+  paid: { title: "Before sending your document to a paid checker",
+    description: "Your whole document is sent through origincheck's server to:",
+    note: "It is compared but not added to the provider's database, and the provider deletes the scan after 24 hours. Each scan uses paid credits." },
+};
 /** What each tool page says before a document is added. */
 const INTRO: Record<Tab, { title: string; text: string }> = {
   similarity: { title: "Plagiarism check", text: "Compares your document with your sources, publications, the web and books. Copied wording is highlighted and counted in the similarity index; lightly edited copying and paraphrase are shown separately. Add your document below, then add sources or use Run all sources." },
@@ -88,7 +102,8 @@ export default function App() {
   const [runs, setRuns] = useState<SourceRun[] | null>(null);
   const [runningAll, setRunningAll] = useState(false);
   const [hybrid, setHybrid] = useState<Hybrid>({ status: "queued", near: [], para: [] });
-  const [privacyAsk, setPrivacyAsk] = useState<{ services: string[]; improve?: boolean; resolve: (ok: boolean) => void } | null>(null);  const [priorDrafts, setPriorDrafts] = useState<Source[]>([]);
+  const [privacyAsk, setPrivacyAsk] = useState<{ services: string[]; kind: PrivacyKind; resolve: (ok: boolean) => void } | null>(null);
+  const [priorDrafts, setPriorDrafts] = useState<Source[]>([]);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [skipIds, setSkipIds] = useState<Set<string>>(new Set());
   const [prefs, setPrefsState] = useState<Prefs>({});
@@ -176,10 +191,10 @@ export default function App() {
   };
 
   /* ---------- privacy notice before anything is sent to a third party ---------- */
-  const confirmPrivacy = (services: string[], improve = false) => {
+  const confirmPrivacy = (services: string[], kind: PrivacyKind = "search") => {
     const key = [...services].sort().join("|");
     if (prefs.privacyAck && key.split("|").every((s) => prefs.privacyAck!.split("|").includes(s))) return Promise.resolve(true);
-    return new Promise<boolean>((resolve) => setPrivacyAsk({ services, improve, resolve: (ok) => {
+    return new Promise<boolean>((resolve) => setPrivacyAsk({ services, kind, resolve: (ok) => {
       if (ok) setPrefs({ privacyAck: [...new Set([...(prefs.privacyAck?.split("|") ?? []), ...services])].sort().join("|") });
       setPrivacyAsk(null);
       resolve(ok);
@@ -485,7 +500,7 @@ export default function App() {
     { id: "settings", label: "Settings", short: "Settings", icon: <SettingsIcon size={18} />, on: () => go("settings"), active: view === "settings" },
   ];
   const improveCard = doc && <ImproveWriting text={doc.text} provider={cfg?.improve ?? null} flagged={flagged}
-    confirmPrivacy={(s) => confirmPrivacy(s, true)} onSetup={() => go("settings")}
+    confirmPrivacy={(s) => confirmPrivacy(s, "improve")} onSetup={() => go("settings")}
     onApply={(s, e, t) => {
       setText(doc.text.slice(0, s) + t + doc.text.slice(e));
       setDoc((d) => d && { ...d, aiAssisted: (d.aiAssisted ?? 0) + 1 });
@@ -573,6 +588,7 @@ export default function App() {
                   <RunTable runs={runs} />
                 </section>}
                 <ExternalCheck text={doc.text} korean={hasHangul(doc.text)} />
+                <PaidCheck text={doc.text} paid={cfg?.paid} confirm={(s) => confirmPrivacy(s, "paid")} onSetup={() => go("settings")} />
                 {run ? <Report doc={doc} run={run} ctx={ctx} webNote={webNote} citeFor={citeFor} prefs={prefs} setPrefs={setPrefs} hybrid={hybrid}
                     recompute={recompute} applyEdit={applyEdit} undo={undo} saveDoc={saveDoc} saveMeta={saveMeta} saveDraft={saveDraft} />
                   : <p className="rounded-xl border border-line bg-panel p-5 text-sm" role="status">
@@ -606,13 +622,10 @@ export default function App() {
           className={cx("flex cursor-pointer flex-col items-center gap-0.5 py-2 text-[11px] font-medium", n.active ? "text-accent" : "text-mute")}>
           {n.icon}{n.short}</button>)}
       </nav>
-      <Dialog open={!!privacyAsk} onOpenChange={(o) => { if (!o) privacyAsk?.resolve(false); }} title={privacyAsk?.improve ? "Before revising with AI" : "Before searching outside your browser"}
-        description={privacyAsk?.improve ? "The passage you selected (not the rest of your document) is sent through origincheck's server to:"
-          : "Your document stays in your browser. To search, origincheck sends short excerpts (at most 16 words each) or the addresses you enter to:"}>
+      <Dialog open={!!privacyAsk} onOpenChange={(o) => { if (!o) privacyAsk?.resolve(false); }} title={PRIVACY[privacyAsk?.kind ?? "search"].title}
+        description={PRIVACY[privacyAsk?.kind ?? "search"].description}>
         <ul className="mb-3 list-disc pl-5 text-sm" id="privacyServices">{privacyAsk?.services.map((s) => <li key={s}>{s}</li>)}</ul>
-        <p className="mb-4 text-[13px] text-mute">These services have their own privacy policies.{privacyAsk?.improve
-          ? " Each passage you revise is sent again. Accepted AI edits are labelled “AI-assisted” in your exports."
-          : " You can turn each input off with its Yes/No switch in “Sources to compare against”."}</p>
+        <p className="mb-4 text-[13px] text-mute">These services have their own privacy policies. {PRIVACY[privacyAsk?.kind ?? "search"].note}</p>
         <div className="flex justify-end gap-2">
           <Button variant="ghost" onClick={() => privacyAsk?.resolve(false)}>Cancel</Button>
           <Button variant="primary" id="privacyOk" onClick={() => privacyAsk?.resolve(true)}>Continue</Button>

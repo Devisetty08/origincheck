@@ -42,6 +42,7 @@ Seven inputs, each with a **Yes/No** switch. Turning one off removes its sources
   - **Near-verbatim** (dotted orange underline): lightly edited copying, found with MinHash/LSH and confirmed by edit distance (≥ 75% similar).
   - **Paraphrase** (double purple underline): the same idea in different words, found with multilingual sentence embeddings (cosine ≥ 0.80). Can be turned off in Settings.
 - For each match: **Mark as quoted & cited**, **Rewrite in my own words**, **Cite this source** or **Remove**. The rewrite editor hides the source by default, re-checks your version as you type and shows a closeness meter. It never writes replacement text.
+- **Copyleaks (paid, optional)**: scans the whole document against the web, journals and Copyleaks' database of submitted papers, which free APIs can't reach. It runs only when you press its button, after a notice that the whole document is sent, and shows Copyleaks' score and matching sources. The document is compared but not added to any Copyleaks database, and Copyleaks deletes the scan after 24 hours. It is a pluggable adapter (`web/src/server/paid/`), shown as **not configured** until its keys are set.
 - **Check externally (optional)**: copies your text to the clipboard and opens Duplichecker or CopyKiller (stronger for Korean) in a new tab. origincheck never sends text to these sites itself; they have no public API.
 - Citations in APA 7, Harvard and IEEE; a citation checker.
 
@@ -106,6 +107,7 @@ Your document is read and matched in your browser. Saved documents, history, you
 | Word lookup | The single word you look up, to Datamuse and the Free Dictionary API. |
 | LanguageTool (if enabled) | The document text, to the LanguageTool server the operator configured. |
 | Improve my writing (if configured) | The passage you selected, to Anthropic or the operator's Ollama server. |
+| Copyleaks (if configured, on request) | **The whole document**, to Copyleaks. Not indexed; deleted by Copyleaks after 24 hours. |
 | Check externally | Nothing: you paste the text into the other site yourself. |
 
 The server never logs documents or passages, strips keys from any error it logs, and rate-limits its own endpoints per client. The page fetcher blocks private, loopback, link-local and metadata addresses (checked after DNS resolution and on every redirect) and caps size (3 MB), time (10 s) and redirects (4).
@@ -136,6 +138,8 @@ The easiest way to set them locally is the **Settings** page in the app: paste a
 | `JINA_API_KEY` | Web search fallback | |
 | `CORE_API_KEY`, `SEMANTIC_SCHOLAR_API_KEY` | Higher rate limits | Both work without a key, but Semantic Scholar often returns `rate-limited` without one |
 | `GOOGLE_API_KEY`, `GOOGLE_CSE_ID` | Google Programmable Search | Existing customers only; Google closed it to new customers and shuts it down on 1 January 2027 |
+| `COPYLEAKS_EMAIL`, `COPYLEAKS_KEY` | Paid Copyleaks check | Uses Copyleaks credits. `COPYLEAKS_SANDBOX=true` gives free mock results for testing |
+| `PUBLIC_BASE_URL` | Copyleaks results | Copyleaks delivers results by webhook, so it needs a public address: locally run `ngrok http 3100` and paste the URL; on Vercel it defaults to the production URL |
 | `AI_PROVIDER` | Improve my writing | `anthropic` (default) or `ollama` |
 | `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` | Improve my writing with Claude | Model defaults to `claude-opus-5-5` |
 | `OLLAMA_BASE_URL`, `OLLAMA_MODEL` | Improve my writing with Ollama | |
@@ -148,6 +152,8 @@ The easiest way to set them locally is the **Settings** page in the app: paste a
 1. Import the repository in Vercel and set **Root Directory** to `web`. The framework is detected as Next.js.
 2. Add the environment variables above under **Settings → Environment Variables**.
 3. Deploy. Search, reference import and Improve my writing run as serverless functions (`maxDuration` 30–60 s, which the Hobby plan allows).
+
+Pending Copyleaks scans are also kept in memory, so the submit, the webhook and the polling must reach the same server process. That holds locally and on a single long-running server; on Vercel, where requests can land on different instances, a result can go missing until the scans are moved to a shared store such as Upstash Redis.
 
 The rate limiter and search cache are in memory, so they are per function instance. That is enough to stop accidental floods, not a determined client; put Vercel's firewall or a shared store in front for a public deployment.
 
