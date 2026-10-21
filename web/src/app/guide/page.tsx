@@ -56,6 +56,22 @@ export default function Guide() {
 
         <h2 className={H2}>Reusing your own work</h2>
         <p>Submitting work you&apos;ve already handed in elsewhere usually counts as self-plagiarism. Cite your earlier work, or get permission to reuse it.</p>
+        <p className="mt-2">In origincheck, save the earlier report with &ldquo;This is my own earlier work&rdquo; ticked. Later checks then show where you reused it.</p>
+
+        <h2 className={H2}>Citing a source you didn&apos;t read</h2>
+        <p>Only cite what you actually read. If you found an idea quoted in a book or article, either find and read the original, or cite where you saw it:</p>
+        <Example label="Secondary citation (APA 7)" tone="border-accent">Darold&apos;s migration checklist (as cited in Kumar, 2023) lists stored procedures first.</Example>
+        <p className="mt-2">The reference list then includes Kumar (2023), the source you read, not Darold.</p>
+
+        <h2 className={H2}>Company and confidential material</h2>
+        <p>For a work project, describe what you did and why, in your own words. Don&apos;t paste internal documents. Leave out client names, internal system names and figures your organisation hasn&apos;t cleared, or describe them in general terms (&ldquo;a global bank&rdquo;, &ldquo;the reporting system&rdquo;). Check with your organisation what you may include.</p>
+        <p className="mt-2">In origincheck, add the company documents you worked from as sources so copied wording is flagged, and list names to keep out under Settings, Confidential words.</p>
+
+        <h2 className={H2}>Using AI</h2>
+        <p>Follow your institution&apos;s rules on AI. If AI helped, say how, in the way your course asks. If a part was written by AI and that isn&apos;t allowed, rewrite it yourself from your own knowledge of the work. origincheck labels any AI suggestion you keep as AI-assisted, and the Write page&apos;s writing history shows how your text developed.</p>
+
+        <h2 className={H2}>Running out of time</h2>
+        <p>Fix the sections with the most matching text first: the plagiarism report lists them under &ldquo;Fix these sections first&rdquo;. The check runs again after every fix, so you can see the score drop as you go.</p>
 
         <h2 className={H2}>Reading a similarity score</h2>
         <p>The similarity index measures shared wording, not misconduct. A moderate score made up of correctly quoted and cited material is normal. Aim for every borrowed idea to be credited — not for 0%. Never use tools that disguise copied or AI-generated text; that is misconduct in itself.</p>

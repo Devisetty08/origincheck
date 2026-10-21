@@ -1,7 +1,8 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MotionConfig } from "motion/react";
-import { ArrowLeft, BookOpen, Bot, NotebookPen, Download, FileCheck, FileSearch, History, Library as LibIcon, Moon, PenLine, Printer, Settings as SettingsIcon, SpellCheck, Sun } from "lucide-react";
+import { ArrowLeft, BookOpen, Bot, NotebookPen, Download, FileCheck, FileSearch, History, Library as LibIcon, Moon, PenLine, Printer, Settings as SettingsIcon, ShieldAlert, SpellCheck, Sun } from "lucide-react";
+import { findTerms } from "@/lib/confidential";
 import { type CiteMeta, type Result, type Settings, type Source, type Tok, bibStart, tokenize } from "@/lib/similarity";
 import { plural } from "@/lib/words";
 import { hasHangul, pickQueries } from "@/lib/queries";
@@ -597,6 +598,7 @@ export default function App() {
     }} />;
 
   const matched = (run?.r.passages.length ?? 0) + hybrid.near.length + hybrid.para.length;
+  const secret = useMemo(() => (doc && prefs.confidential?.length ? findTerms(doc.text, prefs.confidential) : []), [doc, prefs.confidential]);
   const nextSteps: Step[] = doc ? [
     run ? (matched
       ? { id: "plagiarism", icon: <FileSearch size={18} />, tone: run.r.index >= 25 ? "high" : "mid", title: `${plural(matched, "passage")} match your sources (${run.r.index}% similarity)`,
@@ -611,6 +613,8 @@ export default function App() {
     { id: "rewrite", icon: <PenLine size={18} />, tone: "mute", title: "Polish your wording",
       text: cfg?.improve ? "Click a paragraph to get clearer or more concise wording, and keep only the changes you like." : "Clearer, shorter wording from a free model on your computer. Needs a one-time setup (see Rewrite).",
       action: "Open Rewrite", onClick: () => go("check", "rewrite") },
+    ...(secret.length ? [{ id: "confidential", icon: <ShieldAlert size={18} />, tone: "high" as const, title: `Confidential words found: ${secret.map((h) => h.term).join(", ")}`,
+      text: "Leave out or generalise names your organisation hasn't cleared, and describe what you did instead.", action: "Find them", onClick: () => go("check", "write") }] : []),
     ...(ai.result ? [{ id: "ai", icon: <Bot size={18} />, tone: "mute" as const, title: `AI indicator: ${ai.result.label} (${ai.result.score}/100)`,
       text: "A signal only, never proof. See which sentences drove it.", action: "See details", onClick: () => go("check", "ai") }] : []),
   ] : [];
@@ -732,6 +736,7 @@ export default function App() {
               onAcceptAllSpelling={() => setText(applyAll(doc.text, issues.filter((i) => i.category === "spelling" && i.severity !== "style")))}
               onEdit={() => go("check", "write")} onDownload={downloadCorrected} />}
             {tool === "write" && <WritePage title={doc.name} text={doc.text} onChange={(t, origin) => setText(t, origin)} history={wh}
+              confidential={prefs.confidential}
               matches={run && <WriteMatches editorId="writeEditor" hybrid={hybrid} doc={doc} run={run} ctx={ctx} citeFor={citeFor} applyEdit={applyEdit} saveMeta={saveMeta} />}
               on={whOn} setOn={(v) => setPrefs({ writingHistory: v })} onSnapshot={saveSnapshot} onDelete={clearHistory} />}
             {tool === "rewrite" && <RewriteTab text={doc.text} flagged={flagged} index={run?.r.index} onOpenPlagiarism={() => go("check", "similarity")}

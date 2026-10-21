@@ -41,6 +41,13 @@ Open http://localhost:3100 and drop in a document. The plagiarism check, grammar
 
 For each match you can mark it as quoted and cited, cite the source, rewrite it in your own words, or remove it. When you rewrite, the source text is hidden and a meter tells you whether your version is still too close. Citations come in APA 7, Harvard and IEEE.
 
+If you're short on time, start with "Fix these sections first", which ranks your sections by how much of each matches a source. The Citations tab checks the rest of your referencing:
+
+- in-text citations with no reference-list entry, and entries you never cite
+- quotations with no citation, quotations of 40 words or more, and text that is mostly quotes
+- claims that usually need a source, such as statistics, "studies show" or "according to", with no citation (your own findings, written with "we" or "our", are left alone)
+- matched sources you never cite
+
 **Rewrite.** Your document with every sentence that matches a source highlighted in red, plus the similarity score. Click a red sentence to see the source wording and fix it right there: quote and cite it, rewrite it yourself, or remove it. After each fix the passage is checked again. Click any of your own sentences (or switch to whole paragraphs) to get a rewrite suggestion: clearer, shorter, more formal, more casual, plain language, or without filler. You see your original next to the suggestion and keep only the changes you like.
 
 The AI won't reword the red sentences. Rewording copied text is still copying, so those you quote, cite or rewrite yourself. There's also no "humanize" or "beat the AI detector" mode, and there won't be.
@@ -110,6 +117,7 @@ Open Settings in the app, paste a key and press Save settings. Keys are saved on
 | Anthropic key (paid, optional) | Rewrite with Claude, capped at 500 requests a month | [console.anthropic.com](https://console.anthropic.com/) |
 | Copyleaks email and key (paid, optional) | The Copyleaks scan, capped at 20 scans a month | [copyleaks.com](https://copyleaks.com/) |
 | AI indicator | The AI-likelihood estimate | A switch in Settings |
+| Confidential words | Flags names you shouldn't hand in, such as your employer, clients or internal systems, on the overview and the Write page | Type them in Settings (kept in your browser) |
 
 ### Keeping costs under control
 

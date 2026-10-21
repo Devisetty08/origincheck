@@ -7,6 +7,7 @@ import { closeness } from "@/lib/closeness";
 import { PALETTE, band, exportDocx, exportSummaryPdf, pctText, settingsText } from "@/lib/exporters";
 import type { Prefs } from "@/lib/store";
 import { plural } from "@/lib/words";
+import { sections } from "@/lib/sections";
 import { Button, Card, Check, NumberField, Tabs, cx } from "./ui";
 import type { Doc, Hybrid, Recheck, Resolution, RunState } from "./App";
 import { type HPassage, excerpt, useHybridPassages, useRemedies } from "./remedies";
@@ -36,6 +37,13 @@ export default function Report(p: Props) {
   const docRef = useRef<HTMLDivElement>(null);
   const { remedy, sourcePassage, editCitation, dialogs } = useRemedies(p);
   const hyb = useHybridPassages(doc.toks, r, p.hybrid);
+  // sections ranked by how much of them matches a source: fix the worst first
+  const hot = useMemo(() => {
+    const m = new Set<number>();
+    for (const x of r.passages) for (let k = x.b; k < x.e; k++) m.add(k);
+    const all = sections(doc.text, doc.toks, m, doc.headings);
+    return all.length > 1 ? all.filter((x) => x.matched).sort((a, b) => b.pct - a.pct) : [];
+  }, [doc, r]);
 
   const num = useMemo(() => new Map(r.order.map((s, i) => [s, i + 1])), [r.order]);
   const color = useMemo(() => new Map(r.order.map((s, i) => [s, PALETTE[i % PALETTE.length]])), [r.order]);
@@ -134,6 +142,23 @@ export default function Report(p: Props) {
         {(p.hybrid.status === "running" || p.hybrid.note) && <p className="mt-1 text-mute" role="status">{p.hybrid.note ?? "Checking for reworded passages…"}</p>}
         <p className="mt-1 text-mute">Similarity does not prove plagiarism. Quoted or properly cited text may still be flagged.</p>
       </div>
+
+      {hot.length > 0 && <div className="mt-4" id="sections">
+        <h3 className="text-sm font-semibold">Fix these sections first</h3>
+        <p className="text-[12.5px] text-mute">The sections with the most matching text. The check runs again by itself after each fix.</p>
+        <ul className="mt-1.5 grid gap-1">
+          {hot.slice(0, 6).map((x) => {
+            const first = r.passages.find((y) => y.end > x.s && y.s < x.e)!;
+            return <li key={x.s}>
+              <button className="grid w-full cursor-pointer grid-cols-[1fr_auto] items-center gap-x-2 rounded-md px-1.5 py-1 text-left text-[13px] hover:bg-soft" data-section
+                onClick={() => select(first.sid, "m", bySource(first.sid, "m").indexOf(first))}>
+                <span className="truncate">{x.title}</span><b>{x.pct}%</b>
+                <span className="col-span-2 h-[5px] overflow-hidden rounded-full bg-soft" aria-hidden><i className="block h-full rounded-full bg-high" style={{ width: `${x.pct}%` }} /></span>
+              </button>
+            </li>;
+          })}
+        </ul>
+      </div>}
 
       {selected && <Detail />}
 

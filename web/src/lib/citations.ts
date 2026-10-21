@@ -107,7 +107,7 @@ export function orderForList<T extends { meta: CiteMeta; n: number }>(items: T[]
 /* ------------------------------ citation checker ------------------------------ */
 
 export interface CiteIssue {
-  kind: "no-entry" | "uncited-entry" | "uncited-quote" | "uncited-source";
+  kind: "no-entry" | "uncited-entry" | "uncited-quote" | "uncited-source" | "long-quote" | "quote-heavy" | "uncited-claim";
   message: string;
   at?: number; // char offset in the document, for "show me"
 }
@@ -158,6 +158,10 @@ export function findEntries(text: string) {
   });
 }
 
+const LONG_QUOTE = 40, QUOTE_SHARE = 0.15;
+const CLAIM = /\b\d+(?:\.\d+)?\s?(?:%|per ?cent\b)|\b(?:studies|research|researchers|surveys?|reports?|experts|evidence|statistics|data)\s+(?:show|shows|showed|found|finds|suggest|suggests|indicate|indicates|estimate|estimates|reveal|reveals)\b|\baccording to\b|\bit (?:is|has been) (?:widely )?(?:known|reported|estimated|shown|argued)\b/i;
+const OWN = /\b(?:I|we|my|our|us|this (?:study|project|report|thesis|dissertation))\b/i; // your own findings need no citation
+
 export function checkCitations(
   text: string,
   matched: { name: string; meta?: CiteMeta; n: number }[],
@@ -190,6 +194,24 @@ export function checkCitations(
     const before = body.slice(Math.max(0, q.index! - 160), q.index!).split(/(?<=[.!?])\s/).pop() ?? "";
     const cited = /\([^()]*\d{4}[^()]*\)|\[\d+/.test(after) || new RegExp(`\\((?:${YEAR})`).test(before);
     if (!cited) issues.push({ kind: "uncited-quote", message: `Quotation has no citation: ${q[0].slice(0, 80)}${q[0].length > 80 ? "…" : ""}`, at: q.index! });
+  }
+
+  // quotes: keep the ones where the exact wording matters, summarise the rest
+  let quoted = 0;
+  for (const q of body.matchAll(QUOTE_RE)) {
+    const n = q[1].split(/\s+/).filter(Boolean).length;
+    quoted += n;
+    if (n >= LONG_QUOTE) issues.push({ kind: "long-quote", message: `Long quotation (${n} words): ${q[0].slice(0, 60)}… Keep it only if the exact wording matters; otherwise summarise it in your own words and cite. APA sets quotations of 40 or more words as an indented block.`, at: q.index! });
+  }
+  const bodyWords = body.split(/\s+/).filter(Boolean).length;
+  if (bodyWords >= 200 && quoted / bodyWords > QUOTE_SHARE)
+    issues.push({ kind: "quote-heavy", message: `About ${Math.round((100 * quoted) / bodyWords)}% of your text is quoted. Keep the quotations where the exact wording matters and summarise the rest in your own words, with citations.` });
+
+  // claims that usually come from a source: statistics, "studies show", "according to"
+  for (const m of body.matchAll(/[^.!?\n]+[.!?]*/g)) {
+    const t = m[0].trim();
+    if (!CLAIM.test(t) || OWN.test(t) || /\([^()]*\d{4}[^()]*\)|\[\d+|\(n\.d\.\)/.test(t) || /["“”][^"“”]{3,}["“”]/.test(t)) continue;
+    issues.push({ kind: "uncited-claim", message: `No citation for this claim: "${t.slice(0, 90)}${t.length > 90 ? "…" : ""}" If it isn't your own finding or common knowledge, cite where you learned it.`, at: m.index! + m[0].indexOf(t) });
   }
 
   for (const s of matched) {

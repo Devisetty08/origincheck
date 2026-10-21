@@ -3,7 +3,8 @@
 // pause, and whether each part was typed, pasted or AI-assisted. Nothing outside this editor is recorded.
 import { type ReactNode, useMemo, useState } from "react";
 import { diffWords } from "diff";
-import { Circle, Download, History, Save, Trash2 } from "lucide-react";
+import { Circle, Download, History, Save, ShieldAlert, Trash2 } from "lucide-react";
+import { type TermHit, findTerms } from "@/lib/confidential";
 import { type History as WH, NOTE, ORIGIN_LABEL, type Origin, exportReport, summary, textAt } from "@/lib/writingHistory";
 import { baseName, download } from "@/lib/exporters";
 import { Button, Card, cx } from "./ui";
@@ -21,6 +22,8 @@ interface Props {
   onDelete: () => void;
   /** Passages that match a source, shown above the history (when a plagiarism check has run). */
   matches?: ReactNode;
+  /** Words to keep out of the document (Settings). */
+  confidential?: string[];
 }
 
 export default function WritePage(p: Props) {
@@ -42,9 +45,34 @@ export default function WritePage(p: Props) {
       </article>
       <aside className="grid min-w-0 gap-3.5 min-[1000px]:sticky min-[1000px]:top-[72px]" aria-label="Matches and writing history">
         {p.matches}
+        {!!p.confidential?.length && <Confidential text={p.text} terms={p.confidential} />}
         <HistoryPanel {...p} />
       </aside>
     </div>
+  );
+}
+
+/** Confidential words found in the text; clicking one selects its next occurrence in the editor. */
+function Confidential({ text, terms }: { text: string; terms: string[] }) {
+  const hits = useMemo(() => findTerms(text, terms), [text, terms]);
+  const [next, setNext] = useState<Record<string, number>>({});
+  const show = (h: TermHit) => {
+    const i = (next[h.term] ?? 0) % h.count, [s, e] = h.spans[i], el = document.getElementById("writeEditor") as HTMLTextAreaElement | null;
+    if (el) { el.blur(); el.setSelectionRange(s, s); el.focus(); el.setSelectionRange(s, e); } // focusing scrolls the caret into view
+    setNext({ ...next, [h.term]: i + 1 });
+  };
+  return (
+    <Card className="no-print text-[13.5px]" id="confidential">
+      <h3 className="flex items-center gap-1.5 font-semibold"><ShieldAlert size={15} className={hits.length ? "text-high" : "text-low"} />
+        {hits.length ? "Confidential words in your text" : "No confidential words found"}</h3>
+      {hits.length > 0 && <>
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {hits.map((h) => <button key={h.term} data-term={h.term} onClick={() => show(h)}
+            className="cursor-pointer rounded-full border border-high/50 px-2.5 py-0.5 text-[12.5px] hover:bg-high/10">{h.term} ×{h.count}</button>)}
+        </div>
+        <p className="mt-2 text-[12px] text-mute">Click a word to find it. Describe what you did in general terms instead (&ldquo;a global bank&rdquo;, &ldquo;the reporting system&rdquo;), leave out anything confidential, and check what your organisation lets you include.</p>
+      </>}
+    </Card>
   );
 }
 

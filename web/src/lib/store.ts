@@ -39,6 +39,7 @@ export interface Prefs {
   lt?: boolean; // LanguageTool second opinion (only when the server enables it); off by default
   ltLang?: string;
   dictionary?: string[]; // words added to the grammar dictionary
+  confidential?: string[]; // names to keep out of the document (employer, client, internal systems); flagged on the Write page
 }
 
 async function safeGet<T>(key: string, fallback: T): Promise<T> {

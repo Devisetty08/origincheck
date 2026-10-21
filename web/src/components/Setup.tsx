@@ -356,6 +356,12 @@ export function SettingsCard(p: SettingsProps & { className?: string }) {
               </label>}
             </div>
           : <p className="text-[13px] text-mute">LanguageTool: not enabled on this server (ENABLE_LANGUAGETOOL, LANGUAGETOOL_URL).</p>}
+        <label className="grid gap-1 text-sm sm:col-span-2">Confidential words
+          <textarea id="sConfidential" className={cx(inputCls, "min-h-16")} defaultValue={(p.prefs.confidential ?? []).join("\n")}
+            placeholder="One per line, e.g. your employer, clients, internal system names"
+            onBlur={(e) => p.setPrefs({ confidential: [...new Set(e.target.value.split(/[\n,]/).map((x) => x.trim()).filter(Boolean))] })} />
+          <span className="text-[12px] text-mute">Names that shouldn&apos;t appear in what you hand in. The Write page and the overview point out every one it finds. Stays in this browser.</span>
+        </label>
       </div>
       {(p.saved.length > 0 || p.drafts > 0) && <div className="mt-4 grid gap-2 border-t border-line pt-4">
         {p.saved.length > 0 && <Check id="useSaved" checked={p.useSaved} onChange={p.setUseSaved}

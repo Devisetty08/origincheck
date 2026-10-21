@@ -302,6 +302,27 @@ test("Write lists matched passages and tracks a rewrite in your own words until 
   await expect(page.locator("#writeEditor")).toHaveValue(/saves real effort \(.+\)\./);
 });
 
+test("confidential words, worst sections first and citation checks", async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("oc-prefs", JSON.stringify({ autoSearch: false, confidential: ["PostgreSQL", "Not in the text"] })));
+  await page.goto("./");
+  await page.waitForLoadState("networkidle");
+  await page.getByTestId("srcDrop-input").setInputFiles(`${EX}references/azure.txt`);
+  await page.getByRole("button", { name: "Paste text instead" }).click();
+  const copied = readFileSync(`${EX}references/azure.txt`, "utf8").split(/\n\s*\n/)[0].trim();
+  await page.getByLabel("Document text").fill(`Introduction\nOur team planned the move over two quarters and kept the old system running in parallel the whole time.\n\nPlatform\n${copied}\n\nResults\nAbout 70% of projects use open-source databases. We finished a week early.`);
+  await page.locator("#usePaste").click();
+  await expect(page.locator('#nextSteps [data-step="confidential"]')).toContainText("Confidential words found: PostgreSQL", { timeout: 30_000 });
+  await openTool(page, "write");
+  await page.locator('#confidential [data-term="PostgreSQL"]').click();
+  expect(await page.locator("#writeEditor").evaluate((el: HTMLTextAreaElement) => el.value.slice(el.selectionStart, el.selectionEnd))).toBe("PostgreSQL");
+  await openTool(page, "similarity");
+  await expect(page.locator("#sections [data-section]").first()).toContainText("Platform"); // the copied section comes first
+  await page.locator("#sections [data-section]").first().click();
+  await expect(page.locator("#detail")).toBeVisible();
+  await page.getByRole("tab", { name: /Citations/ }).click();
+  await expect(page.locator("#citeIssues")).toContainText("No citation for this claim: \"About 70% of projects");
+});
+
 test("each tool in the sidebar has its own page and opens on its results", async ({ page }) => {
   await page.goto("./");
   await page.waitForLoadState("networkidle");
