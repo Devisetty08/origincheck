@@ -1,5 +1,5 @@
 // Advisory writing feedback (Req 9). Heuristics, shown separately from the similarity report.
-import { bibStart } from "./engine";
+import { bibStart } from "./similarity";
 import { STOP, words } from "./words";
 
 export interface Feedback {

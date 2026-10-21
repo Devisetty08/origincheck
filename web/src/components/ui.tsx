@@ -2,6 +2,7 @@
 // Small Origin UI–style primitives on Radix (the same base Origin UI components use).
 import { Dialog as D, Tabs as T } from "radix-ui";
 import { X } from "lucide-react";
+import { motion } from "motion/react";
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 
 export const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(" ");
@@ -95,6 +96,33 @@ export function Tabs({ value, onValueChange, tabs, className }:
       </T.List>
       {tabs.map((t) => <T.Content key={t.id} value={t.id} className="outline-none">{t.content}</T.Content>)}
     </T.Root>
+  );
+}
+
+/** Animated score ring. `display` is the text in the middle (defaults to the value). */
+export function Ring({ value, color, display, label, size = "size-24", id }: { value: number; color: string; display?: string; label: string; size?: string; id?: string }) {
+  const C = 2 * Math.PI * 50, frac = Math.min(Math.max(value, 0), 100) / 100;
+  return (
+    <svg viewBox="0 0 120 120" className={cx(size, "shrink-0")} role="img" aria-label={label} id={id}>
+      <circle cx="60" cy="60" r="50" fill="none" stroke="var(--soft)" strokeWidth="12" />
+      <motion.circle cx="60" cy="60" r="50" fill="none" stroke={color} strokeWidth="12" strokeLinecap="round" transform="rotate(-90 60 60)"
+        initial={{ strokeDasharray: `0 ${C}` }} animate={{ strokeDasharray: `${(C * frac).toFixed(1)} ${C.toFixed(1)}` }} transition={{ duration: 0.6, ease: "easeOut" }} />
+      <text x="60" y="69" textAnchor="middle" className="fill-ink text-[26px] font-bold">{display ?? value}</text>
+    </svg>
+  );
+}
+
+export type Status = "queued" | "running" | "done" | "error" | "off" | "needs-sources" | "short";
+
+export function StatusPill({ status, pct, label }: { status: Status; pct?: number; label: string }) {
+  const text = status === "running" ? `running${pct != null ? ` ${pct}%` : ""}` : status === "needs-sources" ? "needs sources" : status === "short" ? "not enough text" : status;
+  return (
+    <span className={cx("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12.5px] font-medium",
+      status === "done" ? "bg-low/12 text-low" : status === "error" ? "bg-high/12 text-high" : status === "running" ? "bg-accent/12 text-accent" : "bg-soft text-mute")}
+      data-status={status}>
+      <span aria-hidden className={cx("size-1.5 rounded-full bg-current", status === "running" && "animate-pulse")} />
+      {label}: {text}
+    </span>
   );
 }
 

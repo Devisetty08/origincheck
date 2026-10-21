@@ -1,6 +1,6 @@
 // Everything is kept in this browser (IndexedDB). Nothing is sent anywhere.
 import { clear, get, set } from "idb-keyval";
-import type { CiteMeta } from "./engine";
+import type { CiteMeta } from "./similarity";
 
 export interface SavedDoc {
   id: string;
@@ -16,7 +16,9 @@ export interface DraftCheck {
   docName: string;
   label: string;
   date: string;
-  index: number;
+  index: number | null; // similarity index (null when no sources)
+  grammar?: number; // writing score
+  ai?: number | null; // AI indicator (null: off or too short)
   breakdown: { name: string; kind: string; pct: number }[];
   passages: { key: string; text: string; source: string }[];
   text: string;
@@ -31,7 +33,11 @@ export interface Prefs {
   webSearch?: boolean; // search the web for matching phrases on each check
   searchKey?: string; // the user's own Jina API key, kept in this browser only
   webQueries?: number;
-  books?: boolean; // search inside Open Library's scanned books on each check
+  books?: boolean; // search inside Open Library's scanned books (opt-in, needs internet features)
+  ai?: boolean; // AI indicator; on unless turned off
+  lt?: boolean; // LanguageTool grammar (sends text); off by default
+  ltUrl?: string;
+  ltLang?: string;
   bookQueries?: number;
 }
 

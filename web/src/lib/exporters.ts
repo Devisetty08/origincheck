@@ -1,7 +1,9 @@
 // Downloads: standalone HTML report (10.1), revised .docx (10.2), self-check summary PDF (10.3).
-import type { Passage, Result, Settings, Source } from "./engine";
-import { KIND_LABEL } from "./engine";
+import type { Passage, Result, Settings, Source } from "./similarity";
+import { KIND_LABEL } from "./similarity";
 import { type Seg, type Style, STYLE_LABEL } from "./citations";
+import type { Issue } from "./grammar";
+import { AI_CAVEAT, type AiResult, type AiSignals } from "./aiScore";
 
 export const PALETTE = ["#d13438", "#0078d4", "#16a34a", "#ea580c", "#9333ea", "#0891b2", "#db2777", "#a16207", "#4f46e5", "#65a30d", "#0d9488", "#be123c"];
 export const band = (i: number) =>
@@ -56,50 +58,87 @@ function markup(text: string, toks: { s: number; e: number }[], r: Result, num: 
 }
 
 export function reportHtml(o: {
-  docName: string; text: string; toks: { s: number; e: number }[]; r: Result; sources: Source[]; settings: Settings; checked: Date;
+  docName: string; text: string; toks: { s: number; e: number }[]; r: Result | null; sources: Source[]; settings: Settings; checked: Date;
+  grammar?: { score: number; issues: Issue[] }; ai?: { result: AiResult | null; signals?: AiSignals; note?: string };
 }) {
   const { r, sources } = o;
-  const num = new Map(r.order.map((s, i) => [s, i + 1]));
-  const color = new Map(r.order.map((s, i) => [s, PALETTE[i % PALETTE.length]]));
-  const b = band(r.index);
+  const num = new Map((r?.order ?? []).map((s, i) => [s, i + 1]));
+  const color = new Map((r?.order ?? []).map((s, i) => [s, PALETTE[i % PALETTE.length]]));
+  const b = r ? band(r.index) : null;
   const byKind: Record<string, number> = {};
-  for (const s of r.order) byKind[sources[s].kind] = (byKind[sources[s].kind] ?? 0) + r.counts.get(s)!;
-  const rows = r.order.map((s) =>
+  for (const s of r?.order ?? []) byKind[sources[s].kind] = (byKind[sources[s].kind] ?? 0) + r!.counts.get(s)!;
+  const rows = (r?.order ?? []).map((s) =>
     `<li><span class="n" style="background:${color.get(s)}">${num.get(s)}</span><div><div class="sn">${esc(sources[s].name)}</div>`
-    + `<div class="sk">${KIND_LABEL[sources[s].kind]} · ${r.counts.get(s)} words</div></div><b>${pctText((100 * r.counts.get(s)!) / r.total)}</b></li>`).join("");
+    + `<div class="sk">${KIND_LABEL[sources[s].kind]} · ${r!.counts.get(s)} words</div></div><b>${pctText((100 * r!.counts.get(s)!) / r!.total)}</b></li>`).join("");
+  const g = o.grammar, ai = o.ai?.result;
+  const sevColor = { error: "#d13438", warning: "#d97706", style: "#0078d4" } as const;
+  const grammarRows = (g?.issues ?? []).map((i) =>
+    `<tr><td><span class="pill" style="background:${sevColor[i.severity]}">${i.severity}</span></td><td>${i.category}</td>`
+    + `<td>“${esc(o.text.slice(i.start, i.end))}”</td><td>${esc(i.message)}${i.suggestions[0] ? ` → <b>${esc(i.suggestions[0].text || "(remove)")}</b>` : ""}</td></tr>`).join("");
+  let heat = "";
+  if (ai && o.ai?.signals) {
+    let pos = 0;
+    o.ai.signals.sentences.forEach((x, i) => {
+      const sc = ai.sentenceScores[i];
+      heat += esc(o.text.slice(pos, x.start))
+        + `<span title="Estimated likelihood ${sc ?? "—"}" style="background:color-mix(in srgb,#9333ea ${sc == null ? 0 : Math.round(6 + sc * 0.52)}%,transparent)">${esc(o.text.slice(x.start, x.end))}</span>`;
+      pos = x.end;
+    });
+    heat += esc(o.text.slice(pos));
+  }
+  const card = (title: string, value: string, sub: string, col: string) =>
+    `<div class="card score"><div class="meta">${title}</div><div class="big" style="color:${col}">${value}</div><div class="meta">${sub}</div></div>`;
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Similarity report – ${esc(o.docName)}</title>
+<title>origincheck report – ${esc(o.docName)}</title>
 <style>
 :root{--bg:#f3f8fd;--card:#fff;--ink:#0f1f33;--mute:#4a5d75;--line:#dce7f2;--top:#0078d4;color-scheme:light}
 @media (prefers-color-scheme:dark){:root{--bg:#0b1522;--card:#111e2e;--ink:#e6eef8;--mute:#9fb3c8;--line:#22364d;--top:#0a2540;color-scheme:dark}}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 Inter,system-ui,"Segoe UI",sans-serif}
 header{background:var(--top);color:#fff;font-weight:700;padding:12px 16px}
-.wrap{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:20px;max-width:1300px;margin:auto;padding:20px 16px}
+.page{max-width:1300px;margin:auto;padding:20px 16px;display:grid;gap:20px}
+.scores{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}@media (max-width:700px){.scores{grid-template-columns:1fr}}
+.big{font-size:40px;font-weight:700;line-height:1.1}
+.wrap{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:20px}
 @media (max-width:900px){.wrap{grid-template-columns:minmax(0,1fr)}aside{order:-1}}
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px 24px;min-width:0}
-h1{font-size:18px;margin:0 0 4px;overflow-wrap:anywhere}.meta{color:var(--mute);font-size:13px}
+h1{font-size:18px;margin:0 0 4px;overflow-wrap:anywhere}h2{font-size:17px;margin:0 0 10px}.meta{color:var(--mute);font-size:13px}
 .doc{font:16px/1.75 "Source Serif 4",Georgia,serif;white-space:pre-wrap;overflow-wrap:anywhere;margin-top:14px}
 mark{background:color-mix(in srgb,var(--c) 18%,transparent);color:inherit;border-bottom:2px solid var(--c);border-radius:2px}
 mark sup{background:var(--c);color:#fff;font:700 10px/1 system-ui;padding:2px 4px;border-radius:4px;margin-right:2px}
 .cp{border-bottom:2px dashed #9333ea}.ex{color:var(--mute);text-decoration:line-through;opacity:.8}
-aside .card{position:sticky;top:16px}.idx{font-size:56px;font-weight:700;line-height:1;color:${b.color}}
+.idx{font-size:56px;font-weight:700;line-height:1}
 ol{list-style:none;padding:0;margin:16px 0 0}li{display:flex;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}
 li div{flex:1;min-width:0}.sn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}.sk{color:var(--mute);font-size:12px}
 .n{color:#fff;font-weight:700;font-size:12px;min-width:22px;text-align:center;border-radius:5px;padding:2px 4px}
+table{width:100%;border-collapse:collapse;font-size:14px}td{border-top:1px solid var(--line);padding:6px 8px;vertical-align:top}
+.pill{color:#fff;font-size:11px;font-weight:700;text-transform:uppercase;border-radius:4px;padding:1px 6px}
+.caveat{border:1px solid #d9770666;background:#d977061a;border-radius:10px;padding:10px 12px}
 .foot{color:var(--mute);font-size:12px;margin-top:14px;border-top:1px solid var(--line);padding-top:10px}
-</style></head><body><header>origincheck · Similarity report</header><div class="wrap">
-<main class="card"><h1>${esc(o.docName)}</h1><div class="meta">${r.total} words checked · ${o.checked.toLocaleString()}</div>
+</style></head><body><header>origincheck · Report</header><div class="page">
+<div><h1>${esc(o.docName)}</h1><div class="meta">Checked ${o.checked.toLocaleString()}</div></div>
+<div class="scores">
+${card("Similarity index", r ? `${r.index}%` : "—", r ? b!.label : "Not run: no sources were added", b?.color ?? "inherit")}
+${card("Writing score", g ? String(g.score) : "—", g ? `${g.issues.length} grammar suggestions` : "Not run", "#0078d4")}
+${card("AI indicator", ai ? String(ai.score) : "—", ai ? `${ai.label} — an indicator, never proof` : esc(o.ai?.note ?? "Not run"), "#9333ea")}
+</div>
+${r ? `<section class="wrap">
+<main class="card"><h2>Similarity</h2><div class="meta">${r.total} words checked</div>
 <div class="doc">${markup(o.text, o.toks, r, num, color)}</div></main>
-<aside><div class="card"><div class="meta">Similarity index</div><div class="idx">${r.index}%</div><div style="font-weight:700;color:${b.color}">${b.label}</div>
+<aside><div class="card"><div class="meta">Similarity index</div><div class="idx" style="color:${b!.color}">${r.index}%</div><div style="font-weight:700;color:${b!.color}">${b!.label}</div>
 <div class="meta">${Object.entries(byKind).map(([k, v]) => `${KIND_LABEL[k as Source["kind"]]} ${pctText((100 * v) / r.total)}`).join(" · ") || "No matches"}</div>
 <ol>${rows || "<li>No matching sources found.</li>"}</ol>
 ${r.close.length ? `<p class="meta"><span class="cp">Dashed</span>: ${r.close.length} possible close paraphrase passage(s), not counted in the index.</p>` : ""}
 <div class="foot">Settings: ${esc(settingsText(o.settings))}. Sources compared: ${sources.length}.<br>Struck-through text was excluded.<br>
-Matches show shared wording only. Quote and cite, or rewrite and cite. Made with origincheck — https://github.com/Devisetty08/origincheck</div></div></aside>
+Matches show shared wording only. Quote and cite, or rewrite and cite.</div></div></aside></section>` : ""}
+${g ? `<section class="card"><h2>Grammar</h2><div class="meta">Writing score ${g.score}/100 · ${g.issues.length} suggestions (Harper${g.issues.some((i) => i.engine === "languagetool") ? " and LanguageTool" : ""})</div>
+${g.issues.length ? `<table><tbody>${grammarRows}</tbody></table>` : "<p>No issues found.</p>"}</section>` : ""}
+${o.ai ? `<section class="card"><h2>AI indicator</h2><p class="caveat">${esc(AI_CAVEAT)}</p>
+${ai ? `<p><b>${ai.score}/100 — ${ai.label}.</b> ${ai.reasons.map(esc).join(" ")}</p><div class="doc">${heat}</div>` : `<p>${esc(o.ai.note ?? "Not run.")}</p>`}</section>` : ""}
+<p class="meta">Made with origincheck — https://github.com/Devisetty08/origincheck</p>
 </div></body></html>`;
 }
 
-export async function exportDocx(o: { docName: string; text: string; headings: Map<string, "h1" | "h2" | "h3">; refs: Seg[][]; style: Style; hasBib: boolean }) {
+export async function exportDocx(o: { docName: string; text: string; headings: Map<string, "h1" | "h2" | "h3">; refs: Seg[][]; style: Style; hasBib: boolean; fileName?: string }) {
   const { Document, HeadingLevel, Packer, Paragraph, TextRun } = await import("docx");
   const H = { h1: HeadingLevel.HEADING_1, h2: HeadingLevel.HEADING_2, h3: HeadingLevel.HEADING_3 };
   const paras = o.text.split(/\n\s*\n+/).map((p) => p.trim()).filter(Boolean).map((p) => {
@@ -119,7 +158,7 @@ export async function exportDocx(o: { docName: string; text: string; headings: M
     styles: { default: { document: { run: { font: "Calibri", size: 24 } } } },
     sections: [{ children: paras }],
   });
-  download(`${baseName(o.docName)}_revised.docx`, await Packer.toBlob(doc), "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+  download(o.fileName ?? `${baseName(o.docName)}_revised.docx`, await Packer.toBlob(doc), "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
 }
 
 export interface SummaryRow { excerpt: string; source: string; status: string }

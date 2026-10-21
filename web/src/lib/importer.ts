@@ -1,6 +1,6 @@
 // Source import (Req 7). Only DOIs, reference strings and URLs the user typed are sent out —
 // never document text (Req 11.2).
-import type { CiteMeta } from "./engine";
+import type { CiteMeta } from "./similarity";
 import { DOI_RE, htmlToText } from "./extract";
 
 export interface Imported { name: string; text: string; meta?: CiteMeta; url?: string }

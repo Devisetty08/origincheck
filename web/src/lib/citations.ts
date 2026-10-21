@@ -1,6 +1,6 @@
 // Citation formatting (APA 7, Harvard, IEEE) and the citation checker.
-import type { CiteMeta } from "./engine";
-import { QUOTE_RE, bibStart } from "./engine";
+import type { CiteMeta } from "./similarity";
+import { QUOTE_RE, bibStart } from "./similarity";
 
 export type Style = "apa" | "harvard" | "ieee";
 export const STYLE_LABEL: Record<Style, string> = { apa: "APA 7", harvard: "Harvard", ieee: "IEEE" };

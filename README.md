@@ -1,64 +1,93 @@
 # origincheck
 
-An open-source similarity checker and academic writing assistant. It finds passages in your document that share wording with your sources, explains why each one was flagged, and helps you fix it honestly: quote and cite, paraphrase and cite, or remove. The goal is a document where every borrowed idea is credited, not a score of 0%.
+An open-source writing checker. Add a document and three checks run automatically:
 
-It comes in two versions that use the same matching method and give the same similarity index on the same inputs:
+- **Similarity**: finds passages that share wording with your sources and helps you fix them honestly. Quote and cite, rewrite in your own words and cite, or remove.
+- **Grammar**: spelling, grammar, punctuation, style and clarity suggestions that you accept one at a time, plus readability.
+- **AI indicator**: an estimate of how likely the text is to be machine-written. It is an indicator only, never proof.
 
-- **Web app** (`web/`): runs entirely in your browser. **Live: https://devisetty08.github.io/origincheck/**
-- **Command-line tool** (`origincheck.py`): for batch checks, large source folders and an optional internet search.
+It comes in two versions. The **web app** (`web/`) runs entirely in your browser: **https://devisetty08.github.io/origincheck/**. The **command-line tool** (`origincheck.py`) does similarity checks for batch work, large source folders and web search. Both use the same matching method and give the same similarity index on the same inputs.
 
-![Report view of the web app](example/screenshot.png)
+![The origincheck report: similarity, grammar and AI indicator scores](example/screenshot.png)
 
 ## Web app
 
-Open https://devisetty08.github.io/origincheck/, add your document and your sources, and select **Run check**. Files are read in your browser and never uploaded.
+Drop in a document (.docx, .pdf, .txt, .md, .html, .rtf) or paste text. As soon as the text is read, the three checks start in parallel, each in its own Web Worker so the page stays responsive. A progress row shows each check's state, and results appear as they finish. The summary shows one card per check, for example "47% similarity · 7 grammar suggestions · AI indicator: Unclear". Each card opens its tab.
 
-**Similarity check**
-- Reads .docx, .pdf, .txt, .md, .html/.htm and .rtf for the document and the sources, or pasted text. Scanned PDFs need OCR first.
-- Turnitin-style split view: the document with matches highlighted and numbered in each source's colour, the similarity index, a breakdown by source type and a ranked source list.
-- Click a highlight or **View matches** to compare your text with the source passage, then step through that source's matches.
-- Filters: exclude quotes, the bibliography, matches under N words, sources under X%, or individual sources (their words go to the next best source).
-- **Stricter mode** also flags lightly reworded copying (word stems and common synonyms) as "possible close paraphrase", shown separately and never counted in the index.
+### Similarity
 
-**Guided revision**
-- For each flagged passage: **Quote and cite**, **Paraphrase and cite** or **Remove**. Each edit is re-checked straight away, with undo.
-- The paraphrase editor hides the source while you write and shows a live closeness meter (**Too close / Borderline / Original wording**) with plain-language reasons such as "6 words in a row match the source". It gives advice, never replacement text.
-- Progress shows how many flagged passages are resolved and how the index has changed.
+- Compares the document with the sources you add (files, pasted text, web pages, DOIs and reference lists), your saved documents, earlier drafts of the same document and, if you turn them on, web and book search results. With no sources, the card says "Add sources to run this check". The check runs as soon as a source is added, and the other two checks don't wait for it.
+- Turnitin-style report: the document with matches highlighted and numbered by source, a ranked source list, the matching source passage side by side, and filters (exclude quotes, the bibliography, small matches, small sources, or a single source).
+- For each match: **Mark as quoted & cited**, **Rewrite in my own words**, or **Remove**. The rewrite editor hides the source by default (with a "Show source" toggle), re-checks your version against the source as you type, and shows a closeness meter (Too close / Borderline / Original wording) with a plain-language reason. It never writes replacement text.
+- Citations in APA 7, Harvard and IEEE; a citation checker; a stricter mode for lightly reworded copying (reported separately, never counted in the index).
 
-**Citations**
-- Record author, title, year, journal or publisher, DOI, URL and access date for each source. Details are pre-filled from Word and PDF metadata, or from the DOI.
-- In-text citations and reference lists in **APA 7**, **Harvard** and **IEEE**.
-- Citation checker: citations with no reference entry, entries never cited, quotations without a citation, and matched sources not cited anywhere.
+### Grammar
 
-**More**
-- **Draft history**: every check is saved with its date, label, index and sources, with a chart across drafts and a list of passages resolved or introduced between two drafts. Earlier drafts of the same document are compared automatically and excluded from the index by default.
-- **Self-plagiarism check**: mark saved documents as your own earlier work, and their matches are reported as a separate category.
-- **Web search** (runs automatically once you add a key): like the CLI's `--web`, picks evenly spaced 24-word phrases from your document, searches each as an exact phrase with [Jina Search](https://jina.ai/) (free API key with trial credit, stored only in your browser) and compares the top pages as "Internet" sources. The bibliography is never searched.
-- **Books (Open Library)** (on by default): every check searches inside millions of scanned books at the Internet Archive ([internetarchive/openlibrary](https://github.com/internetarchive/openlibrary)) for phrases from your document, and adds books with matching passages as sources. No key needed. Untick it to keep everything offline.
-- **Free book lists**: browse and search [EbookFoundation/free-programming-books](https://github.com/EbookFoundation/free-programming-books) and [44bits/awesome-opensource-documents](https://github.com/44bits/awesome-opensource-documents), and add a title as a source in one click. This works best for books published as web pages.
-- **Source import** (optional internet features): paste a reference list or DOIs to fetch open-access full text (Crossref, OpenAlex, Unpaywall, Europe PMC), or add a web page by URL. Entries that couldn't be retrieved are listed with a link.
-- **Writing feedback** (advisory): reading ease, long sentences, passive voice, repeated words and inconsistent terminology.
-- **Exports**: standalone HTML report, print or save as PDF, the revised document as **.docx** (headings kept, citations and missing reference entries added), and a **self-check summary PDF** recording what you reviewed and resolved.
-- A short **guide to avoiding plagiarism**: when to quote, how to paraphrase and how to cite.
-- Light and dark themes, keyboard accessible, works on phone-width screens.
+- The document with issues underlined: wavy red for errors, solid amber for warnings and dotted blue for style, so the line style tells them apart as well as the colour.
+- Click an underline for the message, its category and rule, and suggested replacements, with **Accept** (applies that one suggestion), **Ignore** and **Ignore rule**. A side list groups issues by category (spelling, grammar, punctuation, style, clarity) with next and previous buttons.
+- **Accept all spelling fixes** is available. There is no "accept all" for style.
+- **Edit text** lets you edit freely. After a pause, only the changed paragraphs are checked again and the score updates.
+- Readability: Flesch reading ease, average sentence length, sentences over 35 words, passive voice and repeated words.
+- Download the corrected document as .docx (headings and paragraphs kept) or .txt.
 
-**Privacy.** Documents are processed on your device. Saved documents, draft history and citation details stay in your browser (IndexedDB). You can export them to a file or delete them all in one step. Book search is on by default and sends only short phrases (24 words each) to Open Library. Web search does the same with Jina once you add a key. Importing web pages, DOIs and reference lists is off by default and sends only the addresses, DOIs and references you enter. Your whole document is never sent. If a site blocks in-browser downloads, an optional reader service (r.jina.ai) is given the page address only.
+### AI indicator
 
-**Not included, by design.** origincheck doesn't rewrite or "spin" text to lower the score, doesn't "humanize" AI-generated text, and doesn't do AI-writing detection (current detectors are unreliable and flag human writing).
+> AI detection is unreliable. Formal, technical or non-native-English writing is often misjudged as AI. Use this as a prompt to review, never as proof. Your institution's tools may give a different result.
 
-### Developing and deploying the web app
+This caveat is always shown with the score. The tab has a sentence-level heatmap (tooltips, or "Show numbers", give each sentence's estimate, passage probability and perplexity) and a "Why this score" panel. Nothing in origincheck rewrites text to change this score.
 
-Built with Next.js (static export), TypeScript, Tailwind CSS, Radix-based components in the Origin UI style, Lucide icons, Recharts, mammoth.js and pdf.js.
+### History, saved documents and exports
+
+- **History** keeps every check's date, version label, the three scores and the source breakdown, with a chart of all three scores across drafts and a comparison of two drafts.
+- **Saved documents** stay in your browser. Mark your earlier work to have matches reported as self-plagiarism. You can export everything to a file or delete it all in one step.
+- **Download report** saves a standalone HTML file with the three scores, the similarity highlights, the grammar issue list and the AI heatmap. **Print / PDF** uses print styles.
+
+## How the scores are calculated
+
+| Score | Calculation |
+|---|---|
+| **Similarity index** (0–100%) | Matched words ÷ words not excluded (see [How the matching works](#how-the-matching-works)). Bands: under 15 green, 15–24 amber, 25–39 orange, 40+ red. |
+| **Writing score** (0–100) | `max(0, 100 − weighted issues per 100 words × 2)`, with errors weighing 3, warnings 1 and style suggestions 0.5. Words not in Harper's dictionary count as warnings, since in academic writing they are often names or technical terms. Measured with Harper: the example draft scores 95, a Wikipedia article 90 and a messy student paragraph 41. |
+| **AI indicator** (0–100) | 60% RoBERTa detector (length-weighted mean over 200–400-token passages) + 40% language-model signal. That signal is 60% perplexity (geometric mean over sentences: 100 or more scores 0, 25 or less scores 1, on a log scale) and 40% variation (the spread of log-perplexity across sentences: 0.75 or more scores 0, 0.35 or less scores 1). Labels: **Low** under 30, **Unclear** 30–70, **High** over 70. Documents under 150 words show "Not enough text to estimate". |
+
+The AI weighting was calibrated on real model output. Six Wikipedia articles plus passages from Thoreau and Darwin scored 3–24. Four AI-written essays scored 21, 37, 84 and 93: the detector missed one completely, which is why the caveat matters. The scoring code and its tests are in [`web/src/lib/aiScore.ts`](web/src/lib/aiScore.ts).
+
+## Components
+
+| Check | Component | Runs |
+|---|---|---|
+| Grammar | [Harper](https://github.com/Automattic/harper) (`harper.js`, WebAssembly) | On your device |
+| Grammar (optional) | [LanguageTool](https://github.com/languagetool-org/languagetool) public API or your own server | Online, **off by default** |
+| AI indicator | [Transformers.js](https://github.com/huggingface/transformers.js) with [`onnx-community/roberta-base-openai-detector-ONNX`](https://huggingface.co/onnx-community/roberta-base-openai-detector-ONNX) and [`Xenova/distilgpt2`](https://huggingface.co/Xenova/distilgpt2), quantized, in a Web Worker | On your device. About 210 MB is downloaded the first time and then cached by the browser. It can be turned off in Settings. |
+| Similarity | origincheck's own matching engine (`web/src/lib/similarity.ts`, same algorithm as `origincheck.py`) | On your device |
+
+Both models are the ones named in the spec, and both are available and work with Transformers.js 4.3.1 (checked October 2026). The app also uses Next.js (static export), TypeScript, Tailwind CSS, Radix-based components in the Origin UI style, Lucide icons, Recharts, Motion, mammoth.js and pdf.js. Licences are listed in [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
+
+## Privacy
+
+Documents are processed on your device. Saved documents, draft history and citation details are stored in your browser (IndexedDB) and never leave it. Anything that sends data elsewhere is off by default, opt-in and labelled where you turn it on:
+
+| Setting | What is sent, and where |
+|---|---|
+| LanguageTool | **Your document text**, in chunks, to LanguageTool's public API (or the server you enter). |
+| Web search | Up to N short phrases (24 words each) to Jina Search, with your own key. |
+| Books (Open Library) | Up to N short phrases to Open Library's search inside books. |
+| Web page, DOI and reference import | Only the addresses, DOIs and references you type, to the page itself, Crossref, OpenAlex, Unpaywall or Europe PMC. An optional reader service (r.jina.ai) receives the page address only. |
+
+The AI indicator downloads its models from Hugging Face, but your text never leaves your device.
+
+## Developing and deploying
 
 ```
 cd web
 npm ci
 npm run dev        # http://localhost:3100
-npm run build      # static site in web/out
+npm test           # unit tests (Vitest)
+npm run build      # static site in web/out (set BASE_PATH=/origincheck to match GitHub Pages)
+npx playwright test   # end-to-end tests against the build (the AI models are mocked)
 ```
 
-Deployment uses `.github/workflows/pages.yml`, which builds `web/` on every push to `main` and publishes it to GitHub Pages. One-time setup: in the repository, go to **Settings → Pages → Build and deployment → Source** and choose **GitHub Actions**.
-
+`.github/workflows/pages.yml` runs lint, the type check, the unit tests and the end-to-end tests on every push to `main`, then publishes `web/out` to GitHub Pages. One-time setup: **Settings → Pages → Build and deployment → Source → GitHub Actions**. GitHub Pages needs a public repository, or a paid plan for a private one.
 ## Command-line tool
 
 ### Setup
@@ -155,7 +184,7 @@ Quotes, the bibliography, small matches and small sources can be excluded, as in
 - **Internet search.** origincheck searches the open web with a search API (Jina in the web app, Brave in the CLI), using a key you supply. Google's Custom Search API is closed to new users and shuts down on 1 January 2027. Search finds pages that contain the same phrases, not a commercial service's private index.
 - **Blocked downloads.** Many publishers and websites block in-browser downloads. The optional reader service gets around most of these. Anything still blocked is listed so you can download it and add the file.
 - **Copied wording, not heavy paraphrase.** It catches copied or lightly edited text. Turnitin's main score works the same way.
-- **No AI-writing detection.** AI detectors are unreliable and flag human writing as AI-generated, so origincheck doesn't include one.
+- **AI indicator, not AI detection.** Detectors are unreliable, especially on formal, technical or non-native-English writing. origincheck shows an indicator with its reasons and a caveat, never a verdict, and never offers to rewrite text to change it. Turnitin's own AI detector uses different, private models, so its result can differ.
 - **Scanned PDFs** have no text layer. Run OCR on them first.
 
 ## Fixing flagged passages

@@ -1,0 +1,191 @@
+"use client";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Popover } from "radix-ui";
+import { ChevronLeft, ChevronRight, Download, Pencil, Check as CheckIcon, X } from "lucide-react";
+import { CATEGORIES, type Category, type Issue } from "@/lib/grammar";
+import { feedback } from "@/lib/writing";
+import { plural } from "@/lib/words";
+import { Button, Card, cx } from "./ui";
+
+const SEV_STYLE: Record<Issue["severity"], string> = {
+  error: "decoration-high decoration-wavy",
+  warning: "decoration-mid decoration-solid",
+  style: "decoration-accent decoration-dotted",
+};
+const SEV_LABEL = { error: "Error", warning: "Warning", style: "Style" } as const;
+const CAT_LABEL: Record<Category, string> = { spelling: "Spelling", grammar: "Grammar", punctuation: "Punctuation", style: "Style", clarity: "Clarity" };
+
+interface Props {
+  text: string;
+  issues: Issue[];
+  busy: boolean;
+  ltOn: boolean;
+  ltNote?: string;
+  onAccept: (i: Issue, s: Issue["suggestions"][number]) => void;
+  onIgnore: (i: Issue) => void;
+  onIgnoreRule: (rule: string) => void;
+  onAcceptAllSpelling: () => void;
+  onEditText: (t: string) => void;
+  onDownload: (kind: "docx" | "txt") => void;
+}
+
+export default function GrammarTab(p: Props) {
+  const [cat, setCat] = useState<Category | "all">("all");
+  const [open, setOpen] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const docRef = useRef<HTMLDivElement>(null);
+  const anchor = useRef<HTMLElement | null>(null);
+
+  const shown = useMemo(() => (cat === "all" ? p.issues : p.issues.filter((i) => i.category === cat)), [p.issues, cat]);
+  const current = p.issues.find((i) => i.id === open);
+  const spellingFixes = p.issues.filter((i) => i.category === "spelling" && i.severity !== "style" && i.suggestions.length).length;
+
+  const focusIssue = (i: Issue | undefined) => {
+    if (!i) return;
+    const el = docRef.current?.querySelector<HTMLElement>(`[data-issue="${CSS.escape(i.id)}"]`);
+    if (!el) return;
+    el.scrollIntoView({ block: "center", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+    anchor.current = el;
+    setOpen(i.id);
+  };
+  const step = (d: 1 | -1) => {
+    if (!shown.length) return;
+    const k = shown.findIndex((i) => i.id === open);
+    focusIssue(shown[k < 0 ? (d > 0 ? 0 : shown.length - 1) : (k + d + shown.length) % shown.length]);
+  };
+
+  // the document, cut into plain text and underlined issues
+  const body = useMemo(() => {
+    const out: React.ReactNode[] = [];
+    let pos = 0;
+    for (const i of p.issues) {
+      if (i.start < pos) continue; // overlapping issue: shown in the list, not underlined twice
+      out.push(p.text.slice(pos, i.start));
+      out.push(<span key={i.id} data-issue={i.id} tabIndex={0} role="button" aria-label={`${SEV_LABEL[i.severity]}, ${CAT_LABEL[i.category]}: ${i.message}`}
+        className={cx("cursor-pointer underline decoration-2 underline-offset-4", SEV_STYLE[i.severity], open === i.id && "bg-soft", cat !== "all" && i.category !== cat && "opacity-40 decoration-1")}
+        onClick={(e) => { anchor.current = e.currentTarget; setOpen(i.id); }}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); anchor.current = e.currentTarget; setOpen(i.id); } }}>
+        {p.text.slice(i.start, i.end) || "␣"}</span>);
+      pos = i.end;
+    }
+    out.push(p.text.slice(pos));
+    return out;
+  }, [p.text, p.issues, open, cat]);
+
+  const fb = useMemo(() => feedback(p.text), [p.text]);
+  const counts = Object.fromEntries(CATEGORIES.map((c) => [c, p.issues.filter((i) => i.category === c).length])) as Record<Category, number>;
+
+  return (
+    <div className="grid grid-cols-1 items-start gap-5 min-[1000px]:grid-cols-[minmax(0,1fr)_340px]">
+      <article className="print-plain min-w-0 rounded-xl border border-line bg-panel px-4 py-5 sm:px-8">
+        <div className="no-print mb-3 flex flex-wrap items-center gap-2">
+          <Button size="sm" variant={editing ? "primary" : "outline"} onClick={() => setEditing(!editing)} aria-pressed={editing} id="editText"><Pencil size={14} />{editing ? "Done editing" : "Edit text"}</Button>
+          <Button size="sm" onClick={() => p.onDownload("docx")} id="dlDocx"><Download size={14} />Corrected .docx</Button>
+          <Button size="sm" onClick={() => p.onDownload("txt")} id="dlTxt"><Download size={14} />.txt</Button>
+          {p.busy && <span className="text-[13px] text-mute" role="status">Checking…</span>}
+        </div>
+        <p className="no-print mb-3 flex flex-wrap gap-3 text-[12.5px] text-mute" aria-hidden>
+          <span><span className="underline decoration-high decoration-wavy decoration-2 underline-offset-4">wavy</span> error</span>
+          <span><span className="underline decoration-mid decoration-2 underline-offset-4">solid</span> warning</span>
+          <span><span className="underline decoration-accent decoration-dotted decoration-2 underline-offset-4">dotted</span> style</span>
+        </p>
+        {editing
+          ? <EditBox text={p.text} onChange={p.onEditText} />
+          : <div ref={docRef} id="gDoc" className="font-serif text-[16.5px] leading-[1.9] whitespace-pre-wrap wrap-anywhere">{body}</div>}
+      </article>
+
+      <aside className="grid min-w-0 gap-3.5 min-[1000px]:sticky min-[1000px]:top-[72px]" aria-label="Grammar issues">
+        <Card>
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold">{plural(p.issues.length, "suggestion")}</h3>
+            <div className="flex gap-1">
+              <Button size="sm" aria-label="Previous issue" onClick={() => step(-1)} id="gPrev"><ChevronLeft size={16} /></Button>
+              <Button size="sm" aria-label="Next issue" onClick={() => step(1)} id="gNext"><ChevronRight size={16} /></Button>
+            </div>
+          </div>
+          <ul className="mt-2 grid gap-1" aria-label="Issues by category">
+            <CatRow label="All" n={p.issues.length} active={cat === "all"} onClick={() => setCat("all")} />
+            {CATEGORIES.map((c) => <CatRow key={c} label={CAT_LABEL[c]} n={counts[c]} active={cat === c} onClick={() => setCat(c)} />)}
+          </ul>
+          {spellingFixes > 0 && <Button size="sm" className="mt-3 w-full" onClick={p.onAcceptAllSpelling} id="acceptSpelling">
+            <CheckIcon size={14} />Accept all spelling fixes ({spellingFixes})</Button>}
+          <p className="mt-2 text-[12px] text-mute">Checked on your device by Harper{p.ltOn ? " and LanguageTool (online)" : ""}. Style suggestions are reviewed one at a time.{p.ltNote ? ` ${p.ltNote}` : ""}</p>
+        </Card>
+        <Card className="text-[13.5px]" aria-label="Readability">
+          <h3 className="font-semibold">Readability</h3>
+          <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5">
+            <dt className="text-mute">Flesch reading ease</dt><dd className="text-right font-semibold" id="flesch">{fb.flesch}</dd>
+            <dt className="text-mute">Average sentence</dt><dd className="text-right font-semibold">{(fb.words / Math.max(1, fb.sentences)).toFixed(1)} words</dd>
+            <dt className="text-mute">Sentences over 35 words</dt><dd className="text-right font-semibold">{fb.long.length}</dd>
+            <dt className="text-mute">Passive voice</dt><dd className="text-right font-semibold">{fb.passive.length} ({fb.passivePct}%)</dd>
+            <dt className="text-mute">Repeated words</dt><dd className="text-right font-semibold">{fb.repeated.length}</dd>
+          </dl>
+          <p className="mt-2 text-[12px] text-mute">{fb.fleschLabel}.{fb.overused.length ? ` Most used: ${fb.overused.slice(0, 4).map((w) => `${w.word} (${w.count})`).join(", ")}.` : ""}</p>
+          {fb.long.length > 0 && <details className="mt-2"><summary className="cursor-pointer text-[13px] font-medium">Long sentences</summary>
+            <ul className="mt-1 grid list-disc gap-1 pl-5 text-[12.5px]">{fb.long.map((l) => <li key={l.at}>{l.words} words: {l.text.split(/\s+/).slice(0, 14).join(" ")} …</li>)}</ul></details>}
+        </Card>
+      </aside>
+
+      <Popover.Root open={!!current} onOpenChange={(o) => !o && setOpen(null)}>
+        <Popover.Anchor virtualRef={anchor as React.RefObject<HTMLElement>} />
+        <Popover.Portal>
+          {current && <Popover.Content side="bottom" align="start" sideOffset={6} collisionPadding={12}
+            className="z-50 w-[min(340px,calc(100vw-24px))] rounded-xl border border-line bg-panel p-3.5 text-sm shadow-xl" id="issuePopover">
+            <div className="flex items-start gap-2">
+              <span className={cx("rounded px-1.5 py-0.5 text-[11px] font-bold uppercase text-white",
+                current.severity === "error" ? "bg-high" : current.severity === "warning" ? "bg-mid" : "bg-accent")}>{SEV_LABEL[current.severity]}</span>
+              <span className="text-[12px] text-mute">{CAT_LABEL[current.category]} · {current.rule}</span>
+              <Popover.Close className="ml-auto grid size-6 place-items-center rounded hover:bg-soft cursor-pointer" aria-label="Close"><X size={14} /></Popover.Close>
+            </div>
+            <p className="mt-2">{current.message}</p>
+            {current.suggestions.length > 0 && <div className="mt-2.5 flex flex-wrap gap-1.5" aria-label="Suggestions">
+              {current.suggestions.map((s, k) => <Button key={k} size="sm" variant="primary" data-accept={k}
+                onClick={() => { p.onAccept(current, s); setOpen(null); }}>
+                {s.kind === "remove" ? "Remove" : s.kind === "insertAfter" ? `Add “${s.text}”` : `Accept “${s.text || "∅"}”`}
+              </Button>)}
+            </div>}
+            <div className="mt-2.5 flex gap-3 border-t border-line pt-2">
+              <Button variant="link" onClick={() => { p.onIgnore(current); setOpen(null); }}>Ignore</Button>
+              <Button variant="link" onClick={() => { p.onIgnoreRule(current.rule); setOpen(null); }}>Ignore rule</Button>
+            </div>
+          </Popover.Content>}
+        </Popover.Portal>
+      </Popover.Root>
+    </div>
+  );
+}
+
+function CatRow({ label, n, active, onClick }: { label: string; n: number; active: boolean; onClick: () => void }) {
+  return (
+    <li>
+      <button onClick={onClick} aria-pressed={active}
+        className={cx("flex w-full cursor-pointer items-center justify-between rounded-md px-2 py-1.5 text-left text-sm hover:bg-soft", active && "bg-soft font-semibold text-accent")}>
+        <span>{label}</span><span className="rounded-full bg-bg px-2 text-[12px]">{n}</span>
+      </button>
+    </li>
+  );
+}
+
+/** Free editing; changes are passed up after a pause so only changed paragraphs are re-checked. */
+function EditBox({ text, onChange }: { text: string; onChange: (t: string) => void }) {
+  const [value, setValue] = useState(text);
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const pending = useRef<string | null>(null);
+  const latest = useRef(onChange);
+  useEffect(() => { latest.current = onChange; });
+  useEffect(() => () => { // closing the editor flushes an edit still waiting for its pause
+    clearTimeout(timer.current);
+    if (pending.current != null) latest.current(pending.current);
+  }, []);
+  return (
+    <textarea aria-label="Document text" id="gEdit" value={value} spellCheck={false}
+      className="min-h-[60vh] w-full rounded-lg border border-line bg-bg p-3 font-serif text-[16px] leading-[1.8]"
+      onChange={(e) => {
+        const v = e.target.value;
+        setValue(v);
+        pending.current = v;
+        clearTimeout(timer.current);
+        timer.current = setTimeout(() => { pending.current = null; onChange(v); }, 600);
+      }} />
+  );
+}

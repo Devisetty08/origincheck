@@ -1,7 +1,7 @@
 "use client";
 import { useMemo, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
-import type { CiteMeta, Source } from "@/lib/engine";
+import type { CiteMeta, Source } from "@/lib/similarity";
 import { closeness, LEVEL_LABEL } from "@/lib/closeness";
 import { type Style, inText, reference, segText } from "@/lib/citations";
 import { DOI_RE } from "@/lib/extract";
@@ -19,13 +19,13 @@ export function ParaphraseDialog({ open, onClose, sourceName, original, sourcePa
   const pct = m.level === "too-close" ? 100 : m.level === "borderline" ? 60 : m.level === "original" ? 25 : 0;
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()} wide title="Paraphrase and cite"
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()} wide title="Rewrite in my own words"
       description={`Write the idea from ${sourceName} in your own words. The source wording is hidden so you aren't editing its sentences.`}>
       <div className="grid gap-3">
         <div className="rounded-lg bg-soft p-3 text-[13.5px]">
           <div className="flex items-center gap-2">
             <b className="flex-1">Source passage</b>
-            <Button size="sm" variant="ghost" onClick={() => setShow(!show)} aria-expanded={show} id="revealSrc">{show ? <EyeOff size={14} /> : <Eye size={14} />}{show ? "Hide" : "Reveal"}</Button>
+            <Button size="sm" variant="ghost" onClick={() => setShow(!show)} aria-expanded={show} id="revealSrc">{show ? <EyeOff size={14} /> : <Eye size={14} />}{show ? "Hide source" : "Show source"}</Button>
           </div>
           {show ? <p className="mt-1.5 font-serif text-[14.5px]">{sourcePassage}</p>
             : <p className="mt-1 text-mute">Hidden. Re-read the source if you need to, then close it and write from memory and understanding. ({original.split(/\s+/).length} words in your current text)</p>}

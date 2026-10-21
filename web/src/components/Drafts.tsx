@@ -1,6 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Trash2 } from "lucide-react";
 import type { DraftCheck } from "@/lib/store";
 import { Button, Card } from "./ui";
@@ -16,11 +16,11 @@ export default function Drafts({ history, setHistory }: { history: DraftCheck[];
   const diff = A && B && A !== B
     ? { resolved: A.passages.filter((x) => !kb.has(x.key)), added: B.passages.filter((x) => !ka.has(x.key)) }
     : null;
-  const data = drafts.map((d, i) => ({ name: d.label || `Draft ${i + 1}`, index: d.index, date: new Date(d.date).toLocaleString() }));
-  const label = (d: DraftCheck) => `${d.label} · ${new Date(d.date).toLocaleDateString()} · ${d.index}%`;
+  const data = drafts.map((d, i) => ({ name: d.label || `Draft ${i + 1}`, index: d.index, grammar: d.grammar ?? null, ai: d.ai ?? null, date: new Date(d.date).toLocaleString() }));
+  const label = (d: DraftCheck) => `${d.label} · ${new Date(d.date).toLocaleDateString()} · ${d.index ?? "—"}%`;
 
   return (
-    <main className="mx-auto grid max-w-[1180px] gap-4 px-4 pt-7 pb-12">
+    <div className="mx-auto grid max-w-[1180px] gap-4 px-4 pt-7 pb-12">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Draft history</h1>
         <p className="text-mute">Every check is saved in this browser with its date, label, similarity index and sources.</p>
@@ -32,16 +32,20 @@ export default function Drafts({ history, setHistory }: { history: DraftCheck[];
           </select>
         </label>
         <Card aria-label="Similarity index across drafts">
-          <h2 className="mb-2 font-semibold">Similarity index across drafts</h2>
+          <h2 className="mb-2 font-semibold">Scores across drafts</h2>
+          <p className="mb-2 text-[13px] text-mute">Similarity index (%), writing score (0–100) and AI indicator (0–100, an indicator only).</p>
           <div className="h-60 text-[12px]">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={data} margin={{ top: 8, right: 16, bottom: 4, left: -16 }}>
                 <CartesianGrid stroke="var(--line)" strokeDasharray="3 3" />
                 <XAxis dataKey="name" stroke="var(--mute)" tick={{ fontSize: 12 }} />
-                <YAxis stroke="var(--mute)" tick={{ fontSize: 12 }} domain={[0, (max: number) => Math.max(20, Math.ceil(max / 10) * 10)]} unit="%" />
+                <YAxis stroke="var(--mute)" tick={{ fontSize: 12 }} domain={[0, 100]} />
                 <Tooltip contentStyle={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 8, color: "var(--ink)" }}
-                  formatter={(v) => [`${v}%`, "Similarity index"]} labelFormatter={(l, p) => `${l} — ${p?.[0]?.payload?.date ?? ""}`} />
-                <Line type="monotone" dataKey="index" stroke="var(--accent)" strokeWidth={2.5} dot={{ r: 4 }} isAnimationActive={false} />
+                  formatter={(v, n) => [n === "Similarity" ? `${v}%` : String(v), n]} labelFormatter={(l, p) => `${l} — ${p?.[0]?.payload?.date ?? ""}`} />
+                <Line type="monotone" name="Similarity" dataKey="index" stroke="var(--accent)" strokeWidth={2.5} dot={{ r: 4 }} isAnimationActive={false} connectNulls />
+                <Line type="monotone" name="Writing score" dataKey="grammar" stroke="var(--low)" strokeWidth={2.5} strokeDasharray="6 3" dot={{ r: 4 }} isAnimationActive={false} connectNulls />
+                <Line type="monotone" name="AI indicator" dataKey="ai" stroke="var(--close)" strokeWidth={2.5} strokeDasharray="2 3" dot={{ r: 4 }} isAnimationActive={false} connectNulls />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -54,7 +58,7 @@ export default function Drafts({ history, setHistory }: { history: DraftCheck[];
                 <div className="truncate font-medium">{d.label} <span className="font-normal text-mute">· {d.docName}</span></div>
                 <div className="truncate text-[12.5px] text-mute">{new Date(d.date).toLocaleString()} · {d.breakdown.slice(0, 3).map((x) => `${x.name} ${x.pct}%`).join(", ") || "no matches"}</div>
               </div>
-              <b className="text-base">{d.index}%</b>
+              <span className="text-right text-[12.5px] leading-tight"><b className="text-base">{d.index ?? "—"}%</b><br /><span className="text-mute">G {d.grammar ?? "—"} · AI {d.ai ?? "—"}</span></span>
               <button className="grid size-8 place-items-center rounded-md text-mute hover:bg-soft hover:text-high cursor-pointer" aria-label={`Delete ${d.label}`}
                 onClick={() => setHistory(history.filter((h) => h.id !== d.id))}><Trash2 size={16} /></button>
             </li>)}
@@ -78,7 +82,7 @@ export default function Drafts({ history, setHistory }: { history: DraftCheck[];
           <Button size="sm" variant="ghost" className="mt-3" onClick={() => { if (confirm(`Delete all ${drafts.length} drafts of “${cur}”?`)) setHistory(history.filter((h) => h.project !== cur)); }}>Delete this document’s history</Button>
         </Card>}
       </>}
-    </main>
+    </div>
   );
 }
 

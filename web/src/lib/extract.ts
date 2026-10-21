@@ -1,5 +1,5 @@
 // Text extraction in the browser: mammoth.js for Word, pdf.js for PDF, DOMParser for HTML.
-import type { CiteMeta } from "./engine";
+import type { CiteMeta } from "./similarity";
 
 export interface Block { style: "h1" | "h2" | "h3" | "p"; text: string }
 export interface Extracted { text: string; blocks: Block[]; meta?: Partial<CiteMeta> }
@@ -72,24 +72,30 @@ async function docx(buf: ArrayBuffer): Promise<Extracted> {
   return ex;
 }
 
-async function pdf(buf: ArrayBuffer): Promise<Extracted> {
-  const pdfjs = await import("pdfjs-dist");
-  pdfjs.GlobalWorkerOptions.workerSrc = `${BASE}/pdf.worker.min.mjs`;
-  const doc = await pdfjs.getDocument({ data: new Uint8Array(buf) }).promise;
-  const pages: string[] = [];
-  for (let p = 1; p <= doc.numPages; p++) {
-    const tc = await (await doc.getPage(p)).getTextContent();
+export type PdfItem = { str?: string; transform: number[]; height?: number };
+
+/** pdf.js text items → text: line breaks on y changes, paragraph breaks on large gaps, hyphenation and soft wraps undone (as the CLI does). */
+export function pdfText(pages: PdfItem[][]) {
+  return pages.map((items) => {
     let out = "", lastY: number | null = null, lastH = 0;
-    for (const it of tc.items) {
-      if (!("str" in it) || !it.str) continue;
+    for (const it of items) {
+      if (!it.str) continue;
       const y = it.transform[5], h = Math.abs(it.transform[3]) || it.height || 10;
       if (lastY !== null && Math.abs(y - lastY) > 0.5) out += Math.abs(y - lastY) > 1.6 * Math.max(h, lastH) ? "\n\n" : "\n";
       out += it.str;
       lastY = y; lastH = h;
     }
-    pages.push(out);
-  }
-  const text = pages.join("\n\n").replace(/-\n(\w)/g, "$1").replace(/(?<![.\n:])\n(?!\n)/g, " ");
+    return out;
+  }).join("\n\n").replace(/-\n(\w)/g, "$1").replace(/(?<![.\n:])\n(?!\n)/g, " ");
+}
+
+async function pdf(buf: ArrayBuffer): Promise<Extracted> {
+  const pdfjs = await import("pdfjs-dist");
+  pdfjs.GlobalWorkerOptions.workerSrc = `${BASE}/pdf.worker.min.mjs`;
+  const doc = await pdfjs.getDocument({ data: new Uint8Array(buf) }).promise;
+  const pages: PdfItem[][] = [];
+  for (let p = 1; p <= doc.numPages; p++) pages.push((await (await doc.getPage(p)).getTextContent()).items as PdfItem[]);
+  const text = pdfText(pages);
   let meta: Partial<CiteMeta> | undefined;
   try {
     const info = (await doc.getMetadata()).info as Record<string, string>;

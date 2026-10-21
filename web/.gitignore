@@ -40,3 +40,7 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 public/pdf.worker.min.mjs
+public/harper_wasm_bg.wasm
+public/harper_wasm_slim_bg.wasm
+test-results/
+playwright-report/

@@ -9,7 +9,7 @@ export default function Library({ saved, setSaved, onDeletedAll }: { saved: Save
   const [confirming, setConfirming] = useState(false);
   const [msg, setMsg] = useState("");
   return (
-    <main className="mx-auto grid max-w-[1180px] gap-4 px-4 pt-7 pb-12">
+    <div className="mx-auto grid max-w-[1180px] gap-4 px-4 pt-7 pb-12">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Saved documents and data</h1>
         <p className="text-mute">Stored only in this browser. New checks can compare against saved documents.</p>
@@ -44,6 +44,6 @@ export default function Library({ saved, setSaved, onDeletedAll }: { saved: Save
           <Button variant="primary" className="bg-high! border-high!" id="confirmDelete" onClick={async () => { await deleteAll(); onDeletedAll(); setConfirming(false); setMsg("All saved data deleted."); }}>Delete everything</Button>
         </div>
       </Dialog>
-    </main>
+    </div>
   );
 }

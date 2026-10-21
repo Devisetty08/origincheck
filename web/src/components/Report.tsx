@@ -1,10 +1,9 @@
 "use client";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Copy, FileDown, Quote, PenLine, Trash2, Undo2, CheckCircle2, AlertTriangle, Info } from "lucide-react";
-import { type CiteMeta, type Passage, type Settings, type Source, KIND_LABEL, bibStart, sourceSpan } from "@/lib/engine";
+import { type CiteMeta, type Passage, type Settings, type Source, KIND_LABEL, bibStart, sourceSpan } from "@/lib/similarity";
 import { type Style, STYLE_LABEL, checkCitations, findCitations, findEntries, orderForList, reference, segText } from "@/lib/citations";
 import { closeness } from "@/lib/closeness";
-import { feedback } from "@/lib/writing";
 import { PALETTE, band, exportDocx, exportSummaryPdf, pctText, settingsText } from "@/lib/exporters";
 import type { Prefs } from "@/lib/store";
 import { plural } from "@/lib/words";
@@ -226,8 +225,8 @@ export default function Report(p: Props) {
   function Remedies({ x, compact }: { x: Passage; compact?: boolean }) {
     return (
       <div className={cx("flex flex-wrap gap-1.5", compact ? "mt-1.5" : "mt-3")}>
-        <Button size="sm" onClick={() => remedy("quote", x)}><Quote size={14} />Quote and cite</Button>
-        <Button size="sm" onClick={() => remedy("paraphrase", x)}><PenLine size={14} />Paraphrase and cite</Button>
+        <Button size="sm" onClick={() => remedy("quote", x)}><Quote size={14} />Mark as quoted &amp; cited</Button>
+        <Button size="sm" onClick={() => remedy("paraphrase", x)}><PenLine size={14} />Rewrite in my own words</Button>
         <Button size="sm" variant="danger" onClick={() => remedy("remove", x)}><Trash2 size={14} />Remove</Button>
       </div>
     );
@@ -351,25 +350,6 @@ export default function Report(p: Props) {
     </div>
   );
 
-  /* ---------- writing feedback ---------- */
-  const fb = useMemo(() => (tab === "writing" ? feedback(doc.text) : null), [tab, doc.text]);
-  const writing = fb && (
-    <div className="grid gap-4 text-[13.5px]">
-      <p className="text-mute">Advisory only — separate from the similarity report.</p>
-      <div className="grid grid-cols-3 gap-2 text-center">
-        <Stat label="Reading ease" value={String(fb.flesch)} />
-        <Stat label="Grade level" value={String(fb.grade)} />
-        <Stat label="Passive" value={`${fb.passivePct}%`} />
-      </div>
-      <p>{fb.fleschLabel}. {plural(fb.words, "word")} in {plural(fb.sentences, "sentence")}, {Math.round(fb.words / Math.max(1, fb.sentences))} words per sentence on average.</p>
-      <FbList title="Overly long sentences (35+ words)" items={fb.long.map((x) => `${x.words} words: ${excerpt(x.text, 18)}`)} empty="None." />
-      <FbList title="Passive voice" items={fb.passive.map((x) => excerpt(x.text, 18))} empty="Little or none." note={fb.passivePct > 25 ? "Heavy use of passive voice. Try naming who does the action." : undefined} />
-      <FbList title="Repeated words in a sentence" items={fb.repeated.map((x) => `“${x.word}”: ${excerpt(x.text, 14)}`)} empty="None." />
-      <FbList title="Most-used words" items={fb.overused.map((x) => `${x.word} (${x.count}×)`)} empty="Nothing stands out." />
-      <FbList title="Inconsistent terminology" items={fb.terms.map((t) => t.variants.map((v, i) => `${v} (${t.counts[i]})`).join(" vs "))} empty="None found." note={fb.terms.length ? "Pick one form and use it throughout." : undefined} />
-    </div>
-  );
-
   /* ---------- filters ---------- */
   const [f, setF] = useState<Settings>(run.settings);
   useEffect(() => setF(run.settings), [run.settings]);
@@ -393,7 +373,7 @@ export default function Report(p: Props) {
   const [savedMsg, setSavedMsg] = useState("");
 
   return (
-    <main className="print-block mx-auto grid max-w-[1400px] grid-cols-1 items-start gap-5 px-4 pt-5 pb-12 min-[900px]:grid-cols-[minmax(0,1fr)_400px]">
+    <div className="print-block grid grid-cols-1 items-start gap-5 min-[900px]:grid-cols-[minmax(0,1fr)_400px]">
       <article className="print-plain min-w-0 rounded-xl border border-line bg-panel px-4 py-6 shadow-sm sm:px-9 sm:pt-7 sm:pb-9">
         <h1 className="text-[19px] font-bold [overflow-wrap:anywhere]" id="rName">{doc.name}</h1>
         <p className="mt-1 text-[13px] text-mute">Checked {run.checked.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</p>
@@ -419,7 +399,6 @@ export default function Report(p: Props) {
             { id: "overview", label: "Match overview", content: overview },
             { id: "revise", label: <>Revise{open ? <span className="ml-1 rounded-full bg-soft px-1.5 text-[11px] text-accent">{open}</span> : null}</>, content: revise },
             { id: "citations", label: <>Citations{citeIssues.length ? <span className="ml-1 rounded-full bg-soft px-1.5 text-[11px] text-mid">{citeIssues.length}</span> : null}</>, content: citations },
-            { id: "writing", label: "Writing", content: writing },
             { id: "filters", label: "Filters", content: filters },
           ]} />
         </Card>
@@ -450,7 +429,7 @@ export default function Report(p: Props) {
             else remedy(then.remedy, then.p, m);
           }
         }} />}
-    </main>
+    </div>
   );
 }
 
@@ -481,16 +460,4 @@ function RecheckCard({ rc }: { rc: Recheck }) {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-lg bg-soft p-2"><div className="text-lg font-bold">{value}</div><div className="text-[11.5px] text-mute">{label}</div></div>;
-}
 
-function FbList({ title, items, empty, note }: { title: string; items: string[]; empty: string; note?: string }) {
-  return (
-    <div>
-      <h3 className="font-semibold">{title}</h3>
-      {note && <p className="text-mute">{note}</p>}
-      {items.length ? <ul className="mt-1 grid list-disc gap-1 pl-5">{items.map((x, i) => <li key={i}>{x}</li>)}</ul> : <p className="text-mute">{empty}</p>}
-    </div>
-  );
-}
