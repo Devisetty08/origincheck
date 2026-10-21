@@ -6,12 +6,13 @@ import { diffWords } from "diff";
 import { Sparkles } from "lucide-react";
 import { Button, Card, cx } from "./ui";
 
-type Goal = "clarity" | "concise" | "grammar" | "formal";
+type Goal = "clearer" | "shorter" | "formal" | "casual" | "plain" | "nofiller";
 const GOALS: { id: Goal; label: string }[] = [
-  { id: "clarity", label: "Clarity" }, { id: "concise", label: "Concise" }, { id: "grammar", label: "Grammar only" }, { id: "formal", label: "Academic tone" },
+  { id: "clearer", label: "Clearer" }, { id: "shorter", label: "Shorter" }, { id: "formal", label: "More formal" },
+  { id: "casual", label: "More casual" }, { id: "plain", label: "Plain language" }, { id: "nofiller", label: "Cut filler" },
 ];
 type Part = { keep: string } | { del: string; add: string; on: boolean };
-const PROVIDER = { anthropic: "Anthropic (Claude)", ollama: "your Ollama server" } as const;
+const PROVIDER = { anthropic: "Anthropic (Claude)", ollama: "the local model" } as const;
 
 /** Word diff grouped into changes: each run of removed/added words between unchanged text is one change. */
 export function toParts(a: string, b: string): Part[] {
@@ -30,6 +31,8 @@ interface Props {
   text: string;
   picked: { s: number; e: number } | null; // the passage chosen on the Rewrite page
   provider: "anthropic" | "ollama" | null;
+  model?: string;
+  setupNote?: string; // why Rewrite isn't available yet, from the server
   flagged: [number, number][]; // char ranges matched by the similarity check
   confirmPrivacy: (services: string[]) => Promise<boolean>;
   onApply: (start: number, end: number, replacement: string) => void;
@@ -37,7 +40,7 @@ interface Props {
 }
 
 export default function ImproveWriting(p: Props) {
-  const [goal, setGoal] = useState<Goal>("clarity");
+  const [goal, setGoal] = useState<Goal>("clearer");
   const [sel, setSel] = useState<{ s: number; e: number } | null>(null);
   const [parts, setParts] = useState<Part[] | null>(null);
   const [msg, setMsg] = useState("");
@@ -46,7 +49,8 @@ export default function ImproveWriting(p: Props) {
   if (!p.provider) return (
     <Card className="no-print text-[13.5px]" id="improve" aria-label="Rewrite with AI">
       <h3 className="flex items-center gap-1.5 font-semibold"><Sparkles size={15} />Rewrite with AI</h3>
-      <p className="mt-1 text-mute" id="improveOff">Not set up yet. Add an Anthropic API key, or point it at a free Ollama server on your computer, in Settings.</p>
+      <p className="mt-1 text-mute" id="improveOff">{p.setupNote ?? "Not set up yet."} Rewrite uses a free model that runs on your own computer
+        (Phi-4-mini through Ollama) — nothing is sent anywhere. You can switch to Anthropic&apos;s Claude in Settings instead.</p>
       <Button size="sm" className="mt-2 w-full" onClick={p.onSetup} id="improveSetup">Open Settings</Button>
     </Card>
   );
@@ -61,7 +65,7 @@ export default function ImproveWriting(p: Props) {
     if (!pk || !original.trim()) return setMsg("Click a paragraph on the left first.");
     if (original.length > 4000) return setMsg("That passage is too long. Select up to 4,000 characters.");
     if (locked) return setMsg("This passage matches a source. Quote and cite it, or rewrite it in your own words — AI rewriting is off for it.");
-    if (!(await p.confirmPrivacy([PROVIDER[p.provider!]]))) return;
+    if (p.provider === "anthropic" && !(await p.confirmPrivacy([PROVIDER.anthropic]))) return; // the local model sends nothing
     setBusy(true); setSel(pk);
     try {
       const r = await fetch("/api/improve", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: original, goal }) });
@@ -122,7 +126,9 @@ export default function ImproveWriting(p: Props) {
           <Button size="sm" onClick={() => setParts(null)} id="improveDiscard">Discard</Button>
         </div>
       </div>}
-      <p className="mt-3 text-[11.5px] text-mute">Only the chosen passage is sent to {PROVIDER[p.provider]}. Changes you use mark your document as AI-assisted in exports.</p>
+      <p className="mt-3 text-[11.5px] text-mute">{p.provider === "ollama"
+        ? `Runs on this computer (${p.model ?? "local model"} via Ollama): your text stays here.`
+        : "Only the chosen passage is sent to Anthropic (Claude)."} Changes you use mark your document as AI-assisted in exports and in its writing history.</p>
     </Card>
   );
 }

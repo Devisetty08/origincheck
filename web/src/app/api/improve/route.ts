@@ -1,14 +1,15 @@
 // Revises one selected passage. Only that passage is sent to the AI provider, never the whole document,
 // and its text is never logged.
-import { config, publicConfig, redact } from "@/server/config";
+import { config, redact } from "@/server/config";
 import { limit } from "@/server/rateLimit";
 import { GOALS, improve, ImproveError, MAX_CHARS, type Goal } from "@/server/improve";
 
-export const maxDuration = 60;
+export const maxDuration = 180; // a local model on a laptop can take a while
 
 export async function POST(req: Request) {
-  const provider = publicConfig().improve;
-  if (!provider) return Response.json({ error: "“Improve my writing” is not configured on this server (AI_PROVIDER and its key or model)." }, { status: 503 });
+  const provider = config.aiProvider;
+  if (provider === "anthropic" && !config.anthropicKey)
+    return Response.json({ error: "Rewrite is set to Anthropic but ANTHROPIC_API_KEY is not set. Add it in Settings, or switch to the free local model." }, { status: 503 });
   const over = limit(req, "improve", 10);
   if (over) return over;
   const body = (await req.json().catch(() => null)) as { text?: unknown; goal?: unknown } | null;

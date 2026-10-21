@@ -16,6 +16,7 @@ beforeAll(async () => {
   vi.stubEnv("UNPAYWALL_EMAIL", "real@uni.edu");
   vi.stubEnv("CORE_API_KEY", "core-test");
   vi.stubEnv("GOOGLE_BOOKS_API_KEY", "books-test");
+  vi.stubEnv("TAVILY_API_KEY", "tvly-test");
   A = await import("./index");
 });
 afterEach(() => vi.unstubAllGlobals());
@@ -114,6 +115,11 @@ const FIX: Record<string, { ok: (url: string) => Response; empty: () => Response
     empty: () => json({ results: [] }),
     expect: { title: "Light, Harvesting and Energy", url: "https://www.gutenberg.org/ebooks/1228", text: "Book text.", authors: ["Darwin, Charles"] },
   },
+  tavily: {
+    ok: () => json({ results: [{ title: "Tavily page", url: "https://t.example/p", content: "snippet text", raw_content: "Full page text from Tavily." }] }),
+    empty: () => json({ results: [] }),
+    expect: { title: "Tavily page", url: "https://t.example/p", snippet: "snippet text", text: "Full page text from Tavily." },
+  },
   brave: {
     ok: () => json({ web: { results: [{ title: "<b>Page</b>", url: "https://example.org/p", description: "desc", extra_snippets: ["more"] }] } }),
     empty: () => json({ web: { results: [] } }),
@@ -168,6 +174,17 @@ describe("keys and selection", () => {
     await A.ADAPTERS.find((a) => a.id === "brave")!.search("q", { signal: signal() });
     expect(seen[0].headers.get("x-subscription-token")).toBe("brave-test");
     expect(seen[0].url).not.toContain("brave-test");
+    seen.length = 0;
+    vi.stubGlobal("fetch", vi.fn(async (u: string, init?: RequestInit) => { seen.push({ url: u, headers: new Headers(init?.headers) }); return FIX.tavily.ok(u); }));
+    await A.ADAPTERS.find((a) => a.id === "tavily")!.search("q", { signal: signal() });
+    expect(seen[0].headers.get("authorization")).toBe("Bearer tvly-test");
+    expect(seen[0].url).toBe("https://api.tavily.com/search");
+  });
+  it("marks the metered sources and keeps Brave out of the cache", () => {
+    const by = (id: string) => A.ADAPTERS.find((a) => a.id === id)!;
+    expect(by("tavily")).toMatchObject({ metered: "tavily", cost: 1 });
+    expect(by("brave")).toMatchObject({ metered: "brave", noCache: true });
+    expect(A.ADAPTERS.filter((a) => a.noCache).map((a) => a.id)).toEqual(["brave"]);
   });
   it("treats CORE as not configured without its (free) key", () => {
     const core = A.ADAPTERS.find((a) => a.id === "core")!;

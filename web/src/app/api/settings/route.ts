@@ -1,10 +1,11 @@
 // Settings page: GET says which settings are set (secrets as set/not set only); POST saves them on a local machine.
 import { limit } from "@/server/rateLimit";
 import { readSettings, saveSettings, writeBlocked } from "@/server/settings";
+import { usageReport } from "@/server/usage";
 
 export async function GET(req: Request) {
   const blocked = writeBlocked(req);
-  return Response.json({ writable: !blocked, reason: blocked, vars: readSettings() });
+  return Response.json({ writable: !blocked, reason: blocked, vars: readSettings(), usage: usageReport() });
 }
 
 export async function POST(req: Request) {
@@ -19,5 +20,5 @@ export async function POST(req: Request) {
   } catch (e) {
     return Response.json({ error: (e as Error).message }, { status: 400 });
   }
-  return Response.json({ writable: true, reason: null, vars: readSettings() });
+  return Response.json({ writable: true, reason: null, vars: readSettings(), usage: usageReport() });
 }

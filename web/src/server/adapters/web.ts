@@ -1,4 +1,5 @@
-// Web search: Brave (primary), Jina (fallback), Google Programmable Search (existing customers only; never scraped).
+// Web search: Tavily (default, free plan without a card), Brave (optional, metered), Jina, and Google Programmable
+// Search (existing customers only; never scraped).
 import "server-only";
 import { config } from "../config";
 import { getJson } from "../http";
@@ -17,10 +18,35 @@ async function pageText(url: string) {
   } catch { return undefined; }
 }
 
+/**
+ * Tavily: the default web search. Free plan: 1,000 credits a month, no card; requests stop (not billed) when credits
+ * run out. A basic search costs 1 credit. `include_raw_content` returns the page text, so no second fetch is needed.
+ * Note: Tavily's terms let it keep and use the queries it receives; only short phrases are ever sent.
+ */
+export const tavily: Adapter = {
+  id: "tavily", label: "Tavily (web search)", group: "web",
+  missing: () => (config.tavilyKey ? null : "needs TAVILY_API_KEY (free plan, no card)"),
+  minIntervalMs: 300, metered: "tavily", cost: 1,
+  async search(query, { signal }) {
+    type R = { results?: { title: string; url: string; content?: string; raw_content?: string | null }[] };
+    const j = await getJson<R>("https://api.tavily.com/search", { signal, headers: { Authorization: `Bearer ${config.tavilyKey}`, "Content-Type": "application/json" },
+      init: { method: "POST", body: JSON.stringify({ query: `"${query}"`, search_depth: "basic", max_results: 3, include_raw_content: "text" }) } });
+    return (j.results ?? []).map((h): NormalizedResult => ({
+      title: h.title || h.url, snippet: h.content ?? "", url: h.url, authors: [], source: "tavily", text: h.raw_content?.slice(0, 200_000) || h.content || undefined,
+    }));
+  },
+};
+
+/**
+ * Brave Search. Off unless BRAVE_API_KEY is set: a card is required and use beyond the monthly free credit is billed,
+ * so every call spends from BRAVE_MONTHLY_QUERY_CAP first. Brave's terms forbid storing Search Results beyond transient
+ * use, so its results are never cached.
+ */
 export const brave: Adapter = {
   id: "brave", label: "Brave Search", group: "web",
   missing: () => (config.braveKey ? null : "needs BRAVE_API_KEY"),
   minIntervalMs: 1100, // stays inside the lowest plan's per-second limit
+  metered: "brave", cost: 1, noCache: true,
   async search(query, { signal }) {
     type R = { web?: { results?: { title: string; url: string; description?: string; extra_snippets?: string[]; age?: string }[] } };
     const j = await getJson<R>(`https://api.search.brave.com/res/v1/web/search?q=${enc(`"${query}"`)}&count=3&extra_snippets=true`,

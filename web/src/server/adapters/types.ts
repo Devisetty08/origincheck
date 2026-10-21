@@ -1,6 +1,6 @@
 export type SourceId =
   | "wikipedia" | "wikipedia-ko" | "crossref" | "openalex" | "semanticscholar" | "arxiv" | "core" | "europepmc"
-  | "openlibrary" | "gutendex" | "brave" | "jina" | "google"
+  | "openlibrary" | "gutendex" | "tavily" | "brave" | "jina" | "google"
   | "datacite" | "pubmed" | "osf" | "inspire" | "googlebooks" | "poetrydb";
 
 /** One search hit, the same shape for every source. `text` is the fuller passage used for matching, when the API gives one. */
@@ -28,10 +28,15 @@ export interface Adapter {
   /** For slow services: time allowed per request (default 8 s) and how many of the run's phrases to search (default all). */
   timeoutMs?: number;
   maxQueries?: number;
+  /** Pay-as-you-go API: each request spends `cost` from its monthly cap, checked before the call. */
+  metered?: "tavily" | "brave";
+  cost?: number;
+  /** The provider's terms forbid keeping results (Brave): never cached, not even for an hour. */
+  noCache?: boolean;
   search(query: string, ctx: { signal: AbortSignal }): Promise<NormalizedResult[]>;
 }
 
-export type Status = "success" | "no results" | "failed" | "rate-limited" | "not configured";
+export type Status = "success" | "no results" | "failed" | "rate-limited" | "not configured" | "cap reached";
 
 export interface SourceEvent {
   source: SourceId;

@@ -11,6 +11,7 @@ export const config = {
   get crossrefMailto() { return env("CROSSREF_MAILTO") ?? env("CONTACT_EMAIL"); },
   get openalexMailto() { return env("OPENALEX_MAILTO") ?? env("CONTACT_EMAIL"); },
   get unpaywallEmail() { return env("UNPAYWALL_EMAIL"); },
+  get tavilyKey() { return env("TAVILY_API_KEY"); },
   get braveKey() { return env("BRAVE_API_KEY"); },
   get jinaKey() { return env("JINA_API_KEY"); },
   get coreKey() { return env("CORE_API_KEY"); },
@@ -20,11 +21,11 @@ export const config = {
   get googleBooksKey() { return env("GOOGLE_BOOKS_API_KEY") ?? env("GOOGLE_API_KEY"); },
   get libreTranslateUrl() { return env("LIBRETRANSLATE_URL")?.replace(/\/$/, ""); },
   get libreTranslateKey() { return env("LIBRETRANSLATE_API_KEY"); },
-  get aiProvider() { return (env("AI_PROVIDER") ?? "anthropic") as "anthropic" | "ollama"; },
+  get aiProvider() { return (env("AI_PROVIDER") ?? "ollama") as "anthropic" | "ollama"; }, // free local model unless switched
   get anthropicKey() { return env("ANTHROPIC_API_KEY"); },
   get anthropicModel() { return env("ANTHROPIC_MODEL") ?? "claude-opus-5-5"; },
   get ollamaUrl() { return env("OLLAMA_BASE_URL") ?? "http://localhost:11434"; },
-  get ollamaModel() { return env("OLLAMA_MODEL"); },
+  get ollamaModel() { return env("OLLAMA_MODEL") ?? "phi4-mini"; }, // Microsoft Phi-4-mini, MIT licence
   get aiLikelihood() { return env("ENABLE_AI_LIKELIHOOD") === "true"; },
   get languageTool() { return env("ENABLE_LANGUAGETOOL") === "true"; },
   get languageToolUrl() { return env("LANGUAGETOOL_URL") ?? "http://localhost:8010"; },
@@ -36,16 +37,20 @@ export const config = {
     const v = env("PUBLIC_BASE_URL") ?? (env("VERCEL_PROJECT_PRODUCTION_URL") ? `https://${env("VERCEL_PROJECT_PRODUCTION_URL")}` : undefined);
     return v?.replace(/\/$/, "");
   },
+  /** Monthly caps for metered APIs; calls stop when reached (see usage.ts). */
+  get caps() {
+    const n = (k: string, d: number) => { const v = Number(env(k)); return Number.isFinite(v) && v >= 0 ? v : d; };
+    return { tavily: n("TAVILY_MONTHLY_CREDIT_CAP", 900), brave: n("BRAVE_MONTHLY_QUERY_CAP", 800),
+      anthropic: n("ANTHROPIC_MONTHLY_REQUEST_CAP", 500), copyleaks: n("COPYLEAKS_MONTHLY_SCAN_CAP", 20) };
+  },
   get maxQueries() { return Math.max(1, Math.min(40, Number(env("SEARCH_MAX_QUERIES") ?? 8) || 8)); },
 };
 
 /** What the browser may know: which features are available, never the keys themselves. */
 export function publicConfig() {
-  const improve = config.aiProvider === "ollama" ? !!config.ollamaModel : !!config.anthropicKey;
   return {
     aiLikelihood: config.aiLikelihood,
     languageTool: config.languageTool,
-    improve: improve ? config.aiProvider : null,
     maxQueries: config.maxQueries,
     paid: { label: copyleaks.label, missing: copyleaks.missing(), sandbox: config.copyleaksSandbox },
     translate: !!config.libreTranslateUrl,
@@ -55,7 +60,7 @@ export function publicConfig() {
 /** Strip anything that looks like a secret before it reaches a log line. */
 export function redact(s: string) {
   let out = s;
-  for (const v of [config.braveKey, config.jinaKey, config.coreKey, config.semanticScholarKey, config.googleKey, config.anthropicKey, config.copyleaksKey, config.googleBooksKey, config.libreTranslateKey])
+  for (const v of [config.tavilyKey, config.braveKey, config.jinaKey, config.coreKey, config.semanticScholarKey, config.googleKey, config.anthropicKey, config.copyleaksKey, config.googleBooksKey, config.libreTranslateKey])
     if (v) out = out.split(v).join("[redacted]");
   return out.replace(/(api[_-]?key|token|key|authorization)=([^&\s]+)/gi, "$1=[redacted]");
 }

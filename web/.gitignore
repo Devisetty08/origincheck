@@ -45,3 +45,6 @@ public/harper_wasm_bg.wasm
 public/harper_wasm_slim_bg.wasm
 test-results/
 playwright-report/
+
+# monthly usage counts for metered APIs (local)
+/.data/

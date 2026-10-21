@@ -1,6 +1,7 @@
 // Runs the enabled source adapters in parallel. Each source has its own rate limiter, timeout, retries and cache,
 // and reports its own status: one source failing never blocks or fails the rest.
 import type { Adapter, NormalizedResult, SourceEvent, Status } from "./adapters/types";
+import { CapReachedError, spend } from "./usage";
 
 export interface Options {
   concurrency?: number; // sources searched at once
@@ -27,7 +28,7 @@ const isRetryable = (e: unknown) => {
 
 async function searchOne(a: Adapter, query: string, o: Required<Options>, deadline: number): Promise<NormalizedResult[]> {
   const key = `${a.id}|${query}`;
-  const hit = cache.get(key);
+  const hit = a.noCache ? undefined : cache.get(key);
   if (hit && o.now() - hit.at < CACHE_TTL) return hit.results;
   for (let attempt = 0; ; attempt++) {
     const last = lastCall.get(a.id);
@@ -35,10 +36,13 @@ async function searchOne(a: Adapter, query: string, o: Required<Options>, deadli
     if (wait > 0) await o.sleep(wait);
     lastCall.set(a.id, o.now());
     if (o.now() >= deadline) throw Object.assign(new Error("source deadline reached"), { name: "TimeoutError" });
+    if (a.metered) spend(a.metered, a.cost ?? 1); // every attempt is a billed call: checked first, throws at the cap
     try {
       const results = await a.search(query, { signal: AbortSignal.timeout(a.timeoutMs ?? o.timeoutMs) });
-      cache.set(key, { at: o.now(), results });
-      if (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value!);
+      if (!a.noCache) {
+        cache.set(key, { at: o.now(), results });
+        if (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value!);
+      }
       return results;
     } catch (e) {
       const status = (e as { status?: number }).status;
@@ -66,7 +70,7 @@ export async function runSource(a: Adapter, queries: string[], opts: Options = {
   if (missing) return { ...base, status: "not configured", ms: 0, results: [], error: missing };
   const results: NormalizedResult[] = [];
   const seen = new Set<string>();
-  let error: string | undefined, done = 0, limited = false;
+  let error: string | undefined, done = 0, limited = false, capped = false;
   for (const q of queries) {
     try {
       for (const r of await searchOne(a, q, o, deadline)) {
@@ -76,12 +80,13 @@ export async function runSource(a: Adapter, queries: string[], opts: Options = {
       done++;
     } catch (e) {
       error = (e as Error).message;
+      if (e instanceof CapReachedError) { capped = true; error = `monthly cap of ${e.cap} reached — raise it in Settings or wait for next month`; break; }
       if (e instanceof RateLimitedError) { limited = true; break; }
       if ((e as Error).name === "TimeoutError" && o.now() >= deadline) break;
     }
   }
   // Results win: a source that found something before failing still reports success, with a note saying it stopped.
-  const status: Status = results.length ? "success" : limited ? "rate-limited" : done === 0 ? "failed" : "no results";
+  const status: Status = results.length ? "success" : capped ? "cap reached" : limited ? "rate-limited" : done === 0 ? "failed" : "no results";
   if (error && done > 0 && done < queries.length) error = `${done} of ${queries.length} queries completed; ${error}`;
   return { ...base, status, ms: o.now() - start, results, error };
 }

@@ -178,7 +178,9 @@ export function SourcesCard(p: SourcesProps & { compact?: boolean; note?: string
   const cur = OWN.find((i) => i.id === mode)!;
   const runs = p.runs ?? [];
   const found = runs.filter((r) => r.status === "success").length;
-  const couldnt = runs.filter((r) => r.status === "failed" || r.status === "rate-limited" || r.status === "not configured").length;
+  const couldnt = runs.filter((r) => ["failed", "rate-limited", "not configured", "cap reached"].includes(r.status)).length;
+  const braveUsed = runs.some((r) => r.source === "brave" && r.status !== "not configured");
+  const capped = runs.filter((r) => r.status === "cap reached").map((r) => r.label);
 
   return (
     <Card aria-labelledby="srcH" className={p.compact ? "border-0 p-0" : undefined} id={p.compact ? "moreSources" : "sourcesCard"}>
@@ -208,6 +210,9 @@ export function SourcesCard(p: SourcesProps & { compact?: boolean; note?: string
       </div>
       {runs.length > 0 && <div className="mt-2 rounded-lg bg-bg px-3 py-2 text-[13px]" id="searchSummary">
         <p role="status">{p.running ? `Searching ${runs.length} services…` : `${plural(found, "service")} found sources, ${runs.length - found - couldnt} found nothing${couldnt ? `, ${couldnt} couldn't search (see details)` : ""}.`}</p>
+        {capped.length > 0 && <p className="mt-1 text-high" id="capNote">Monthly spending cap reached for {capped.join(", ")}: not searched. See Settings → Paid APIs.</p>}
+        {braveUsed && <p className="mt-1 text-[11.5px] font-semibold tracking-wide text-mute" id="braveAttribution">
+          Web results: <a href="https://brave.com/search/api/" target="_blank" rel="noreferrer" className="hover:underline">POWERED BY BRAVE</a></p>}
         <details className="mt-1"><summary className="cursor-pointer text-accent">Details per service</summary><div className="mt-2">
           <p className="mb-2 text-[12px] text-mute"><b>No results</b> means none of your phrases appear in that service — normal for original writing.
             <b> Success</b> means it returned something to compare (journal search engines always return their closest papers); the plagiarism
@@ -269,7 +274,7 @@ export function SourcesCard(p: SourcesProps & { compact?: boolean; note?: string
 
 const STATUS_STYLE: Record<string, string> = {
   success: "bg-low/12 text-low", "no results": "bg-soft text-mute", failed: "bg-high/12 text-high",
-  "rate-limited": "bg-mid/12 text-mid", "not configured": "bg-soft text-mute", running: "bg-accent/12 text-accent",
+  "rate-limited": "bg-mid/12 text-mid", "not configured": "bg-soft text-mute", "cap reached": "bg-high/12 text-high", running: "bg-accent/12 text-accent",
 };
 
 export function RunTable({ runs }: { runs: SourceRun[] }) {

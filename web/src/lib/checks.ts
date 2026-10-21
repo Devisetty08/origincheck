@@ -89,7 +89,7 @@ export async function runEmbeddings(texts: string[], onProgress?: (p: AiProgress
 /* ------------------------------ run all sources (server search, streamed) ------------------------------ */
 
 export type SourceGroup = "refs" | "web" | "books" | "lists";
-export type SearchStatus = "success" | "no results" | "failed" | "rate-limited" | "not configured";
+export type SearchStatus = "success" | "no results" | "failed" | "rate-limited" | "not configured" | "cap reached";
 export interface SearchHit { title: string; snippet: string; url?: string; doi?: string; authors: string[]; year?: number; source: string; text?: string; oaUrl?: string }
 export interface SourceRun { source: string; label: string; status: SearchStatus | "running"; ms: number; queries: number; results: SearchHit[]; error?: string }
 

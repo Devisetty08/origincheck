@@ -4,6 +4,7 @@ import { config, redact } from "@/server/config";
 import { limit } from "@/server/rateLimit";
 import { copyleaks } from "@/server/paid/copyleaks";
 import { createScan, dropScan, getScan } from "@/server/paid/scans";
+import { CapReachedError, spend } from "@/server/usage";
 
 export const maxDuration = 30;
 const MAX_CHARS = 300_000;
@@ -16,6 +17,11 @@ export async function POST(req: Request) {
   const body = (await req.json().catch(() => null)) as { text?: unknown } | null;
   const text = typeof body?.text === "string" ? body.text.trim() : "";
   if (text.split(/\s+/).length < 10 || text.length > MAX_CHARS) return Response.json({ error: `Send between 10 words and ${MAX_CHARS / 1000}k characters.` }, { status: 400 });
+  try { spend("copyleaks"); } // counted before the call, so a failed submit never lets usage exceed the cap
+  catch (e) {
+    if (e instanceof CapReachedError) return Response.json({ error: `This month's ${copyleaks.label} cap (${e.cap} scans) is reached. Raise COPYLEAKS_MONTHLY_SCAN_CAP in Settings or wait until next month.` }, { status: 429 });
+    throw e;
+  }
   const { id, scan } = createScan();
   const hook = `${config.publicBaseUrl}/api/paid/webhook/{STATUS}?scan=${id}&t=${scan.secret}`;
   try {

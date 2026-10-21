@@ -60,6 +60,8 @@ export interface ServerConfig {
   maxQueries: number;
   paid?: { label: string; missing: string | null; sandbox: boolean };
   translate?: boolean;
+  improveModel?: string;
+  improveNote?: string;
   sources: { id: string; label: string; group: string; missing: string | null }[];
 }
 export interface Hybrid { status: Status; note?: string; near: PassageMatch[]; para: PassageMatch[] }
@@ -89,7 +91,7 @@ const INTRO: Record<Tab, { title: string; text: string }> = {
   similarity: { title: "Plagiarism check", text: "Compares your document with your sources, publications, the web and books. Copied wording is highlighted and counted in the similarity index; lightly edited copying and paraphrase are shown separately. Add your document below, then add sources or use Run all sources." },
   grammar: { title: "Grammar check", text: "Spelling, grammar, punctuation and style, checked on your device. No sources needed: add or paste your document below." },
   ai: { title: "AI indicator", text: "An estimate of how likely the text is machine-written. It is a signal, never proof. Add your document below." },
-  rewrite: { title: "Rewrite", text: "Select any passage and have it revised for clarity, concision, grammar or academic tone, accepting each change yourself. Passages that match a source are rewritten by you in the plagiarism check. Add your document below." },
+  rewrite: { title: "Rewrite", text: "Click any paragraph and have it made clearer, shorter, more formal or casual, plainer, or free of filler, accepting each change yourself. It uses a free model on your own computer by default. Passages that match a source are rewritten by you in the plagiarism check. Add your document below." },
 };
 type PendingRecheck = { res: Omit<Resolution, "id" | "at">; at: number; len: number; sid?: number; mine?: string; sourcePassage?: string };
 
@@ -526,7 +528,7 @@ export default function App() {
     { id: "history", label: "History", short: "History", icon: <History size={18} />, on: () => go("history"), active: view === "history" },
     { id: "settings", label: "Settings", short: "Settings", icon: <SettingsIcon size={18} />, on: () => go("settings"), active: view === "settings" },
   ];
-  const improveCard = (picked: { s: number; e: number } | null) => doc && <ImproveWriting text={doc.text} picked={picked} provider={cfg?.improve ?? null} flagged={flagged}
+  const improveCard = (picked: { s: number; e: number } | null) => doc && <ImproveWriting text={doc.text} picked={picked} provider={cfg?.improve ?? null} model={cfg?.improveModel} setupNote={cfg?.improveNote} flagged={flagged}
     confirmPrivacy={(s) => confirmPrivacy(s, "improve")} onSetup={() => go("settings")}
     onApply={(s, e, t) => {
       setText(doc.text.slice(0, s) + t + doc.text.slice(e));
@@ -546,7 +548,7 @@ export default function App() {
       title: grammar.status !== "done" ? "Checking grammar…" : grammar.englishOnly ? "Grammar check is English-only" : issues.length ? `${plural(issues.length, "grammar suggestion")} to review` : "No grammar issues found",
       text: "Spelling, grammar, punctuation and style. Accept or dismiss each one.", action: "Fix grammar", onClick: () => go("check", "grammar") },
     { id: "rewrite", icon: <PenLine size={18} />, tone: "mute", title: "Polish your wording",
-      text: cfg?.improve ? "Click a paragraph to get clearer or more concise wording, and keep only the changes you like." : "Clearer, more concise wording with AI. Needs an API key in Settings.",
+      text: cfg?.improve ? "Click a paragraph to get clearer or more concise wording, and keep only the changes you like." : "Clearer, shorter wording from a free model on your computer. Needs a one-time setup (see Rewrite).",
       action: "Open Rewrite", onClick: () => go("check", "rewrite") },
     ...(ai.result ? [{ id: "ai", icon: <Bot size={18} />, tone: "mute" as const, title: `AI indicator: ${ai.result.label} (${ai.result.score}/100)`,
       text: "A signal only, never proof. See which sentences drove it.", action: "See details", onClick: () => go("check", "ai") }] : []),
@@ -599,7 +601,7 @@ export default function App() {
               <h1 className="text-xl font-bold">{INTRO[tool].title}</h1>
               <p className="mt-1 text-[14.5px]">{INTRO[tool].text}</p>
               {tool === "ai" && cfg && !cfg.aiLikelihood && <p className="mt-2 text-[13.5px] text-mute">The AI indicator is turned off on this server. Turn it on in <button className="cursor-pointer text-accent underline" onClick={() => go("settings")}>Settings</button>.</p>}
-              {tool === "rewrite" && cfg && !cfg.improve && <p className="mt-2 text-[13.5px] text-mute">AI revision needs an Anthropic API key or an Ollama server: add one in <button className="cursor-pointer text-accent underline" onClick={() => go("settings")}>Settings</button>.</p>}
+              {tool === "rewrite" && cfg && !cfg.improve && <p className="mt-2 text-[13.5px] text-mute">{cfg.improveNote ?? "Rewrite isn't set up yet."} See <button className="cursor-pointer text-accent underline" onClick={() => go("settings")}>Settings</button>.</p>}
             </div>
           </section>}
           {view === "check" && !doc && <Setup doc={doc} setDoc={openDoc} sources={sources} setSources={setSources} settings={settings} setSettings={setSettings}

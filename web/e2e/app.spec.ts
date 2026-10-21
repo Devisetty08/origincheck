@@ -248,7 +248,7 @@ test("Rewrite shows a diff for a clicked paragraph, applies kept changes and lab
   await expect(page.locator("#improveRun")).toBeDisabled(); // nothing picked yet
   await page.locator('#rwDoc [data-para="0"]').click();
   await expect(page.locator("#improveOriginal")).toHaveText(first);
-  await page.locator('[data-goal="concise"]').click();
+  await page.locator('[data-goal="shorter"]').click();
   await page.locator("#improveRun").click();
   await expect(page.locator("#privacyServices")).toContainText("Anthropic");
   await page.locator("#privacyOk").click();
