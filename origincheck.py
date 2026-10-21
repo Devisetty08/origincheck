@@ -17,7 +17,6 @@ Run `python origincheck.py -h` for every option.
 """
 
 import argparse
-import hashlib
 import html
 import json
 import os
@@ -26,7 +25,7 @@ import sys
 import time
 import urllib.parse
 import urllib.request
-from collections import defaultdict
+from collections import Counter, defaultdict
 from datetime import datetime
 from html.parser import HTMLParser
 from pathlib import Path
@@ -77,6 +76,14 @@ def rtf_to_text(raw: str) -> str:
     return re.sub(r"[{}]", "", raw)
 
 
+def pdf_to_text(f) -> str:
+    from pypdf import PdfReader
+
+    text = "\n\n".join((pg.extract_text() or "") for pg in PdfReader(f).pages)
+    text = re.sub(r"-\n(\w)", r"\1", text)            # re-join hyphenated line breaks
+    return re.sub(r"(?<![.\n:])\n(?!\n)", " ", text)  # unwrap soft line breaks
+
+
 def extract_text(path: Path) -> str:
     ext = path.suffix.lower()
     if ext == ".docx":
@@ -89,14 +96,7 @@ def extract_text(path: Path) -> str:
                 paras.append(" | ".join(c.text for c in row.cells))
         return "\n\n".join(p for p in paras if p.strip())
     if ext == ".pdf":
-        from pypdf import PdfReader
-
-        reader = PdfReader(str(path))
-        pages = [(pg.extract_text() or "") for pg in reader.pages]
-        text = "\n\n".join(pages)
-        text = re.sub(r"-\n(\w)", r"\1", text)          # re-join hyphenated line breaks
-        text = re.sub(r"(?<![.\n:])\n(?!\n)", " ", text)  # unwrap soft line breaks
-        return text
+        return pdf_to_text(str(path))
     raw = path.read_text(encoding="utf-8", errors="ignore")
     if ext in (".html", ".htm"):
         return html_to_text(raw)
@@ -118,12 +118,8 @@ def tokenize(text):
 
 
 def shingles(words, n):
-    """Hash every n-word window -> list of (hash, start_index)."""
-    out = []
-    for i in range(len(words) - n + 1):
-        h = hashlib.blake2b(" ".join(words[i : i + n]).encode(), digest_size=8).digest()
-        out.append((h, i))
-    return out
+    """Every n-word window -> list of (shingle, start_index)."""
+    return [(" ".join(words[i : i + n]), i) for i in range(len(words) - n + 1)]
 
 
 # --------------------------------------------------------------------------
@@ -188,10 +184,10 @@ def _http_get(url, headers=None, timeout=15):
 def web_sources(text, max_queries, api_key, results_per_query=3):
     """Search distinctive sentences via the Brave Search API and fetch the hit pages."""
     sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text) if len(s.split()) >= 12]
-    if not sentences:
+    if not sentences or max_queries < 1:
         return []
-    step = max(1, len(sentences) // max_queries)
-    picked = sentences[::step][:max_queries]
+    k = min(max_queries, len(sentences))
+    picked = [sentences[i * len(sentences) // k] for i in range(k)]  # evenly spaced
     urls = []
     for i, s in enumerate(picked, 1):
         q = " ".join(s.split()[:24])
@@ -199,7 +195,7 @@ def web_sources(text, max_queries, api_key, results_per_query=3):
         try:
             _, data = _http_get(
                 "https://api.search.brave.com/res/v1/web/search?count=%d&q=%s"
-                % (results_per_query, urllib.parse.quote(f'"{q}"' if len(q) < 180 else q)),
+                % (results_per_query, urllib.parse.quote(f'"{q}"')),
                 {"X-Subscription-Token": api_key, "Accept": "application/json"},
             )
             for r in json.loads(data).get("web", {}).get("results", []):
@@ -214,9 +210,8 @@ def web_sources(text, max_queries, api_key, results_per_query=3):
             ctype, data = _http_get(u)
             if "pdf" in ctype or u.lower().endswith(".pdf"):
                 import io
-                from pypdf import PdfReader
 
-                t = "\n".join((pg.extract_text() or "") for pg in PdfReader(io.BytesIO(data)).pages)
+                t = pdf_to_text(io.BytesIO(data))
             else:
                 t = html_to_text(data.decode("utf-8", errors="ignore"))
             if len(t.split()) > 50:
@@ -233,51 +228,65 @@ def web_sources(text, max_queries, api_key, results_per_query=3):
 
 
 def find_matches(doc_tokens, sources, n, min_words, excluded):
-    doc_words = [t[0] for t in doc_tokens]
-    doc_sh = shingles(doc_words, n)
-
-    # word index -> set(source ids) that cover it
-    cover = defaultdict(set)
+    """Return {source id: [(doc_start, doc_end, source_start), ...]} passages (doc_end exclusive)."""
+    doc_sh = shingles([t[0] for t in doc_tokens], n)
+    runs = {}
     for sid, src in enumerate(sources):
-        stoks = tokenize(src["text"])
-        src["_words"] = len(stoks)
-        index = defaultdict(list)
-        for h, i in shingles([t[0] for t in stoks], n):
-            index[h].append(i)
-        for h, i in doc_sh:
-            if h in index:
-                for k in range(i, i + n):
-                    if k not in excluded:
-                        cover[k].add(sid)
+        index = {}
+        for sh, i in shingles([t[0] for t in tokenize(src["text"])], n):
+            index.setdefault(sh, i)  # first position in the source
+        covered = {}  # doc word -> matching source word
+        for sh, i in doc_sh:
+            j = index.get(sh)
+            if j is not None:
+                for k in range(n):
+                    if i + k not in excluded:
+                        covered.setdefault(i + k, j + k)
+        out, k = [], 0
+        while k < len(doc_tokens):
+            if k not in covered:
+                k += 1
+                continue
+            b = k
+            while k in covered:
+                k += 1
+            if k - b >= min_words:
+                out.append((b, k, covered[b]))
+        if out:
+            runs[sid] = out
+    return runs
 
-    # Build contiguous runs per source and drop runs shorter than min_words
-    per_source = defaultdict(set)
-    for sid in range(len(sources)):
-        run = []
-        for k in range(len(doc_words) + 1):
-            if k < len(doc_words) and sid in cover.get(k, ()):
-                run.append(k)
-            else:
-                if len(run) >= min_words:
-                    per_source[sid].update(run)
-                run = []
 
-    # Turnitin-style attribution: each word credited to one source only,
-    # preferring the source with the most matched words overall.
-    ranking = sorted(per_source, key=lambda s: -len(per_source[s]))
+def attribute(runs, active):
+    """Credit each matched word to one source, preferring the source with the most matched words."""
+    totals = {s: sum(e - b for b, e, _ in runs[s]) for s in active if s in runs}
     owner = {}
-    for sid in ranking:
-        for k in per_source[sid]:
-            owner.setdefault(k, sid)
+    for sid in sorted(totals, key=lambda s: -totals[s]):
+        for b, e, _ in runs[sid]:
+            for k in range(b, e):
+                owner.setdefault(k, sid)
     return owner
+
+
+def score(runs, total, drop_pct=0, skip=()):
+    """Attribute, then drop sources under drop_pct and re-attribute (at most 5 passes)."""
+    active = [s for s in runs if s not in skip]
+    for _ in range(5):
+        counts = Counter(attribute(runs, active).values())
+        small = {s for s in active if 100 * counts[s] / total < drop_pct}
+        if not small:
+            break
+        active = [s for s in active if s not in small]
+    return attribute(runs, active)
 
 
 # --------------------------------------------------------------------------
 # Report
 # --------------------------------------------------------------------------
 
-PALETTE = ["#e5484d", "#3e63dd", "#30a46c", "#f76b15", "#8e4ec6", "#12a594", "#d6409f",
-           "#ad7f58", "#0090ff", "#c2a300", "#e54666", "#46a758"]
+KIND_LABEL = {"file": "Uploaded files", "repository": "Saved documents", "internet": "Internet"}
+PALETTE = ["#d13438", "#0078d4", "#16a34a", "#ea580c", "#9333ea", "#0891b2", "#db2777",
+           "#a16207", "#4f46e5", "#65a30d", "#0d9488", "#be123c"]
 
 
 def build_report(doc_name, text, tokens, owner, excluded, reasons, sources, settings):
@@ -288,7 +297,7 @@ def build_report(doc_name, text, tokens, owner, excluded, reasons, sources, sett
     order = sorted(counts, key=lambda s: -counts[s])
     num = {sid: i + 1 for i, sid in enumerate(order)}
     color = {sid: PALETTE[i % len(PALETTE)] for i, sid in enumerate(order)}
-    index = round(100 * len(owner) / total)
+    index = int(100 * len(owner) / total + 0.5)  # round half up, same as the web app
     by_kind = defaultdict(int)
     for sid, c in counts.items():
         by_kind[sources[sid]["kind"]] += c
@@ -313,7 +322,7 @@ def build_report(doc_name, text, tokens, owner, excluded, reasons, sources, sett
             out.append(f'<span class="ex" title="Excluded: {reasons.get(i, "")}">{frag}</span>')
         pos, i = e, j + 1
     out.append(html.escape(text[pos:]))
-    body = "".join(out).replace("\n\n", "</p><p>").replace("\n", "<br>")
+    body = "".join(out)
 
     rows = []
     for sid in order:
@@ -323,37 +332,38 @@ def build_report(doc_name, text, tokens, owner, excluded, reasons, sources, sett
         link = f'<a href="{html.escape(loc)}">{html.escape(src["name"])}</a>' if loc.startswith("http") \
             else html.escape(src["name"])
         rows.append(f'<li><span class="n" style="background:{color[sid]}">{num[sid]}</span>'
-                    f'<div><div class="sn">{link}</div><div class="sk">{html.escape(src["kind"])} · '
+                    f'<div><div class="sn">{link}</div><div class="sk">{KIND_LABEL.get(src["kind"], src["kind"])} · '
                     f'{counts[sid]} words</div></div><b>{pct:.0f}%</b></li>')
-    kinds = " · ".join(f"{k.title()} {100 * v / total:.0f}%" for k, v in by_kind.items()) or "No matches"
+    kinds = " · ".join(f"{KIND_LABEL.get(k, k)} {100 * v / total:.0f}%" for k, v in by_kind.items()) or "No matches"
     band = "low" if index < 15 else "mid" if index < 25 else "mid2" if index < 40 else "high"
 
     return f"""<!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Similarity Report – {html.escape(doc_name)}</title>
 <style>
-:root{{--bg:#f6f7f9;--card:#fff;--ink:#1c2024;--mute:#60646c;--line:#e0e1e6}}
-@media (prefers-color-scheme:dark){{:root{{--bg:#111113;--card:#18191b;--ink:#edeef0;--mute:#b0b4ba;--line:#2e3135}}}}
+:root{{--bg:#f3f8fd;--card:#fff;--ink:#0f1f33;--mute:#4a5d75;--line:#dce7f2}}
+@media (prefers-color-scheme:dark){{:root{{--bg:#0b1522;--card:#111e2e;--ink:#e6eef8;--mute:#9fb3c8;--line:#22364d}}}}
 *{{box-sizing:border-box}}body{{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 system-ui,Segoe UI,sans-serif}}
+header{{background:#0078d4;color:#fff;font-weight:700;padding:12px 16px}}@media (prefers-color-scheme:dark){{header{{background:#0a2540}}}}
 .wrap{{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:20px;max-width:1300px;margin:auto;padding:20px 16px}}
 @media (max-width:900px){{.wrap{{grid-template-columns:1fr}}aside{{order:-1}}}}
 .card{{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:20px 24px}}
 h1{{font-size:18px;margin:0 0 4px}}.meta{{color:var(--mute);font-size:13px}}
-.doc p{{margin:0 0 1em}}.doc{{font-family:Georgia,serif;font-size:16px}}
+.doc{{font-family:"Source Serif 4",Georgia,serif;font-size:16px;white-space:pre-wrap;overflow-wrap:anywhere}}
 mark{{background:color-mix(in srgb,var(--c) 22%,transparent);color:inherit;border-bottom:2px solid var(--c);padding:0 1px;border-radius:2px}}
 mark sup{{background:var(--c);color:#fff;font:600 10px system-ui;padding:0 4px;border-radius:3px;margin-right:2px}}
-.ex{{color:var(--mute);text-decoration:line-through dotted;text-decoration-color:var(--line)}}
+.ex{{color:var(--mute);text-decoration:line-through;opacity:.8}}
 aside .card{{position:sticky;top:20px}}
 .idx{{font-size:56px;font-weight:700;line-height:1}}.idx small{{font-size:22px}}
-.low{{color:#30a46c}}.mid{{color:#c2a300}}.mid2{{color:#f76b15}}.high{{color:#e5484d}}
+.low{{color:#16a34a}}.mid{{color:#d97706}}.mid2{{color:#ea580c}}.high{{color:#d13438}}
 ol{{list-style:none;padding:0;margin:16px 0 0}}li{{display:flex;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}}
 li div{{flex:1;min-width:0}}.sn{{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500}}.sk{{color:var(--mute);font-size:12px}}
 .n{{color:#fff;font-weight:700;font-size:12px;min-width:22px;text-align:center;border-radius:4px;padding:2px 4px}}
 a{{color:inherit}}.set{{color:var(--mute);font-size:12px;margin-top:14px;border-top:1px solid var(--line);padding-top:10px}}
-</style></head><body><div class="wrap">
+</style></head><body><header>origincheck · Similarity report</header><div class="wrap">
 <main class="card"><h1>{html.escape(doc_name)}</h1>
 <div class="meta">{total} words checked · generated {datetime.now():%d %b %Y %H:%M}</div><hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
-<div class="doc"><p>{body}</p></div></main>
+<div class="doc">{body}</div></main>
 <aside><div class="card"><div class="meta">Similarity index</div>
 <div class="idx {band}">{index}<small>%</small></div><div class="meta">{kinds}</div>
 <ol>{''.join(rows) or '<li>No matching sources found.</li>'}</ol>
@@ -399,7 +409,7 @@ def main():
     for f in a.sources:
         sources += load_folder(Path(f))
     if not a.no_repo:
-        repo = [s for s in load_folder(REPO_DIR, "repository: ") if s["name"] != "repository: " + doc.name]
+        repo = [s for s in load_folder(REPO_DIR, "repository: ") if s["name"] != f"repository: {doc.stem}.txt"]
         sources += repo
     if a.web:
         key = os.environ.get("BRAVE_API_KEY")
@@ -413,15 +423,9 @@ def main():
     print(f"Comparing against {len(sources)} source(s) ...", file=sys.stderr)
 
     excluded, reasons = excluded_positions(text, tokens, a.exclude_quotes, a.exclude_bib)
-    owner = find_matches(tokens, sources, a.ngram, a.min_words, excluded)
-
+    runs = find_matches(tokens, sources, a.ngram, a.min_words, excluded)
     total = sum(1 for i in range(len(tokens)) if i not in excluded) or 1
-    if a.exclude_source_pct > 0:
-        counts = defaultdict(int)
-        for sid in owner.values():
-            counts[sid] += 1
-        small = {s for s, c in counts.items() if 100 * c / total < a.exclude_source_pct}
-        owner = {k: v for k, v in owner.items() if v not in small}
+    owner = score(runs, total, a.exclude_source_pct)
 
     settings = (f"{a.ngram}-word fingerprints, min match {a.min_words} words"
                 + (", quotes excluded" if a.exclude_quotes else "")
@@ -431,10 +435,8 @@ def main():
     out = Path(a.out) if a.out else doc.with_name(doc.stem + "_similarity.html")
     out.write_text(report, encoding="utf-8")
 
-    index = round(100 * len(owner) / total)
-    counts = defaultdict(int)
-    for sid in owner.values():
-        counts[sid] += 1
+    index = int(100 * len(owner) / total + 0.5)  # round half up, same as the web app
+    counts = Counter(owner.values())
     print(f"\nSimilarity index: {index}%")
     for sid in sorted(counts, key=lambda s: -counts[s])[:10]:
         print(f"  {100 * counts[sid] / total:5.1f}%  {sources[sid]['name']}")
@@ -444,8 +446,11 @@ def main():
         jpath = out.with_suffix(".json")
         jpath.write_text(json.dumps({
             "document": doc.name, "similarity_index": index, "words_checked": total,
-            "sources": [{"name": sources[s]["name"], "location": sources[s]["location"],
-                         "percent": round(100 * counts[s] / total, 1)} for s in sorted(counts, key=lambda s: -counts[s])],
+            "sources": [{"name": sources[s]["name"], "kind": sources[s]["kind"], "location": sources[s]["location"],
+                         "matched_words": counts[s], "percent": round(100 * counts[s] / total, 1),
+                         "passages": [{"text": text[tokens[b][1]:tokens[e - 1][2]], "source_word": j}
+                                      for b, e, j in runs[s]]}
+                        for s in sorted(counts, key=lambda s: -counts[s])],
         }, indent=2), encoding="utf-8")
         print(f"JSON:   {jpath}")
 
