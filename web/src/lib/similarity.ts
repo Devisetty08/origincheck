@@ -30,6 +30,8 @@ export interface Source {
   toks: Tok[];
   meta?: CiteMeta;
   input?: Input;
+  /** Language of the source text (ISO 639-3), when detected; drives cross-language paraphrase checks. */
+  lang?: string;
   /** For sources found by "Run all sources": which adapter found it, and where. */
   found?: { adapter: string; url?: string; doi?: string; oaUrl?: string; authors?: string[]; year?: number };
 }

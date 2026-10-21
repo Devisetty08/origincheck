@@ -10,6 +10,9 @@ origincheck uses the open-source components below. Versions are the ones pinned 
 | [LanguageTool](https://github.com/languagetool-org/languagetool) | self-hosted server, not bundled | LGPL-2.1 (server software) | Optional extra grammar rules through origincheck's proxy; off unless the operator enables it |
 | [Transformers.js](https://github.com/huggingface/transformers.js) (`@huggingface/transformers`) | 4.3.1 | Apache-2.0 | Running the paraphrase and AI-indicator models in the browser |
 | [ONNX Runtime Web](https://github.com/microsoft/onnxruntime) (`onnxruntime-web`, via Transformers.js) | 1.31.0-dev | MIT | Model inference |
+| [Tesseract.js](https://github.com/naptha/tesseract.js) (`tesseract.js`) | 7.0.0 | Apache-2.0 | Text recognition (OCR) of scanned PDFs in the browser. Its engine and the English [tessdata](https://github.com/tesseract-ocr/tessdata) language file (Apache-2.0) download from a CDN on first use. |
+| [franc](https://github.com/wooorm/franc) (`franc-min`) | 6.2.0 | MIT | Detecting the document's language on the device |
+| [sentiment](https://github.com/thisandagain/sentiment) | 5.0.2 | MIT | Tone of the writing on the device. Uses the [AFINN-165](http://www2.imm.dtu.dk/pubdb/pubs/6010-full.html) word list by Finn Årup Nielsen (Open Database License 1.0). |
 
 ## Models (downloaded on first use, not bundled)
 
@@ -65,10 +68,10 @@ origincheck uses the open-source components below. Versions are the ones pinned 
 
 ## Online services and their content
 
-These are called through public APIs under their own terms of service and are not bundled with origincheck: Wikipedia (MediaWiki Action and REST APIs), Crossref, OpenAlex, Unpaywall, Semantic Scholar, arXiv, CORE, Europe PMC, Open Library / Internet Archive, Project Gutenberg (its official catalogue and book texts), Brave Search, Jina, Google Programmable Search (existing customers only), Datamuse, the Free Dictionary API, Copyleaks (paid, optional), Anthropic and Ollama.
+These are called through public APIs under their own terms of service and are not bundled with origincheck: Wikipedia (MediaWiki API), Wiktionary, Wikidata, Crossref, OpenAlex, Unpaywall, Semantic Scholar, arXiv, CORE, Europe PMC, PubMed (NCBI E-utilities), DataCite, OSF Preprints (SHARE), INSPIRE-HEP, Open Library and the Wayback Machine (Internet Archive), Google Books, Project Gutenberg (its official catalogue and book texts), PoetryDB, Brave Search, Jina, Google Programmable Search (existing customers only), Datamuse, the Free Dictionary API, LibreTranslate (optional), Copyleaks (paid, optional), Anthropic and Ollama.
 
 - **Wikipedia** text is licensed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). origincheck shows matched Wikipedia passages with the article link and "Wikipedia contributors" as the author, which is the attribution the licence asks for.
-- **OpenAlex** and **Open Library** data are CC0; **arXiv** metadata is CC0; full texts keep their own licences (shown per paper by Unpaywall / Europe PMC where known).
+- **OpenAlex**, **Open Library** and **Wikidata** data are CC0; **Wiktionary** definitions are CC BY-SA, shown with their source; **arXiv** metadata is CC0; full texts keep their own licences (shown per paper by Unpaywall / Europe PMC where known).
 - **Project Gutenberg** texts are public domain in the USA; the Project Gutenberg name is a trademark and is used only to identify the source.
 
 Duplichecker and CopyKiller have no public API and are never called: the "Check externally" panel only opens them in a new tab.

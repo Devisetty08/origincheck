@@ -4,6 +4,7 @@ import { Popover } from "radix-ui";
 import { ChevronLeft, ChevronRight, Download, Pencil, Check as CheckIcon, X } from "lucide-react";
 import { CATEGORIES, type Category, type Issue } from "@/lib/grammar";
 import { feedback } from "@/lib/writing";
+import { tone } from "@/lib/tone";
 import { plural } from "@/lib/words";
 import { Button, Card, cx } from "./ui";
 
@@ -106,6 +107,7 @@ export default function GrammarTab(p: Props) {
   }, [p.text, p.issues, open, cat]);
 
   const fb = useMemo(() => feedback(p.text), [p.text]);
+  const tn = useMemo(() => (p.englishOnly ? null : tone(p.text)), [p.text, p.englishOnly]); // the word list is English
   const counts = Object.fromEntries(CATEGORIES.map((c) => [c, p.issues.filter((i) => i.category === c).length])) as Record<Category, number>;
 
   return (
@@ -165,6 +167,13 @@ export default function GrammarTab(p: Props) {
           <p className="mt-2 text-[12px] text-mute">{fb.fleschLabel}.{fb.overused.length ? ` Most used: ${fb.overused.slice(0, 4).map((w) => `${w.word} (${w.count})`).join(", ")}.` : ""}</p>
           {fb.long.length > 0 && <details className="mt-2"><summary className="cursor-pointer text-[13px] font-medium">Long sentences</summary>
             <ul className="mt-1 grid list-disc gap-1 pl-5 text-[12.5px]">{fb.long.map((l) => <li key={l.at}>{l.words} words: {l.text.split(/\s+/).slice(0, 14).join(" ")} …</li>)}</ul></details>}
+          {tn && <div className="mt-3 border-t border-line pt-2" id="tone">
+            <div className="flex justify-between"><span className="text-mute">Tone</span><b>{tn.label}</b></div>
+            <p className="text-[12px] text-mute">{tn.label === "Neutral" ? "A neutral tone suits academic writing." : "Academic writing usually keeps a neutral tone; check the sentences below."}</p>
+            {tn.strong.length > 0 && <details className="mt-1"><summary className="cursor-pointer text-[13px] font-medium">Strongly worded sentences ({tn.strong.length})</summary>
+              <ul className="mt-1 grid list-disc gap-1 pl-5 text-[12.5px]">{tn.strong.map((s, i) => <li key={i}>{s.text.split(/\s+/).slice(0, 16).join(" ")}{s.text.split(/\s+/).length > 16 ? " …" : ""}
+                <span className="text-mute"> ({s.words.join(", ")})</span></li>)}</ul></details>}
+          </div>}
         </Card>
         {p.children}
       </aside>

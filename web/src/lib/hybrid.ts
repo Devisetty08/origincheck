@@ -80,6 +80,25 @@ export function lexicalPass(doc: { text: string }, sources: Source[], r: Result,
   return { near: dedupe(near), semantic: semantic.slice(0, THRESHOLDS.maxSemanticPairs), docUnits };
 }
 
+/**
+ * Cross-language candidates: a source written in another language than the document shares no words with it, so the
+ * lexical step can't propose pairs. Pair the document's sentences with those sources' sentences directly; the
+ * multilingual model then compares meaning across languages. Capped so the in-browser model stays quick.
+ */
+export function crossLangPairs(docUnits: Unit[], sources: Source[], docLang: string, skip: Set<number>, maxDoc = 150, maxSrc = 400) {
+  const out: { d: Unit; s: Unit; sid: number; score: number }[] = [];
+  if (docLang === "und") return out;
+  const doc = docUnits.slice(0, maxDoc);
+  let budget = maxSrc;
+  sources.forEach((src, sid) => {
+    if (budget <= 0 || skip.has(sid) || !src.lang || src.lang === "und" || src.lang === docLang) return;
+    const units = sentenceUnits(src.text, 6, 5000).slice(0, Math.min(60, budget));
+    budget -= units.length;
+    for (const s of units) for (const d of doc) out.push({ d, s, sid, score: 0 });
+  });
+  return out;
+}
+
 /** Paraphrase pass: cosine similarity of sentence embeddings for the lexical candidates only. */
 export async function semanticPass(text: string, sources: Source[], cands: { d: Unit; s: Unit; sid: number }[],
   embed: (texts: string[]) => Promise<Float32Array[]>, threshold = THRESHOLDS.paraphrase): Promise<PassageMatch[]> {

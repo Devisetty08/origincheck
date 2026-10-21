@@ -5,7 +5,8 @@ import { ArrowLeft, BookOpen, Bot, Download, FileCheck, FileSearch, History, Lib
 import { type CiteMeta, type Result, type Settings, type Source, type Tok, bibStart, tokenize } from "@/lib/similarity";
 import { plural } from "@/lib/words";
 import { hasHangul, pickQueries } from "@/lib/queries";
-import { type PassageMatch, lexicalPass, semanticPass } from "@/lib/hybrid";
+import { type PassageMatch, crossLangPairs, lexicalPass, semanticPass } from "@/lib/hybrid";
+import { detectLanguage } from "@/lib/language";
 import { type Style, inText } from "@/lib/citations";
 import { closeness, type Closeness } from "@/lib/closeness";
 import { aiScore } from "@/lib/aiScore";
@@ -58,15 +59,16 @@ export interface ServerConfig {
   improve: "anthropic" | "ollama" | null;
   maxQueries: number;
   paid?: { label: string; missing: string | null; sandbox: boolean };
+  translate?: boolean;
   sources: { id: string; label: string; group: string; missing: string | null }[];
 }
 export interface Hybrid { status: Status; note?: string; near: PassageMatch[]; para: PassageMatch[] }
 const GROUP_KIND = { refs: "scholarly", web: "internet", books: "library", lists: "library" } as const;
 const GROUP_SERVICES: Record<SourceGroup, string> = {
-  refs: "Crossref, OpenAlex, Semantic Scholar, arXiv, CORE, Europe PMC and Unpaywall",
+  refs: "Crossref, OpenAlex, PubMed, Semantic Scholar, arXiv, CORE, Europe PMC, DataCite, OSF Preprints, INSPIRE-HEP and Unpaywall",
   web: "Wikipedia and the configured web search (Brave, Jina or Google)",
-  books: "Open Library (Internet Archive)",
-  lists: "Project Gutenberg",
+  books: "Open Library (Internet Archive) and Google Books",
+  lists: "Project Gutenberg and PoetryDB",
 };
 type View = "check" | "history" | "library" | "settings";
 const TOOL_TITLE: Record<Tab, string> = { similarity: "Plagiarism check", grammar: "Grammar", ai: "AI indicator", rewrite: "Rewrite" };
@@ -95,6 +97,8 @@ export default function App() {
   const [view, setView] = useState<View>("check");
   const [tool, setTool] = useState<"check" | Tab>("check"); // which sidebar tool the user picked
   const [doc, setDoc] = useState<Doc | null>(null);
+  const docText = doc?.text ?? "";
+  const docLang = useMemo(() => detectLanguage(docText), [docText]);
   const [sources, setSources] = useState<Source[]>([]);
   const [found, setFound] = useState<Source[]>([]); // results of "Run all sources" for this document
   const [cfg, setCfg] = useState<ServerConfig | null>(null);
@@ -205,12 +209,26 @@ export default function App() {
     if (!doc) return;
     const groups = (["refs", "web", "books", "lists"] as SourceGroup[]).filter((g) => prefs.inputs?.[g] !== false);
     if (!groups.length) return;
-    if (!(await confirmPrivacy(groups.map((g) => GROUP_SERVICES[g])))) return;
-    const queries = pickQueries(doc.text, { max: cfg?.maxQueries ?? 8, skipQuotedAndCited: settings.quotes });
+    // a document in another language is also searched with English translations of half its phrases
+    const translating = !!cfg?.translate && prefs.translateSearch !== false && !["eng", "und"].includes(docLang.code);
+    const services = [...groups.map((g) => GROUP_SERVICES[g]), ...(translating ? ["LibreTranslate (the same short phrases, to translate them into English)"] : [])];
+    if (!(await confirmPrivacy(services))) return;
+    let queries = pickQueries(doc.text, { max: cfg?.maxQueries ?? 8, skipQuotedAndCited: settings.quotes });
     if (!queries.length) { setWebNote("No sentences long enough to search (8 or more words)."); return; }
     setRunningAll(true);
     setSearching(true);
     setRuns([]);
+    let note = "";
+    if (translating) {
+      const keep = Math.ceil(queries.length / 2);
+      try {
+        const r = await fetch("/api/translate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ q: queries.slice(0, queries.length - keep), target: "en" }) });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.error ?? `HTTP ${r.status}`);
+        queries = [...queries.slice(0, keep), ...(j.translated as string[]).filter((t) => t.split(/\s+/).length >= 4)];
+        note = ` ${docLang.name} phrases were also searched in English translation.`;
+      } catch (e) { note = ` Translation failed (${(e as Error).message}); searched in ${docLang.name} only.`; }
+    }
     const korean = hasHangul(doc.text);
     const added: Source[] = [];
     const seen = new Set<string>();
@@ -227,14 +245,14 @@ export default function App() {
           seen.add(key);
           const [first, ...rest] = h.authors;
           added.push({
-            id: uid(), name: h.title, kind: GROUP_KIND[group], input: group, text, toks: tokenize(text),
+            id: uid(), name: h.title, kind: GROUP_KIND[group], input: group, text, toks: tokenize(text), lang: detectLanguage(text).code,
             found: { adapter: e.run.label, url: h.url, doi: h.doi, oaUrl: h.oaUrl, authors: h.authors, year: h.year },
             meta: { title: h.title, year: h.year ? String(h.year) : undefined, doi: h.doi, url: h.url, accessed: new Date().toISOString().slice(0, 10),
               authors: [first, ...rest].filter(Boolean).map((a) => { const parts = a!.split(/\s+/); return { family: parts.pop()!, given: parts.join(" ") || undefined }; }) },
           });
         }
       });
-      setWebNote(`Run all sources: ${plural(queries.length, "phrase")} searched, ${plural(added.length, "result")} compared.`);
+      setWebNote(`Run all sources: ${plural(queries.length, "phrase")} searched, ${plural(added.length, "result")} compared.${note}`);
     } catch (e) {
       setWebNote(`Run all sources failed: ${(e as Error).message}`);
     }
@@ -333,11 +351,13 @@ export default function App() {
     if (!doc || !runR || !runAllSrc || !runSkip) return;
     const seq = ++hybridSeq.current;
     const t = setTimeout(async () => {
-      const { near, semantic } = lexicalPass(doc, runAllSrc, runR, settings, runSkip);
-      setHybrid({ status: paraphraseOn && semantic.length ? "running" : "done", near, para: [] });
-      if (!paraphraseOn || !semantic.length) return;
+      const { near, semantic, docUnits } = lexicalPass(doc, runAllSrc, runR, settings, runSkip);
+      // sources in another language than the document share no words with it: compare meaning directly (multilingual model)
+      const cands = [...semantic, ...crossLangPairs(docUnits, runAllSrc, docLang.code, runSkip)];
+      setHybrid({ status: paraphraseOn && cands.length ? "running" : "done", near, para: [] });
+      if (!paraphraseOn || !cands.length) return;
       try {
-        const para = await semanticPass(doc.text, runAllSrc, semantic, (texts) => runEmbeddings(texts, (p) => {
+        const para = await semanticPass(doc.text, runAllSrc, cands, (texts) => runEmbeddings(texts, (p) => {
           if (seq === hybridSeq.current) setHybrid((h) => ({ ...h, note: p.stage === "download" ? `Downloading the paraphrase model (${p.mb ?? 118} MB, first time only)… ${p.pct}%` : `Comparing meaning… ${p.pct}%` }));
         }));
         if (seq === hybridSeq.current) setHybrid({ status: "done", near, para });
@@ -346,7 +366,7 @@ export default function App() {
       }
     }, 300);
     return () => clearTimeout(t);
-  }, [doc, runR, runAllSrc, runSkip, settings, paraphraseOn]);
+  }, [doc, runR, runAllSrc, runSkip, settings, paraphraseOn, docLang.code]);
 
   useEffect(() => {
     if (!doc || searching) return;
@@ -589,7 +609,7 @@ export default function App() {
             {tool === "check" ? <>
               <div>
                 <h1 className="text-[clamp(21px,3vw,26px)] font-bold leading-tight wrap-anywhere">{doc.name}</h1>
-                <p className="mt-0.5 text-sm text-mute">{doc.toks.length.toLocaleString()} words · Click a result to see the details.</p>
+                <p className="mt-0.5 text-sm text-mute">{doc.toks.length.toLocaleString()} words{docLang.code !== "und" && <> · <span id="docLang">{docLang.name}</span></>} · Click a result to see the details.</p>
               </div>
               <Dashboard onOpen={(t) => go("check", t)} onAddSources={addSourceFiles}
                 sim={{ status: sim.status, index: run?.r.index, sources: run?.all.length ?? allSources.length, note: sim.note ?? (searching ? "Searching…" : undefined) }}

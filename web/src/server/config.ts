@@ -48,6 +48,7 @@ export function publicConfig() {
     improve: improve ? config.aiProvider : null,
     maxQueries: config.maxQueries,
     paid: { label: copyleaks.label, missing: copyleaks.missing(), sandbox: config.copyleaksSandbox },
+    translate: !!config.libreTranslateUrl,
   };
 }
 

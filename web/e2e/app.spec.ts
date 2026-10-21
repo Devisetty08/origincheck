@@ -64,6 +64,7 @@ test("uploading runs all three checks automatically and shows their scores", asy
   await expect(page.locator("#summaryLine")).toContainText(/\d+ grammar suggestions?/);
   await expect(page.locator("#summaryLine")).toContainText(/AI indicator: (Low|Unclear|High)/);
   await expect(page.locator("#nextSteps [data-step]")).toHaveCount(4);
+  await expect(page.locator("#docLang")).toHaveText("English"); // detected on the device
   await expect(page.locator('#nextSteps [data-step="plagiarism"]')).toContainText("2 passages match your sources (47% similarity)");
   expect(await noSideScroll(page)).toBe(true);
 
@@ -92,6 +93,7 @@ test("accepting a grammar suggestion changes the text and updates the score", as
   await expect(page.locator("#grammarRing text")).toHaveText(/^\d+$/, { timeout: 30_000 });
   const scoreBefore = Number(await page.locator("#grammarRing text").textContent());
   await openTool(page, "grammar");
+  await expect(page.locator("#tone")).toContainText("Neutral");
   const issue = page.locator('#gDoc [data-issue][aria-label^="Warning"], #gDoc [data-issue][aria-label^="Error"]').first();
   const flagged = await issue.textContent();
   const countBefore = await page.locator("#gDoc [data-issue]").count();

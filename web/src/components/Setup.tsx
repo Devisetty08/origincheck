@@ -17,13 +17,13 @@ const fillMeta = (m: Partial<CiteMeta> | undefined, name: string): CiteMeta | un
   m && (m.title || m.authors?.length) ? { authors: m.authors ?? [], title: m.title || name.replace(/\.[^.]+$/, ""), year: m.year } : undefined;
 
 type Read = Source & { headings: Map<string, HStyle> };
-async function readAll(files: File[]): Promise<{ ok: Read[]; errors: string }> {
+async function readAll(files: File[], onProgress?: (msg: string) => void): Promise<{ ok: Read[]; errors: string }> {
   const ok: Read[] = [], errs: string[] = [];
   for (const f of files)
     try {
-      const ex = await extract(f);
+      const ex = await extract(f, onProgress && ((m) => onProgress(`${f.name}: ${m}`)));
       const toks = tokenize(ex.text);
-      if (!toks.length) errs.push(`No text found in ${f.name}. If it's a scanned PDF, run OCR on it first.`);
+      if (!toks.length) errs.push(`No text found in ${f.name}${ex.ocr ? ", even with text recognition (is the scan readable?)" : ""}.`);
       else ok.push({
         id: uid(), name: f.name, kind: "file", input: "files", text: ex.text, toks, meta: fillMeta(ex.meta, f.name),
         headings: new Map(ex.blocks.filter((b) => b.style !== "p").map((b) => [b.text, b.style as HStyle])),
@@ -63,11 +63,11 @@ interface DocProps { doc: Doc | null; setDoc: (d: Omit<Doc, "id"> | null) => voi
 export function DocCard(p: DocProps) {
   const [msg, setMsg] = useState("");
   const [paste, setPaste] = useState<string | null>(null);
-  const [reading, setReading] = useState(false);
+  const [reading, setReading] = useState<string | null>(null);
   const onDoc = async (files: File[]) => {
-    setReading(true);
-    const { ok, errors } = await readAll(files.slice(0, 1));
-    setReading(false);
+    setReading("Reading your document…");
+    const { ok, errors } = await readAll(files.slice(0, 1), setReading);
+    setReading(null);
     setMsg(errors);
     const d = ok[0];
     if (d) p.setDoc({ name: d.name, text: d.text, toks: d.toks, headings: d.headings, kind: "file" });
@@ -77,7 +77,7 @@ export function DocCard(p: DocProps) {
       <h2 id="docH" className="font-semibold">1. Your document</h2>
       <p className="text-[13.5px] text-mute">The paper, essay or dissertation you want to check.</p>
       <Drop id="docDrop" label="Choose your document file" onFiles={onDoc} icon={<FileUp aria-hidden />} title="Drop a file here or click to browse" sub=".docx, .pdf, .txt, .md, .html, .rtf" />
-      {reading && <p className="mt-2 text-sm text-mute" role="status">Reading your document…</p>}
+      {reading && <p className="mt-2 text-sm text-mute" role="status" id="readingMsg">{reading}</p>}
       {p.doc && <ul className="mt-3"><FileRow tag={p.doc.kind === "paste" ? "text" : ext(p.doc.name)} name={p.doc.name} words={p.doc.toks.length} onRemove={() => p.setDoc(null)} /></ul>}
       {paste === null
         ? <Button variant="link" className="mt-3" onClick={() => setPaste("")}>Paste text instead</Button>
@@ -109,9 +109,9 @@ interface SourcesProps {
 /** Searched automatically from short phrases of your document (each one is a Yes/No input). */
 const SEARCH: { id: Input; label: string; hint: string; icon: React.ReactNode }[] = [
   { id: "web", label: "The internet", hint: "Wikipedia and web search", icon: <Search size={16} /> },
-  { id: "refs", label: "Journals & publications", hint: "Crossref, OpenAlex, arXiv, Semantic Scholar, CORE, Europe PMC", icon: <Globe size={16} /> },
-  { id: "books", label: "Books", hint: "Inside millions of books (Open Library)", icon: <BookOpen size={16} /> },
-  { id: "lists", label: "Free classic books", hint: "Project Gutenberg", icon: <Library size={16} /> },
+  { id: "refs", label: "Journals & publications", hint: "Crossref, OpenAlex, PubMed, arXiv, Semantic Scholar, CORE, Europe PMC, DataCite theses, OSF preprints, INSPIRE-HEP", icon: <Globe size={16} /> },
+  { id: "books", label: "Books", hint: "Inside millions of books (Open Library, Google Books)", icon: <BookOpen size={16} /> },
+  { id: "lists", label: "Free classic books & poems", hint: "Project Gutenberg and PoetryDB", icon: <Library size={16} /> },
 ];
 /** Sources you add yourself. */
 const OWN: { id: Input; label: string; icon: React.ReactNode; include: string }[] = [
@@ -138,7 +138,7 @@ export function SourcesCard(p: SourcesProps & { compact?: boolean; note?: string
 
   const onSources = async (files: File[]) => {
     setBusy(`Reading ${plural(files.length, "file")}…`);
-    const { ok, errors } = await readAll(files);
+    const { ok, errors } = await readAll(files, setBusy);
     setBusy("");
     setMsg(errors);
     p.setSources((s) => [...s, ...ok.map(asSource)]);
@@ -319,6 +319,9 @@ export function SettingsCard(p: SettingsProps & { className?: string }) {
       <div className="mt-2 grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
         <Check id="sAuto" label="Search automatically when I add a document" hint="Searches the internet and publications with short phrases. Turn off to search only when you press Search now."
           checked={p.prefs.autoSearch !== false} onChange={(v) => p.setPrefs({ autoSearch: v })} />
+        {p.cfg?.translate && <Check id="sTranslate" label="Search in English too (documents in other languages)"
+          hint="Translates half of the search phrases into English with LibreTranslate, and compares meaning across languages."
+          checked={p.prefs.translateSearch !== false} onChange={(v) => p.setPrefs({ translateSearch: v })} />}
         <Check id="sQuotes" label="Ignore quotes and cited passages" hint="Excluded from the index and from search queries." checked={s.quotes} onChange={(v) => set({ quotes: v })} />
         <Check id="sBib" label="Exclude bibliography" checked={s.bib} onChange={(v) => set({ bib: v })} />
         <Check id="sPara" label="Detect paraphrase" hint="Compares meaning with an on-device model (downloads about 120 MB once). Reported separately, not in the index." checked={p.prefs.paraphrase !== false} onChange={(v) => p.setPrefs({ paraphrase: v })} />

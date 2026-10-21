@@ -50,6 +50,14 @@ export const ENV_VARS: EnvVar[] = [
   { key: "OLLAMA_MODEL", group: "Rewrite (Improve my writing)", label: "Ollama model", placeholder: "llama3.1",
     help: "Any model you have pulled with ollama pull." },
 
+  { key: "LIBRETRANSLATE_URL", group: "Translation (documents not in English)", label: "LibreTranslate server", placeholder: "https://libretranslate.com",
+    help: "Translates your search phrases into English so a document in another language is also checked against English sources. Self-host it for free, or use libretranslate.com with a key.",
+    link: "https://github.com/LibreTranslate/LibreTranslate" },
+  { key: "LIBRETRANSLATE_API_KEY", group: "Translation (documents not in English)", label: "LibreTranslate API key", secret: true, link: "https://portal.libretranslate.com/",
+    help: "Only for libretranslate.com; a self-hosted server doesn't need one." },
+  { key: "GOOGLE_BOOKS_API_KEY", group: "Web search", label: "Google Books API key", secret: true, link: "https://console.cloud.google.com/apis/library/books.googleapis.com",
+    help: "Free. Searches inside millions of books for your phrases." },
+
   { key: "ENABLE_AI_LIKELIHOOD", group: "Optional checks", label: "AI indicator", kind: "bool",
     help: "Shows an AI-likelihood estimate. Unreliable by nature: a signal, never proof." },
   { key: "ENABLE_LANGUAGETOOL", group: "Optional checks", label: "LanguageTool second opinion", kind: "bool",

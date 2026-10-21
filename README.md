@@ -12,9 +12,9 @@ Your document is read and compared **in your browser**. Searches send only short
 
 | Page | What you get |
 |---|---|
-| **Check document** | Add a file (.docx, .pdf, .txt, .md, .html, .rtf) or paste text. All checks start at once. The overview shows three scores and a **What to do next** list with one button per check. |
+| **Check document** | Add a file (.docx, .pdf, .txt, .md, .html, .rtf) or paste text. Scanned PDFs are read with text recognition (OCR) in your browser. All checks start at once. The overview shows the document's language, three scores and a **What to do next** list with one button per check. |
 | **Plagiarism check** | A similarity report: your document with matching passages highlighted and numbered by source, a ranked source list, and each source passage side by side. |
-| **Grammar** | Spelling, grammar, punctuation and style, checked on your device. Every suggestion is a card with **Accept** and **Dismiss**. Plus readability and a corrected .docx. |
+| **Grammar** | Spelling, grammar, punctuation and style, checked on your device. Every suggestion is a card with **Accept** and **Dismiss**. Definitions and synonyms for any word, and recognition of names and technical terms. Plus readability, the tone of your writing, and a corrected .docx. |
 | **Rewrite** | Click a paragraph, pick a mode (Clarity, Concise, Grammar only, Academic tone), compare your original with the suggestion, and keep only the changes you want. |
 | **AI indicator** | Optional. An estimate of how likely the text is machine-written, with a sentence heatmap and the reasons. Never a verdict. |
 | **History** | Every check's scores across drafts, with a chart. |
@@ -27,11 +27,13 @@ Your document is read and compared **in your browser**. Searches send only short
 As soon as you add a document, origincheck picks up to 8 short, distinctive phrases from it (skipping quotations, cited sentences and the bibliography) and searches:
 
 - **The internet:** Wikipedia (English, plus Korean for Korean text) and web search through Brave, Jina or Google.
-- **Journals & publications:** Crossref, OpenAlex, arXiv, Semantic Scholar, CORE and Europe PMC, with Unpaywall finding free legal copies by DOI.
-- **Books:** search inside books on Open Library.
-- **Free classic books:** Project Gutenberg.
+- **Journals & publications:** Crossref, OpenAlex, PubMed, arXiv, Semantic Scholar, CORE, Europe PMC, DataCite (theses, dissertations and datasets), OSF Preprints (PsyArXiv, SocArXiv…) and INSPIRE-HEP (physics), with Unpaywall finding free legal copies by DOI.
+- **Books:** search inside books on Open Library and Google Books.
+- **Free classic books & poems:** Project Gutenberg and PoetryDB.
 
-You can also add your own sources: upload files, paste text, add a web page, paste your reference list (origincheck finds the open-access full texts), or pick from free book lists. Each source type has a tick box to include or leave it out. The page shows which services found something, which found nothing, and which couldn't search and why.
+**Documents in other languages:** if a translation server is set up, half of the phrases are also searched in English translation, and sources in another language are compared with your document by meaning, so text translated from an English source can still be found.
+
+You can also add your own sources: upload files, paste text, add a web page (if the page is gone, its latest copy from the Internet Archive's Wayback Machine is used), paste your reference list (origincheck finds the open-access full texts), or pick from free book lists. Each source type has a tick box to include or leave it out. The page shows which services found something, which found nothing, and which couldn't search and why.
 
 Two optional extras sit at the bottom of the plagiarism page:
 
@@ -78,6 +80,8 @@ To turn on more, open **Settings** in the app, paste a key and press **Save sett
 | Brave Search API key | Web search, the widest internet coverage | [brave.com/search/api](https://brave.com/search/api/) |
 | Semantic Scholar API key | Semantic Scholar without constant rate limits | [semanticscholar.org/product/api](https://www.semanticscholar.org/product/api) |
 | CORE API key (free) | CORE's open-access papers (it no longer answers without a key) | [core.ac.uk/services/api](https://core.ac.uk/services/api) |
+| Google Books API key (free) | Search inside millions of books | [Google Cloud console → Books API](https://console.cloud.google.com/apis/library/books.googleapis.com) |
+| LibreTranslate server (and key for libretranslate.com) | English-translation search for documents in other languages | [Self-host it](https://github.com/LibreTranslate/LibreTranslate) for free, or [libretranslate.com](https://libretranslate.com/) |
 | Anthropic API key | Rewrite with Claude | [console.anthropic.com](https://console.anthropic.com/) |
 | Ollama server and model | Rewrite with a free model on your computer | [ollama.com](https://ollama.com/) |
 | Copyleaks email and key | The paid Copyleaks scan | [copyleaks.com](https://copyleaks.com/) |
@@ -90,8 +94,11 @@ Your document, saved documents, history and settings stay in your browser. Thing
 | Feature | What is sent, and where |
 |---|---|
 | Searching sources | Up to 8 phrases of at most 16 words each, to the sources you ticked. The server refuses anything longer. |
-| Web page and reference import | Only the addresses, DOIs and references you enter. |
-| Word lookup | The single word you look up, to Datamuse and the Free Dictionary API. |
+| Translated search (optional) | The same short phrases, to the LibreTranslate server set up for this app. |
+| Web page and reference import | Only the addresses, DOIs and references you enter (and, for a dead page, the address to the Internet Archive). |
+| Word lookup | The single word you look up, to Datamuse, the Free Dictionary API, Wiktionary and Wikidata. |
+| Scanned PDFs | Nothing. Text recognition runs in your browser; only the recognition engine (about 15 MB) is downloaded once. |
+| Language detection and tone | Nothing. Both run in your browser. |
 | Rewrite | The passage you chose, to Anthropic or your Ollama server. |
 | LanguageTool (optional) | The document text, to the LanguageTool server you set up. |
 | Copyleaks (optional, on request) | **The whole document.** Compared but not added to any Copyleaks database; deleted after 24 hours. |
@@ -130,9 +137,10 @@ How matching works:
 - **Not a commercial database.** Commercial plagiarism services compare against private databases of web pages, journals and past student papers. origincheck searches public sources, so your institution's report can show matches this doesn't. The paid Copyleaks option narrows the gap.
 - **Searches are sampled.** Up to 8 phrases per document by default. Raise **Passages searched per run** in Settings for long documents.
 - **Paywalled papers** are matched on their abstracts only. Add the file yourself if you have it.
-- **Grammar is English-only** (Harper). Other languages are detected and skipped, with a note.
+- **Grammar and tone are English-only** (Harper and the AFINN word list). Other languages are detected and skipped, with a note.
 - **AI detection is unreliable**, as the app says next to every score.
-- **Scanned PDFs** have no text. Run OCR on them first.
+- **Scanned PDFs** are read with English text recognition, first 30 pages only, and recognition can misread poor scans. For long or non-English scans, run them through dedicated OCR software first.
+- **Translated plagiarism** is found only when a translation server is set up, and only for documents in Latin script or Korean.
 
 ## If a passage is flagged
 

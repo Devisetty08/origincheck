@@ -2,7 +2,7 @@
 import type { CiteMeta } from "./similarity";
 
 export interface Block { style: "h1" | "h2" | "h3" | "p"; text: string }
-export interface Extracted { text: string; blocks: Block[]; meta?: Partial<CiteMeta> }
+export interface Extracted { text: string; blocks: Block[]; meta?: Partial<CiteMeta>; scanned?: boolean; ocr?: boolean }
 
 const BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 export const SUPPORTED = ".docx,.pdf,.txt,.md,.html,.htm,.rtf";
@@ -105,7 +105,38 @@ async function pdf(buf: ArrayBuffer): Promise<Extracted> {
     const y = (info.CreationDate ?? "").match(/(\d{4})/)?.[1];
     meta = { title: info.Title?.trim() || undefined, authors: parseAuthors(info.Author), year: y };
   } catch { /* optional */ }
-  return { text, blocks: text.split(/\n\n+/).map((t) => ({ style: "p" as const, text: t.trim() })).filter((b) => b.text), meta };
+  const scanned = text.split(/\s+/).filter(Boolean).length < 25 * doc.numPages; // little or no text layer: probably a scan
+  return { text, blocks: text.split(/\n\n+/).map((t) => ({ style: "p" as const, text: t.trim() })).filter((b) => b.text), meta, scanned };
+}
+
+export const MAX_OCR_PAGES = 30;
+
+/**
+ * Reads a scanned PDF with OCR, entirely in the browser: pdf.js renders each page and Tesseract.js (open source) reads it.
+ * The recognition engine and English language data (~15 MB) download once from a CDN; the pages never leave the device.
+ */
+async function ocrPdf(buf: ArrayBuffer, onProgress?: (msg: string) => void): Promise<Extracted> {
+  const pdfjs = await import("pdfjs-dist");
+  pdfjs.GlobalWorkerOptions.workerSrc = `${BASE}/pdf.worker.min.mjs`;
+  const doc = await pdfjs.getDocument({ data: new Uint8Array(buf) }).promise;
+  const n = Math.min(doc.numPages, MAX_OCR_PAGES);
+  onProgress?.("Scanned PDF: loading the text-recognition engine (first time only)…");
+  const { createWorker } = await import("tesseract.js");
+  const worker = await createWorker("eng");
+  const texts: string[] = [];
+  try {
+    for (let p = 1; p <= n; p++) {
+      onProgress?.(`Scanned PDF: reading page ${p} of ${n}${doc.numPages > n ? ` (first ${n} pages only)` : ""}…`);
+      const page = await doc.getPage(p);
+      const viewport = page.getViewport({ scale: 2 }); // ~150 dpi for a typical page: enough for print-quality text
+      const canvas = document.createElement("canvas");
+      canvas.width = viewport.width; canvas.height = viewport.height;
+      await page.render({ canvas, canvasContext: canvas.getContext("2d")!, viewport }).promise;
+      texts.push((await worker.recognize(canvas)).data.text.trim());
+    }
+  } finally { await worker.terminate(); }
+  const text = texts.join("\n\n").replace(/-\n(\w)/g, "$1").replace(/(?<![.\n:])\n(?!\n)/g, " ");
+  return { text, blocks: text.split(/\n\n+/).map((t) => ({ style: "p" as const, text: t.trim() })).filter((b) => b.text), ocr: true };
 }
 
 const plainBlocks = (text: string): Block[] =>
@@ -117,8 +148,11 @@ const plainBlocks = (text: string): Block[] =>
 export const MAX_FILE_MB = 50;
 export const PARSE_TIMEOUT_MS = 60_000;
 
-/** Reads a file in the browser, with a size cap and a time limit so a malformed file can't hang the page. */
-export async function extract(file: File): Promise<Extracted> {
+/**
+ * Reads a file in the browser, with a size cap and a time limit so a malformed file can't hang the page.
+ * A PDF without a text layer (a scan) is then read with OCR, which has its own page cap instead of the time limit.
+ */
+export async function extract(file: File, onProgress?: (msg: string) => void): Promise<Extracted> {
   const ext = (file.name.match(/\.[^.]+$/)?.[0] ?? "").toLowerCase();
   if (!SUPPORTED.split(",").includes(ext)) throw new Error(`${file.name}: unsupported file type. Use .docx, .pdf, .txt, .md, .html or .rtf.`);
   if (file.size > MAX_FILE_MB * 1e6) throw new Error(`${file.name} is larger than ${MAX_FILE_MB} MB.`);
@@ -126,7 +160,13 @@ export async function extract(file: File): Promise<Extracted> {
   const timeout = new Promise<never>((_, reject) => {
     timer = setTimeout(() => reject(new Error(`${file.name} took too long to read (over ${PARSE_TIMEOUT_MS / 1000} s). Try saving it again or as .txt.`)), PARSE_TIMEOUT_MS);
   });
-  try { return await Promise.race([read(file, ext), timeout]); } finally { clearTimeout(timer); }
+  let ex: Extracted;
+  try { ex = await Promise.race([read(file, ext), timeout]); } finally { clearTimeout(timer); }
+  if (ex.scanned && typeof document !== "undefined") {
+    const o = await ocrPdf(await file.arrayBuffer(), onProgress);
+    if (o.text.split(/\s+/).length > ex.text.split(/\s+/).length) ex = { ...o, meta: ex.meta, text: o.text.replace(/\r\n?/g, "\n") };
+  }
+  return ex;
 }
 
 async function read(file: File, ext: string): Promise<Extracted> {
