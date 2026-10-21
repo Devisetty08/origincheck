@@ -1,6 +1,6 @@
 // Spending guard for metered (pay-as-you-go) APIs: a usage count per calendar month (UTC), checked BEFORE every call.
 // When a cap is reached the call is not made. Counts are kept in web/.data/usage.json (git-ignored).
-// ponytail: a local JSON file — right for one machine or one long-running server. On Vercel the disk isn't kept
+// Note: a local JSON file — right for one machine or one long-running server. On Vercel the disk isn't kept
 // between requests, so counts fall back to memory per instance; use a shared store (e.g. Upstash Redis) there.
 import "server-only";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";

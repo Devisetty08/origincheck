@@ -1,5 +1,5 @@
 // Pending and finished paid scans. Each scan has a random secret that must come back on the webhook URL.
-// ponytail: in-memory, so submit, webhook and polling must reach the same server process (local + tunnel, or one
+// Note: in-memory, so submit, webhook and polling must reach the same server process (local + tunnel, or one
 // long-running instance). On Vercel's multi-instance functions, move this to a shared store (e.g. Upstash Redis).
 import "server-only";
 import { randomBytes } from "node:crypto";

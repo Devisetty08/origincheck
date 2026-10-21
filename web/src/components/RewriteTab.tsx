@@ -43,7 +43,7 @@ export default function RewriteTab(p: Props) {
   const fromSelection = (): Range | null => {
     const t = window.getSelection()?.toString().trim() ?? "";
     if (t.length < 3) return null;
-    const s = p.text.indexOf(t); // ponytail: first occurrence; a repeated passage resolves to its first copy
+    const s = p.text.indexOf(t); // note: first occurrence only; a repeated passage resolves to its first copy
     return s < 0 ? null : { s, e: s + t.length };
   };
   const pick = (r: Range, fallback: Range) => { const sel = fromSelection(); setPicked(sel && sel.s >= r.s && sel.e <= r.e ? sel : fallback); };
