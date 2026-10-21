@@ -245,3 +245,31 @@ test("Improve my writing shows a diff, applies accepted changes and labels the e
   await page.locator("#dlReport").click();
   expect(readFileSync(await (await report).path(), "utf8")).toContain("AI-assisted");
 });
+
+test("each tool in the sidebar has its own page and opens on its tab", async ({ page }) => {
+  await page.goto("./");
+  await page.waitForLoadState("networkidle");
+  for (const [id, title] of [["similarity", "Plagiarism check"], ["grammar", "Grammar check"], ["ai", "AI indicator"], ["rewrite", "Rewrite"]]) {
+    await page.locator(`[data-nav="${id}"]:visible, [data-nav-mobile="${id}"]:visible`).first().click();
+    await expect(page.locator("#toolIntro h1")).toHaveText(title);
+  }
+  await page.locator('[data-nav="grammar"]:visible, [data-nav-mobile="grammar"]:visible').first().click();
+  await page.getByRole("button", { name: "Paste text instead" }).click();
+  await page.getByLabel("Document text").fill("This sentence have a error in it. ".repeat(5));
+  await page.locator("#usePaste").click();
+  await expect(page.getByRole("tab", { name: "Grammar" })).toHaveAttribute("aria-selected", "true");
+});
+
+test("Rewrite points to Settings when no AI provider is set, and Settings shows keys without values", async ({ page }) => {
+  await serverConfig(page, { improve: null });
+  await upload(page);
+  await page.getByRole("tab", { name: "Rewrite" }).click();
+  await expect(page.locator("#rwDoc")).toContainText("Azure Database for PostgreSQL");
+  await expect(page.locator("#improveOff")).toBeVisible();
+  await page.locator("#improveSetup").click();
+  await expect(page.getByRole("heading", { name: "Settings", level: 1 })).toBeVisible();
+  await expect(page.locator("#sPara")).toBeVisible(); // check options moved here
+  await expect(page.locator('[data-status="ANTHROPIC_API_KEY"]')).toHaveText(/Set|Not set/);
+  await expect(page.locator("#settingsReadOnly")).toContainText("production mode"); // e2e runs next start
+  await expect(page.locator("#saveSettings")).toBeDisabled();
+});

@@ -16,6 +16,8 @@ It comes in two versions. The **web app** (`web/`) is a Next.js app: documents a
 
 Drop in a document (.docx, .pdf, .txt, .md, .html, .rtf) or paste text. The checks start in parallel, each in its own Web Worker, and results appear as they finish. The summary shows one card per check, for example "47% similarity · 7 grammar suggestions".
 
+The sidebar has a page per tool: **Check document** (everything at once), **Plagiarism check**, **Grammar**, **AI indicator**, **Rewrite**, **History** and **Settings**. Each tool page explains itself and accepts a document directly, then opens on that tool's results.
+
 ### Sources to compare against
 
 Seven inputs, each with a **Yes/No** switch. Turning one off removes its sources from the check.
@@ -122,6 +124,8 @@ npm run build && npx playwright test   # end-to-end tests against the production
 ### Keys and settings
 
 All keys are read from environment variables on the server and never sent to the browser. A source without its key shows as **not configured** and is skipped.
+
+The easiest way to set them locally is the **Settings** page in the app: paste a key and save. It is written to `web/.env.local` and applies immediately; afterwards the page only shows whether each key is set, never its value. Saving is allowed only from `localhost` in development (`npm run dev`). With `npm start` set `ALLOW_SETTINGS_WRITE=true` to allow it; on Vercel, use the project's Environment Variables instead.
 
 | Variable | Needed for | Notes |
 |---|---|---|

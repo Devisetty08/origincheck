@@ -37,7 +37,7 @@ async function readAll(files: File[]): Promise<{ ok: Read[]; errors: string }> {
 const asSource = (x: Read): Source => ({ id: x.id, name: x.name, kind: x.kind, input: x.input, text: x.text, toks: x.toks, meta: x.meta });
 
 /** The upload screen: document, sources and settings. Checks start as soon as a document is added. */
-export default function Setup(p: DocProps & SourcesProps & SettingsProps) {
+export default function Setup(p: DocProps & SourcesProps & SettingsProps & { onOpenSettings: () => void }) {
   return (
     <div className="mx-auto max-w-[1180px] px-4 pt-7 pb-12">
       <div className="mb-6">
@@ -52,7 +52,8 @@ export default function Setup(p: DocProps & SourcesProps & SettingsProps) {
         <DocCard {...p} />
         <SourcesCard {...p} />
       </div>
-      <SettingsCard {...p} className="mt-[18px]" />
+      <p className="mt-[18px] text-[13.5px] text-mute">Check options (quotes, bibliography, paraphrase, citation style) and API keys are in{" "}
+        <button className="cursor-pointer text-accent underline" onClick={p.onOpenSettings} id="setupSettings">Settings</button>.</p>
     </div>
   );
 }

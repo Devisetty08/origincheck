@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MotionConfig } from "motion/react";
-import { BookOpen, Bot, Download, FileCheck, FileSearch, History, Library as LibIcon, Moon, Printer, SpellCheck, Sun } from "lucide-react";
+import { BookOpen, Bot, Download, FileCheck, FileSearch, History, Library as LibIcon, Moon, PenLine, Printer, Settings as SettingsIcon, SpellCheck, Sun } from "lucide-react";
 import { Tabs as T } from "radix-ui";
 import { type CiteMeta, type Result, type Settings, type Source, type Tok, bibStart, tokenize } from "@/lib/similarity";
 import { plural } from "@/lib/words";
@@ -20,7 +20,9 @@ import {
   storeHistory, storeMeta, storePrefs, storeSaved, uid,
 } from "@/lib/store";
 import { Button, Dialog, Logo, type Status, cx } from "./ui";
-import Setup, { RunTable, SourcesCard } from "./Setup";
+import Setup, { RunTable, SettingsCard, SourcesCard } from "./Setup";
+import { ServerSettings } from "./SettingsPage";
+import RewriteTab from "./RewriteTab";
 import ExternalCheck from "./ExternalCheck";
 import Report from "./Report";
 import Drafts from "./Drafts";
@@ -65,12 +67,20 @@ const GROUP_SERVICES: Record<SourceGroup, string> = {
   books: "Open Library (Internet Archive)",
   lists: "Project Gutenberg (Gutendex)",
 };
-type View = "check" | "history" | "library";
+type View = "check" | "history" | "library" | "settings";
+/** What each tool page says before a document is added. */
+const INTRO: Record<Tab, { title: string; text: string }> = {
+  similarity: { title: "Plagiarism check", text: "Compares your document with your sources, publications, the web and books. Copied wording is highlighted and counted in the similarity index; lightly edited copying and paraphrase are shown separately. Add your document below, then add sources or use Run all sources." },
+  grammar: { title: "Grammar check", text: "Spelling, grammar, punctuation and style, checked on your device. No sources needed: add or paste your document below." },
+  ai: { title: "AI indicator", text: "An estimate of how likely the text is machine-written. It is a signal, never proof. Add your document below." },
+  rewrite: { title: "Rewrite", text: "Select any passage and have it revised for clarity, concision, grammar or academic tone, accepting each change yourself. Passages that match a source are rewritten by you in the plagiarism check. Add your document below." },
+};
 type PendingRecheck = { res: Omit<Resolution, "id" | "at">; at: number; len: number; sid?: number; mine?: string; sourcePassage?: string };
 
 export default function App() {
   const [view, setView] = useState<View>("check");
   const [tab, setTab] = useState<Tab>("similarity");
+  const [tool, setTool] = useState<"check" | Tab>("check"); // which sidebar tool the user picked
   const [doc, setDoc] = useState<Doc | null>(null);
   const [sources, setSources] = useState<Source[]>([]);
   const [found, setFound] = useState<Source[]>([]); // results of "Run all sources" for this document
@@ -100,10 +110,11 @@ export default function App() {
   const pendingRecheck = useRef<PendingRecheck | null>(null);
   const draftId = useRef<string | null>(null);
   const edited = useRef(false);
+  const loadCfg = () => fetch("/api/config").then((r) => (r.ok ? r.json() : null)).then((c) => setCfg(c)).catch(() => setCfg(null));
 
   useEffect(() => {
     warmGrammar();
-    fetch("/api/config").then((r) => (r.ok ? r.json() : null)).then((c) => setCfg(c)).catch(() => setCfg(null));
+    loadCfg();
     Promise.all([loadSaved(), loadHistory(), loadMeta()]).then(([s, h, m]) => {
       setPrefsState(loadPrefs());
       setSaved(s);
@@ -245,7 +256,7 @@ export default function App() {
     setSkipIds(new Set(drafts.map((x) => x.id))); // previous drafts are compared but excluded from the index by default
     setRuns(null);
     setHybrid({ status: "queued", near: [], para: [] });
-    setTab("similarity");
+    setTab(tool === "check" ? "similarity" : tool);
     setView("check");
     startAi(next.text);
     scrollTo(0, 0);
@@ -460,16 +471,25 @@ export default function App() {
     ...(run?.r.passages ?? []).map((x): [number, number] => [x.s, x.end]),
     ...[...hybrid.near, ...hybrid.para].map((m): [number, number] => [m.docStart, m.docEnd]),
   ], [run, hybrid]);
-  const go = (v: View, t?: Tab) => { setView(v); if (t) setTab(t); };
+  const go = (v: View, t?: Tab) => { setView(v); if (t) setTab(t); if (v === "check") setTool(t ?? "check"); scrollTo(0, 0); };
   const userSources = sources.length + found.length;
+  const toolActive = (t: Tab) => view === "check" && tool === t;
 
   const NAV: { id: string; label: string; short: string; icon: React.ReactNode; on: () => void; active: boolean }[] = [
-    { id: "check", label: "Check document", short: "Check", icon: <FileCheck size={18} />, on: () => go("check"), active: view === "check" && !doc },
-    { id: "similarity", label: "Similarity", short: "Similarity", icon: <FileSearch size={18} />, on: () => go("check", "similarity"), active: view === "check" && !!doc && tab === "similarity" },
-    { id: "grammar", label: "Grammar", short: "Grammar", icon: <SpellCheck size={18} />, on: () => go("check", "grammar"), active: view === "check" && !!doc && tab === "grammar" },
-    { id: "ai", label: "AI indicator", short: "AI", icon: <Bot size={18} />, on: () => go("check", "ai"), active: view === "check" && !!doc && tab === "ai" },
+    { id: "check", label: "Check document", short: "Check", icon: <FileCheck size={18} />, on: () => go("check"), active: view === "check" && tool === "check" },
+    { id: "similarity", label: "Plagiarism check", short: "Plagiarism", icon: <FileSearch size={18} />, on: () => go("check", "similarity"), active: toolActive("similarity") },
+    { id: "grammar", label: "Grammar", short: "Grammar", icon: <SpellCheck size={18} />, on: () => go("check", "grammar"), active: toolActive("grammar") },
+    { id: "ai", label: "AI indicator", short: "AI", icon: <Bot size={18} />, on: () => go("check", "ai"), active: toolActive("ai") },
+    { id: "rewrite", label: "Rewrite", short: "Rewrite", icon: <PenLine size={18} />, on: () => go("check", "rewrite"), active: toolActive("rewrite") },
     { id: "history", label: "History", short: "History", icon: <History size={18} />, on: () => go("history"), active: view === "history" },
+    { id: "settings", label: "Settings", short: "Settings", icon: <SettingsIcon size={18} />, on: () => go("settings"), active: view === "settings" },
   ];
+  const improveCard = doc && <ImproveWriting text={doc.text} provider={cfg?.improve ?? null} flagged={flagged}
+    confirmPrivacy={(s) => confirmPrivacy(s, true)} onSetup={() => go("settings")}
+    onApply={(s, e, t) => {
+      setText(doc.text.slice(0, s) + t + doc.text.slice(e));
+      setDoc((d) => d && { ...d, aiAssisted: (d.aiAssisted ?? 0) + 1 });
+    }} />;
 
   return (
     <MotionConfig reducedMotion="user">
@@ -484,6 +504,9 @@ export default function App() {
           <a href={`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/guide/`} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-white/30 bg-white/12 px-2.5 text-[13.5px] font-medium hover:bg-white/22" aria-label="Guide to avoiding plagiarism">
             <BookOpen size={15} /><span className="hidden lg:inline">Guide</span>
           </a>
+          <button onClick={() => go("settings")} className="inline-grid size-8 place-items-center rounded-lg border border-white/30 bg-white/12 hover:bg-white/22 cursor-pointer md:hidden" aria-label="Settings">
+            <SettingsIcon size={16} />
+          </button>
           <button onClick={toggleTheme} className="inline-grid size-8 place-items-center rounded-lg border border-white/30 bg-white/12 hover:bg-white/22 cursor-pointer" aria-label="Toggle dark mode">
             <Moon size={16} className="dark:hidden" /><Sun size={16} className="hidden dark:block" />
           </button>
@@ -501,9 +524,26 @@ export default function App() {
           {view === "history" && <Drafts history={history} setHistory={(h) => { setHistory(h); storeHistory(h); }} />}
           {view === "library" && <Library saved={saved} setSaved={(s) => { setSaved(s); storeSaved(s); }}
             onDeletedAll={() => { setSaved([]); setHistory([]); setMeta({}); setPrefsState({}); delete document.documentElement.dataset.theme; }} />}
+          {view === "settings" && <div className="mx-auto grid max-w-[1180px] gap-[18px] px-4 pt-7 pb-12">
+            <div>
+              <h1 className="text-[clamp(23px,4vw,30px)] font-bold leading-tight tracking-tight">Settings</h1>
+              <p className="mt-1.5 text-[15.5px] text-mute">How the checks behave (saved in this browser), and the keys and services the server uses.</p>
+            </div>
+            <SettingsCard settings={settings} setSettings={setSettings} prefs={prefs} setPrefs={setPrefs} cfg={cfg}
+              saved={saved} useSaved={useSaved} setUseSaved={setUseSaved} drafts={priorDrafts.length} />
+            <ServerSettings onSaved={loadCfg} />
+          </div>}
+          {view === "check" && !doc && tool !== "check" && <section className="mx-auto max-w-[1180px] px-4 pt-7" id="toolIntro" aria-label={INTRO[tool].title}>
+            <div className="rounded-xl border border-accent/40 bg-soft p-4">
+              <h1 className="text-xl font-bold">{INTRO[tool].title}</h1>
+              <p className="mt-1 text-[14.5px]">{INTRO[tool].text}</p>
+              {tool === "ai" && cfg && !cfg.aiLikelihood && <p className="mt-2 text-[13.5px] text-mute">The AI indicator is turned off on this server. Turn it on in <button className="cursor-pointer text-accent underline" onClick={() => go("settings")}>Settings</button>.</p>}
+              {tool === "rewrite" && cfg && !cfg.improve && <p className="mt-2 text-[13.5px] text-mute">AI revision needs an Anthropic API key or an Ollama server: add one in <button className="cursor-pointer text-accent underline" onClick={() => go("settings")}>Settings</button>.</p>}
+            </div>
+          </section>}
           {view === "check" && !doc && <Setup doc={doc} setDoc={openDoc} sources={sources} setSources={setSources} settings={settings} setSettings={setSettings}
             prefs={prefs} setPrefs={setPrefs} saved={saved} useSaved={useSaved} setUseSaved={setUseSaved} drafts={0}
-            cfg={cfg} runs={runs} running={runningAll} canRun={false} onRunAll={runAll} confirmPrivacy={confirmPrivacy} />}
+            cfg={cfg} runs={runs} running={runningAll} canRun={false} onRunAll={runAll} confirmPrivacy={confirmPrivacy} onOpenSettings={() => go("settings")} />}
           {view === "check" && doc && <div className="mx-auto grid max-w-[1400px] gap-4 px-4 pt-5">
             <Dashboard active={tab} onOpen={setTab} onAddSources={addSourceFiles}
               sim={{ status: sim.status, index: run?.r.index, sources: run?.all.length ?? allSources.length, note: sim.note ?? (searching ? "Searching…" : undefined) }}
@@ -517,9 +557,9 @@ export default function App() {
               <Button size="sm" onClick={() => downloadCorrected("txt")}><Download size={14} />Corrected .txt</Button>
             </div>
 
-            <T.Root value={tab} onValueChange={(v) => setTab(v as Tab)}>
+            <T.Root value={tab} onValueChange={(v) => { setTab(v as Tab); setTool(v as Tab); }}>
               <T.List aria-label="Report" className="no-print mb-4 flex overflow-x-auto border-b border-line">
-                {([["similarity", "Similarity"], ["grammar", "Grammar"], ["ai", "AI indicator"]] as const).map(([id, label]) =>
+                {([["similarity", "Plagiarism (similarity)"], ["grammar", "Grammar"], ["ai", "AI indicator"], ["rewrite", "Rewrite"]] as const).map(([id, label]) =>
                   <T.Trigger key={id} value={id} className="shrink-0 cursor-pointer border-b-2 border-transparent px-4 py-2.5 text-sm font-semibold text-mute data-[state=active]:border-accent data-[state=active]:text-accent">{label}</T.Trigger>)}
               </T.List>
               <T.Content value="similarity" className="grid gap-4 outline-none">
@@ -547,13 +587,11 @@ export default function App() {
                   onIgnoreRule={(r) => setIgnoredRules((x) => new Set(x).add(r))}
                   onAcceptAllSpelling={() => setText(applyAll(doc.text, issues.filter((i) => i.category === "spelling" && i.severity !== "style")))}
                   onEditText={setText} onDownload={downloadCorrected}>
-                  <ImproveWriting text={doc.text} provider={cfg?.improve ?? null} flagged={flagged}
-                    confirmPrivacy={(s) => confirmPrivacy(s, true)}
-                    onApply={(s, e, t) => {
-                      setText(doc.text.slice(0, s) + t + doc.text.slice(e));
-                      setDoc((d) => d && { ...d, aiAssisted: (d.aiAssisted ?? 0) + 1 });
-                    }} />
+                  {improveCard}
                 </GrammarTab>
+              </T.Content>
+              <T.Content value="rewrite" className="outline-none">
+                <RewriteTab text={doc.text} flagged={flagged} onOpenPlagiarism={() => go("check", "similarity")}>{improveCard}</RewriteTab>
               </T.Content>
               <T.Content value="ai" className="outline-none">
                 <AiTab s={ai} available={aiAvailable} onRerun={() => startAi(doc.text)} onEnable={() => { setPrefs({ ai: true }); startAi(doc.text, true); }} />
@@ -563,8 +601,8 @@ export default function App() {
         </main>
       </div>
 
-      <nav aria-label="Tools" className="no-print fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-line bg-panel md:hidden">
-        {NAV.map((n) => <button key={n.id} onClick={n.on} aria-current={n.active ? "page" : undefined} data-nav-mobile={n.id}
+      <nav aria-label="Tools" className="no-print fixed inset-x-0 bottom-0 z-30 grid grid-cols-6 border-t border-line bg-panel md:hidden">
+        {NAV.filter((n) => n.id !== "settings").map((n) => <button key={n.id} onClick={n.on} aria-current={n.active ? "page" : undefined} data-nav-mobile={n.id}
           className={cx("flex cursor-pointer flex-col items-center gap-0.5 py-2 text-[11px] font-medium", n.active ? "text-accent" : "text-mute")}>
           {n.icon}{n.short}</button>)}
       </nav>

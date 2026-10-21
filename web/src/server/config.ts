@@ -1,29 +1,30 @@
 // Server-only configuration. Keys are read from the environment and never sent to the browser.
+// Getters, so values saved from the Settings page apply without a restart.
 import "server-only";
 
 const env = (k: string) => process.env[k]?.trim() || undefined;
 
 export const config = {
-  userAgent: env("HTTP_USER_AGENT") ?? `origincheck/0.2 (contact: ${env("CONTACT_EMAIL") ?? "unknown"})`,
-  contactEmail: env("CONTACT_EMAIL"),
-  crossrefMailto: env("CROSSREF_MAILTO") ?? env("CONTACT_EMAIL"),
-  openalexMailto: env("OPENALEX_MAILTO") ?? env("CONTACT_EMAIL"),
-  unpaywallEmail: env("UNPAYWALL_EMAIL"),
-  braveKey: env("BRAVE_API_KEY"),
-  jinaKey: env("JINA_API_KEY"),
-  coreKey: env("CORE_API_KEY"),
-  semanticScholarKey: env("SEMANTIC_SCHOLAR_API_KEY"),
-  googleKey: env("GOOGLE_API_KEY"),
-  googleCx: env("GOOGLE_CSE_ID"),
-  aiProvider: (env("AI_PROVIDER") ?? "anthropic") as "anthropic" | "ollama",
-  anthropicKey: env("ANTHROPIC_API_KEY"),
-  anthropicModel: env("ANTHROPIC_MODEL") ?? "claude-opus-5-5",
-  ollamaUrl: env("OLLAMA_BASE_URL") ?? "http://localhost:11434",
-  ollamaModel: env("OLLAMA_MODEL"),
-  aiLikelihood: env("ENABLE_AI_LIKELIHOOD") === "true",
-  languageTool: env("ENABLE_LANGUAGETOOL") === "true",
-  languageToolUrl: env("LANGUAGETOOL_URL") ?? "http://localhost:8010",
-  maxQueries: Math.max(1, Math.min(40, Number(env("SEARCH_MAX_QUERIES") ?? 8) || 8)),
+  get userAgent() { return env("HTTP_USER_AGENT") ?? `origincheck/0.2 (contact: ${env("CONTACT_EMAIL") ?? "unknown"})`; },
+  get contactEmail() { return env("CONTACT_EMAIL"); },
+  get crossrefMailto() { return env("CROSSREF_MAILTO") ?? env("CONTACT_EMAIL"); },
+  get openalexMailto() { return env("OPENALEX_MAILTO") ?? env("CONTACT_EMAIL"); },
+  get unpaywallEmail() { return env("UNPAYWALL_EMAIL"); },
+  get braveKey() { return env("BRAVE_API_KEY"); },
+  get jinaKey() { return env("JINA_API_KEY"); },
+  get coreKey() { return env("CORE_API_KEY"); },
+  get semanticScholarKey() { return env("SEMANTIC_SCHOLAR_API_KEY"); },
+  get googleKey() { return env("GOOGLE_API_KEY"); },
+  get googleCx() { return env("GOOGLE_CSE_ID"); },
+  get aiProvider() { return (env("AI_PROVIDER") ?? "anthropic") as "anthropic" | "ollama"; },
+  get anthropicKey() { return env("ANTHROPIC_API_KEY"); },
+  get anthropicModel() { return env("ANTHROPIC_MODEL") ?? "claude-opus-5-5"; },
+  get ollamaUrl() { return env("OLLAMA_BASE_URL") ?? "http://localhost:11434"; },
+  get ollamaModel() { return env("OLLAMA_MODEL"); },
+  get aiLikelihood() { return env("ENABLE_AI_LIKELIHOOD") === "true"; },
+  get languageTool() { return env("ENABLE_LANGUAGETOOL") === "true"; },
+  get languageToolUrl() { return env("LANGUAGETOOL_URL") ?? "http://localhost:8010"; },
+  get maxQueries() { return Math.max(1, Math.min(40, Number(env("SEARCH_MAX_QUERIES") ?? 8) || 8)); },
 };
 
 /** What the browser may know: which features are available, never the keys themselves. */

@@ -32,6 +32,7 @@ interface Props {
   flagged: [number, number][]; // char ranges matched by the similarity check
   confirmPrivacy: (services: string[]) => Promise<boolean>;
   onApply: (start: number, end: number, replacement: string) => void;
+  onSetup: () => void; // opens Settings when no provider is configured
 }
 
 export default function ImproveWriting(p: Props) {
@@ -41,7 +42,13 @@ export default function ImproveWriting(p: Props) {
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
 
-  if (!p.provider) return null;
+  if (!p.provider) return (
+    <Card className="no-print text-[13.5px]" id="improve" aria-label="Improve my writing">
+      <h3 className="flex items-center gap-1.5 font-semibold"><Sparkles size={15} />Improve my writing</h3>
+      <p className="mt-1 text-mute" id="improveOff">Not set up yet. Add an Anthropic API key, or point it at a free Ollama server on your computer, in Settings.</p>
+      <Button size="sm" className="mt-2 w-full" onClick={p.onSetup} id="improveSetup">Open Settings</Button>
+    </Card>
+  );
 
   const run = async () => {
     setParts(null); setMsg("");

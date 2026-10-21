@@ -9,7 +9,7 @@ import type { Issue, Severity } from "@/lib/grammar";
 import { plural } from "@/lib/words";
 import { Button, Ring, type Status, StatusPill, cx } from "./ui";
 
-export type Tab = "similarity" | "grammar" | "ai";
+export type Tab = "similarity" | "grammar" | "ai" | "rewrite";
 
 export const grammarBand = (s: number) =>
   s >= 90 ? { label: "Clean", color: "var(--low)" } : s >= 75 ? { label: "A few issues", color: "var(--mid)" }
