@@ -89,8 +89,10 @@ export const arxiv: Adapter = {
 };
 
 export const core: Adapter = {
-  id: "core", label: "CORE", group: "refs", missing: () => null,
-  minIntervalMs: 1000, // keyless requests are allowed at a low rate; CORE_API_KEY raises it
+  id: "core", label: "CORE", group: "refs",
+  // keyless requests used to work but are refused (429/500) as of Oct 2026; the key is free
+  missing: () => (config.coreKey ? null : "needs a free CORE_API_KEY (core.ac.uk/services/api)"),
+  minIntervalMs: 1000,
   async search(query, { signal }) {
     type W = { title?: string; abstract?: string; fullText?: string; authors?: { name: string }[]; yearPublished?: number; doi?: string; downloadUrl?: string; links?: { type: string; url: string }[] };
     const headers: Record<string, string> = config.coreKey ? { Authorization: `Bearer ${config.coreKey}` } : {};

@@ -66,7 +66,7 @@ const GROUP_SERVICES: Record<SourceGroup, string> = {
   refs: "Crossref, OpenAlex, Semantic Scholar, arXiv, CORE, Europe PMC and Unpaywall",
   web: "Wikipedia and the configured web search (Brave, Jina or Google)",
   books: "Open Library (Internet Archive)",
-  lists: "Project Gutenberg (Gutendex)",
+  lists: "Project Gutenberg",
 };
 type View = "check" | "history" | "library" | "settings";
 const TOOL_TITLE: Record<Tab, string> = { similarity: "Plagiarism check", grammar: "Grammar", ai: "AI indicator", rewrite: "Rewrite" };

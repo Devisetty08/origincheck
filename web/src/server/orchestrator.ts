@@ -34,9 +34,9 @@ async function searchOne(a: Adapter, query: string, o: Required<Options>, deadli
     const wait = last == null ? 0 : last + a.minIntervalMs - o.now(); // per-API rate limiter
     if (wait > 0) await o.sleep(wait);
     lastCall.set(a.id, o.now());
-    if (o.now() > deadline) throw Object.assign(new Error("source deadline reached"), { name: "TimeoutError" });
+    if (o.now() >= deadline) throw Object.assign(new Error("source deadline reached"), { name: "TimeoutError" });
     try {
-      const results = await a.search(query, { signal: AbortSignal.timeout(o.timeoutMs) });
+      const results = await a.search(query, { signal: AbortSignal.timeout(a.timeoutMs ?? o.timeoutMs) });
       cache.set(key, { at: o.now(), results });
       if (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value!);
       return results;
@@ -58,6 +58,9 @@ export async function runSource(a: Adapter, queries: string[], opts: Options = {
     now: () => Date.now(), sleep: (ms) => new Promise((r) => setTimeout(r, ms)), ...opts,
   };
   const start = o.now();
+  if (a.maxQueries) queries = queries.slice(0, a.maxQueries);
+  // a slow service gets one full request; its timeout then also ends the source, so a timed-out request isn't retried
+  const deadline = start + Math.max(o.sourceDeadlineMs, a.timeoutMs ?? 0);
   const base = { source: a.id, label: a.label, queries: queries.length };
   const missing = a.missing();
   if (missing) return { ...base, status: "not configured", ms: 0, results: [], error: missing };
@@ -66,7 +69,7 @@ export async function runSource(a: Adapter, queries: string[], opts: Options = {
   let error: string | undefined, done = 0, limited = false;
   for (const q of queries) {
     try {
-      for (const r of await searchOne(a, q, o, start + o.sourceDeadlineMs)) {
+      for (const r of await searchOne(a, q, o, deadline)) {
         const k = r.doi?.toLowerCase() || r.url || r.title;
         if (!seen.has(k)) { seen.add(k); results.push(r); }
       }
@@ -74,7 +77,7 @@ export async function runSource(a: Adapter, queries: string[], opts: Options = {
     } catch (e) {
       error = (e as Error).message;
       if (e instanceof RateLimitedError) { limited = true; break; }
-      if ((e as Error).name === "TimeoutError" && o.now() > start + o.sourceDeadlineMs) break;
+      if ((e as Error).name === "TimeoutError" && o.now() >= deadline) break;
     }
   }
   // Results win: a source that found something before failing still reports success, with a note saying it stopped.

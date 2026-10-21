@@ -77,7 +77,7 @@ To turn on more, open **Settings** in the app, paste a key and press **Save sett
 | Unpaywall email | Free legal copies of papers by DOI | Your own email (a real one) |
 | Brave Search API key | Web search, the widest internet coverage | [brave.com/search/api](https://brave.com/search/api/) |
 | Semantic Scholar API key | Semantic Scholar without constant rate limits | [semanticscholar.org/product/api](https://www.semanticscholar.org/product/api) |
-| CORE API key | Higher limits for open-access papers | [core.ac.uk/services/api](https://core.ac.uk/services/api) |
+| CORE API key (free) | CORE's open-access papers (it no longer answers without a key) | [core.ac.uk/services/api](https://core.ac.uk/services/api) |
 | Anthropic API key | Rewrite with Claude | [console.anthropic.com](https://console.anthropic.com/) |
 | Ollama server and model | Rewrite with a free model on your computer | [ollama.com](https://ollama.com/) |
 | Copyleaks email and key | The paid Copyleaks scan | [copyleaks.com](https://copyleaks.com/) |

@@ -24,6 +24,9 @@ export interface Adapter {
   missing(): string | null;
   /** Minimum gap between this source's requests, from its published rate guidance. */
   minIntervalMs: number;
+  /** For slow services: time allowed per request (default 8 s) and how many of the run's phrases to search (default all). */
+  timeoutMs?: number;
+  maxQueries?: number;
   search(query: string, ctx: { signal: AbortSignal }): Promise<NormalizedResult[]>;
 }
 

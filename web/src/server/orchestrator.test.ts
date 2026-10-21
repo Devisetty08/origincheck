@@ -11,6 +11,22 @@ const fast = { sleep: async () => {}, retries: 2 };
 
 beforeEach(() => clearState());
 
+describe("slow services", () => {
+  it("searches only maxQueries phrases", async () => {
+    const search = vi.fn(async (q: string) => [hit(q)]);
+    const e = await runSource(fake("slow", search, { maxQueries: 1 }), ["a", "b", "c"], fast);
+    expect(search).toHaveBeenCalledTimes(1);
+    expect(e).toMatchObject({ status: "success", queries: 1 });
+  });
+  it("gives one long request and doesn't retry it after its timeout", async () => {
+    let t = 0;
+    const search = vi.fn(async () => { t += 45_000; throw Object.assign(new Error("timed out"), { name: "TimeoutError" }); });
+    const e = await runSource(fake("slow", search, { timeoutMs: 45_000, maxQueries: 1 }), ["a"], { ...fast, now: () => t });
+    expect(search).toHaveBeenCalledTimes(1);
+    expect(e.status).toBe("failed");
+  });
+});
+
 describe("runSource", () => {
   it("reports success and de-duplicates results across queries", async () => {
     const e = await runSource(fake("a", async (q) => [hit("same"), hit(q)]), ["q1", "q2"], fast);

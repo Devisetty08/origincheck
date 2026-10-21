@@ -14,6 +14,7 @@ beforeAll(async () => {
   vi.stubEnv("GOOGLE_API_KEY", "g-test");
   vi.stubEnv("GOOGLE_CSE_ID", "cx-test");
   vi.stubEnv("UNPAYWALL_EMAIL", "real@uni.edu");
+  vi.stubEnv("CORE_API_KEY", "core-test");
   A = await import("./index");
 });
 afterEach(() => vi.unstubAllGlobals());
@@ -66,10 +67,12 @@ const FIX: Record<string, { ok: (url: string) => Response; empty: () => Response
     empty: () => json({ hits: { hits: [] } }),
     expect: { title: "Computer type", url: "https://archive.org/details/computertype", text: "It was the best of times", authors: ["Rogondino, Michael"] },
   },
-  gutendex: {
-    ok: (u) => u.includes("gutendex") ? json({ results: [{ id: 1228, title: "On the Origin of Species", authors: [{ name: "Darwin, Charles" }], formats: { "text/plain; charset=utf-8": "https://gutenberg/1228.txt" } }] }) : text("Book text."),
+  gutendex: { // Project Gutenberg: the official catalogue CSV, then the book's text
+    ok: (u) => u.includes("pg_catalog.csv")
+      ? text('Text#,Type,Issued,Title,Language,Authors,Subjects,LoCC,Bookshelves\n1228,Text,1999-12-01,"Light, Harvesting\nand Energy",en,"Darwin, Charles",,,\n5,Sound,2000-01-01,Light harvesting energy,en,X,,,\n')
+      : text("Book text."),
     empty: () => json({ results: [] }),
-    expect: { title: "On the Origin of Species", url: "https://www.gutenberg.org/ebooks/1228", text: "Book text." },
+    expect: { title: "Light, Harvesting and Energy", url: "https://www.gutenberg.org/ebooks/1228", text: "Book text.", authors: ["Darwin, Charles"] },
   },
   brave: {
     ok: () => json({ web: { results: [{ title: "<b>Page</b>", url: "https://example.org/p", description: "desc", extra_snippets: ["more"] }] } }),
@@ -100,7 +103,7 @@ describe.each(Object.keys(FIX))("%s adapter", (id) => {
     expect(r).toMatchObject({ ...f.expect, source: id });
     expect(calls.length).toBeGreaterThan(0);
   });
-  it("returns [] when nothing matches", async () => { // (Gutendex also returns [] without a request when the query has no distinctive words)
+  it("returns [] when nothing matches", async () => { // (Gutenberg also returns [] without a request when the query has no distinctive words)
     vi.stubGlobal("fetch", vi.fn(async () => f.empty()));
     expect(await adapter().search("zzqx", { signal: signal() })).toEqual([]);
   });
@@ -125,6 +128,13 @@ describe("keys and selection", () => {
     await A.ADAPTERS.find((a) => a.id === "brave")!.search("q", { signal: signal() });
     expect(seen[0].headers.get("x-subscription-token")).toBe("brave-test");
     expect(seen[0].url).not.toContain("brave-test");
+  });
+  it("treats CORE as not configured without its (free) key", () => {
+    const core = A.ADAPTERS.find((a) => a.id === "core")!;
+    expect(core.missing()).toBeNull();
+    vi.stubEnv("CORE_API_KEY", "");
+    expect(core.missing()).toMatch(/CORE_API_KEY/);
+    vi.stubEnv("CORE_API_KEY", "core-test");
   });
   it("adds Korean Wikipedia only for Hangul text", () => {
     expect(A.pick(["web"], false).map((a) => a.id)).not.toContain("wikipedia-ko");

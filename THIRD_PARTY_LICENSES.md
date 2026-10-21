@@ -65,7 +65,7 @@ origincheck uses the open-source components below. Versions are the ones pinned 
 
 ## Online services and their content
 
-These are called through public APIs under their own terms of service and are not bundled with origincheck: Wikipedia (MediaWiki Action and REST APIs), Crossref, OpenAlex, Unpaywall, Semantic Scholar, arXiv, CORE, Europe PMC, Open Library / Internet Archive, Gutendex (Project Gutenberg), Brave Search, Jina, Google Programmable Search (existing customers only), Datamuse, the Free Dictionary API, Copyleaks (paid, optional), Anthropic and Ollama.
+These are called through public APIs under their own terms of service and are not bundled with origincheck: Wikipedia (MediaWiki Action and REST APIs), Crossref, OpenAlex, Unpaywall, Semantic Scholar, arXiv, CORE, Europe PMC, Open Library / Internet Archive, Project Gutenberg (its official catalogue and book texts), Brave Search, Jina, Google Programmable Search (existing customers only), Datamuse, the Free Dictionary API, Copyleaks (paid, optional), Anthropic and Ollama.
 
 - **Wikipedia** text is licensed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). origincheck shows matched Wikipedia passages with the article link and "Wikipedia contributors" as the author, which is the attribution the licence asks for.
 - **OpenAlex** and **Open Library** data are CC0; **arXiv** metadata is CC0; full texts keep their own licences (shown per paper by Unpaywall / Europe PMC where known).

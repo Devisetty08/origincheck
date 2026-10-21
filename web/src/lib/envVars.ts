@@ -28,7 +28,7 @@ export const ENV_VARS: EnvVar[] = [
   { key: "SEMANTIC_SCHOLAR_API_KEY", group: "Publications", label: "Semantic Scholar API key", secret: true, link: "https://www.semanticscholar.org/product/api",
     help: "Without a key, Semantic Scholar is usually rate-limited." },
   { key: "CORE_API_KEY", group: "Publications", label: "CORE API key", secret: true, link: "https://core.ac.uk/services/api",
-    help: "Raises CORE's rate limit for open-access papers." },
+    help: "Free. Needed to search CORE's open-access papers: without it CORE refuses requests." },
 
   { key: "COPYLEAKS_EMAIL", group: "Paid plagiarism check (Copyleaks)", label: "Copyleaks account email", placeholder: "you@university.edu",
     help: "Scans the whole document against the web, journals and Copyleaks' database of submitted papers. Uses paid credits." },

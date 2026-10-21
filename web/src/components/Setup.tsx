@@ -208,7 +208,11 @@ export function SourcesCard(p: SourcesProps & { compact?: boolean; note?: string
       </div>
       {runs.length > 0 && <div className="mt-2 rounded-lg bg-bg px-3 py-2 text-[13px]" id="searchSummary">
         <p role="status">{p.running ? `Searching ${runs.length} services…` : `${plural(found, "service")} found sources, ${runs.length - found - couldnt} found nothing${couldnt ? `, ${couldnt} couldn't search (see details)` : ""}.`}</p>
-        <details className="mt-1"><summary className="cursor-pointer text-accent">Details per service</summary><div className="mt-2"><RunTable runs={runs} /></div></details>
+        <details className="mt-1"><summary className="cursor-pointer text-accent">Details per service</summary><div className="mt-2">
+          <p className="mb-2 text-[12px] text-mute"><b>No results</b> means none of your phrases appear in that service — normal for original writing.
+            <b> Success</b> means it returned something to compare (journal search engines always return their closest papers); the plagiarism
+            report shows whether any of it actually matches.</p>
+          <RunTable runs={runs} /></div></details>
       </div>}
 
       <h3 className="mt-5 text-[12.5px] font-semibold uppercase tracking-wide text-mute">Add your own sources <span className="normal-case tracking-normal">(optional)</span></h3>
@@ -274,10 +278,11 @@ export function RunTable({ runs }: { runs: SourceRun[] }) {
       <table className="w-full text-[13px]" aria-label="Source status">
         <thead><tr className="text-left text-mute"><th className="py-1 pr-2 font-medium">Source</th><th className="pr-2 font-medium">Status</th><th className="pr-2 text-right font-medium">Results</th><th className="text-right font-medium">Time</th></tr></thead>
         <tbody>{runs.map((r) => <tr key={r.source} className="border-t border-line" data-source={r.source} data-status={r.status}>
-          <td className="py-1.5 pr-2">{r.label}{r.error && r.status !== "success" && <div className="text-[11.5px] text-mute">{r.error}</div>}</td>
+          <td className="py-1.5 pr-2">{r.label}{r.error && <div className="text-[11.5px] text-mute">{r.error}</div>}</td>
           <td className="pr-2"><span className={cx("rounded-full px-2 py-0.5 text-[12px] font-medium", STATUS_STYLE[r.status])}>{r.status}</span></td>
           <td className="pr-2 text-right">{r.status === "running" ? "…" : r.results.length}</td>
-          <td className="text-right text-mute">{r.status === "running" || r.status === "not configured" ? "—" : `${(r.ms / 1000).toFixed(1)} s`}</td>
+          <td className="text-right text-mute" title={r.ms < 50 && r.status !== "not configured" ? "Same phrases searched in the last hour: answer reused" : undefined}>
+            {r.status === "running" || r.status === "not configured" ? "—" : r.ms < 50 ? "cached" : `${(r.ms / 1000).toFixed(1)} s`}</td>
         </tr>)}</tbody>
       </table>
     </div>
