@@ -19,6 +19,30 @@ function getLinter() {
   return linter;
 }
 
+/** Harper is English-only: skip it for text that is mostly another script (e.g. Hangul) or clearly not English. */
+export function isEnglish(text: string) {
+  const sample = text.slice(0, 20_000);
+  const letters = sample.match(/\p{L}/gu)?.length ?? 0;
+  if (!letters) return true;
+  const latin = sample.match(/[A-Za-z]/g)?.length ?? 0;
+  if (latin / letters < 0.6) return false; // Hangul, CJK, Cyrillic, Arabic…
+  const words = sample.toLowerCase().match(/[a-z]+/g) ?? [];
+  const common = words.filter((w) => /^(the|and|of|to|in|is|that|for|it|with|as|was|on|are|be|this|by|or|an|which)$/.test(w)).length;
+  return words.length < 40 || common / words.length > 0.06; // English text has many function words
+}
+
+let userWords = "";
+/** Load the user's dictionary into Harper; results are re-checked when it changes. */
+export async function setUserWords(words: string[]) {
+  const key = [...words].sort().join("\n");
+  if (key === userWords) return;
+  const l = await getLinter();
+  await l.clearWords();
+  if (words.length) await l.importWords(words);
+  userWords = key;
+  cache.clear();
+}
+
 /** Start loading Harper's WebAssembly while the page is idle, so the first check doesn't wait for it. */
 export function warmGrammar() {
   const start = () => { getLinter().catch(() => { linter = null; }); };

@@ -64,6 +64,11 @@ mark.m sup { background: var(--c); color: #fff; font: 700 10px/1 var(--font-sans
 mark.m.flash, .cp.flash { animation: flash 1.2s ease; }
 @keyframes flash { 0%, 40% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--c, var(--close)) 45%, transparent); } 100% { box-shadow: 0 0 0 0 transparent; } }
 .cp { border-bottom: 2px dashed var(--close); cursor: pointer; }
+/* hybrid matches: near-verbatim (dotted orange) and paraphrase (double purple); not counted in the index */
+.nv { border-bottom: 2px dotted var(--mid2); cursor: pointer; }
+.pp { border-bottom: 3px double var(--close); cursor: pointer; }
+.focus .nv:not(.on), .focus .pp:not(.on) { opacity: .4; }
+.nv.flash, .pp.flash { animation: flash 1.2s ease; }
 .ex { color: var(--mute); text-decoration: line-through; opacity: .75; }
 .ring-arc { transition: stroke-dasharray .6s ease; }
 @media (prefers-reduced-motion: reduce) { .ring-arc, mark.m { transition: none; } mark.m.flash, .cp.flash { animation: none; } }

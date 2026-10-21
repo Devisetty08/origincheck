@@ -77,5 +77,6 @@ export function aiScore(words: number, s: AiSignals): AiResult | null {
 }
 
 export const AI_CAVEAT =
-  "AI detection is unreliable. Formal, technical or non-native-English writing is often misjudged as AI. " +
-  "Use this as a prompt to review, never as proof. Your institution's tools may give a different result.";
+  "AI detection is unreliable. Detectors are probabilistic and produce false positives — formal, technical or non-native-English " +
+  "writing is often misjudged as AI — and they work best on English. Use this as a prompt to review, never as proof, and never as the " +
+  "sole basis for an accusation. Your institution's tools may give a different result.";

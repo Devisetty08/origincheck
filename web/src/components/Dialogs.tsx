@@ -102,7 +102,7 @@ export function CitationDialog({ open, onClose, source, initial, style, internet
           <div className="flex-1">{field("doi", "DOI", "10.xxxx/…")}</div>
           {internet && <Button type="button" onClick={lookup} disabled={!m.doi}>Look up</Button>}
         </div>
-        {!internet && m.doi && <p className="text-[12px] text-mute">Turn on internet features (setup screen) to fill these in from the DOI.</p>}
+        
         <div className="grid grid-cols-[1fr_auto] gap-2.5">{field("url", "URL", "https://…", "url")}{field("accessed", "Accessed", "", "date")}</div>
         {msg && <p className="text-[13px] text-mute" role="status">{msg}</p>}
         {full.title.trim() && <div className="rounded-lg bg-soft p-2.5 text-[13px]">

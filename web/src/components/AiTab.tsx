@@ -28,7 +28,7 @@ export function Caveat() {
   );
 }
 
-export default function AiTab({ s, onRerun, onEnable }: { s: AiState; onRerun: () => void; onEnable: () => void }) {
+export default function AiTab({ s, available, onRerun, onEnable }: { s: AiState; available: boolean; onRerun: () => void; onEnable: () => void }) {
   const [numbers, setNumbers] = useState(false);
   const r = s.result;
 
@@ -55,7 +55,9 @@ export default function AiTab({ s, onRerun, onEnable }: { s: AiState; onRerun: (
   return (
     <div className="grid gap-4">
       <Caveat />
-      {s.status === "off" && <Card><p>The AI indicator is turned off.</p><Button size="sm" variant="primary" className="mt-2" onClick={onEnable}>Turn it on</Button></Card>}
+      {s.status === "off" && (available
+        ? <Card><p>The AI-likelihood signal is turned off in your settings.</p><Button size="sm" variant="primary" className="mt-2" onClick={onEnable}>Turn it on</Button></Card>
+        : <Card><p id="aiOff">The AI-likelihood signal is off on this server. It is off by default (<code>ENABLE_AI_LIKELIHOOD=false</code>) because detectors are unreliable; the site owner can enable it.</p></Card>)}
       {s.status === "short" && <Card><p id="aiShort">Not enough text to estimate. The AI indicator needs at least {MIN_WORDS} words{s.words != null ? `; this document has ${s.words}` : ""}.</p></Card>}
       {s.status === "error" && <Card><p className="text-high">The AI check failed: {s.error}</p><Button size="sm" className="mt-2" onClick={onRerun}><RefreshCw size={14} />Try again</Button></Card>}
       {(s.status === "running" || s.status === "queued") && <Card>

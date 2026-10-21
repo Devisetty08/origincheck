@@ -8,7 +8,8 @@ import { PALETTE, band, exportDocx, exportSummaryPdf, pctText, settingsText } fr
 import type { Prefs } from "@/lib/store";
 import { plural } from "@/lib/words";
 import { Button, Card, Check, NumberField, Tabs, cx } from "./ui";
-import type { Doc, Recheck, Resolution, RunState } from "./App";
+import type { Doc, Hybrid, Recheck, Resolution, RunState } from "./App";
+import type { PassageMatch } from "@/lib/hybrid";
 import { CitationDialog, ParaphraseDialog } from "./Dialogs";
 
 export interface Ctx { style: Style; metaFor: (s: Source) => CiteMeta | undefined; ieeeN: (name: string) => number }
@@ -21,9 +22,14 @@ interface Props {
   saveDoc: (own: boolean) => Promise<boolean | undefined>;
   saveMeta: (name: string, m: CiteMeta) => void;
   saveDraft: (label: string) => Promise<void>;
+  hybrid: Hybrid;
 }
-type Sel = { kind: "m" | "c"; sid: number; idx: number } | null;
-type Remedy = "quote" | "paraphrase" | "remove";
+/** m = verbatim (counted), c = stricter mode, n = near-verbatim, p = paraphrase (n, c and p are not counted in the index). */
+type MKind = "m" | "c" | "n" | "p";
+type Sel = { kind: MKind; sid: number; idx: number } | null;
+type Remedy = "quote" | "paraphrase" | "remove" | "cite";
+type HPassage = Passage & { type: "near-verbatim" | "paraphrase"; similarity: number; srcStart: number; srcEnd: number };
+const MATCH_LABEL: Record<MKind, string> = { m: "Verbatim", c: "Possible close paraphrase (stricter mode)", n: "Near-verbatim", p: "Paraphrase" };
 
 const words = (s: string) => s.split(/\s+/).filter(Boolean);
 const excerpt = (s: string, n = 16) => { const w = words(s); return w.slice(0, n).join(" ") + (w.length > n ? " …" : ""); };
@@ -38,7 +44,20 @@ export default function Report(p: Props) {
 
   const num = useMemo(() => new Map(r.order.map((s, i) => [s, i + 1])), [r.order]);
   const color = useMemo(() => new Map(r.order.map((s, i) => [s, PALETTE[i % PALETTE.length]])), [r.order]);
-  const bySource = (sid: number, kind: "m" | "c") => (kind === "m" ? r.passages : r.close).filter((x) => x.sid === sid);
+  // Hybrid matches (near-verbatim, paraphrase) as passages; any that overlap a verbatim or stricter-mode match are dropped.
+  const hyb = useMemo(() => {
+    const taken = new Set<number>();
+    for (const x of [...r.passages, ...r.close]) for (let k = x.b; k < x.e; k++) taken.add(k);
+    const conv = (ms: PassageMatch[], pre: "n" | "p"): HPassage[] => ms.flatMap((m) => {
+      const idx = doc.toks.map((t, i) => [t, i] as const).filter(([t]) => t.s >= m.docStart && t.e <= m.docEnd).map(([, i]) => i);
+      if (!idx.length || idx.some((i) => taken.has(i))) return [];
+      const b = idx[0], e = idx[idx.length - 1] + 1;
+      return [{ id: `${pre}${m.sid}:${b}`, sid: m.sid, b, e, s: doc.toks[b].s, end: doc.toks[e - 1].e, type: m.type as HPassage["type"], similarity: m.similarity, srcStart: m.srcStart, srcEnd: m.srcEnd }];
+    });
+    return { n: conv(p.hybrid.near, "n"), p: conv(p.hybrid.para, "p") };
+  }, [p.hybrid, r, doc.toks]);
+  const listOf = (kind: MKind): Passage[] => (kind === "m" ? r.passages : kind === "c" ? r.close : hyb[kind]);
+  const bySource = (sid: number, kind: MKind) => listOf(kind).filter((x) => x.sid === sid);
   const selected = sel ? bySource(sel.sid, sel.kind)[sel.idx] : undefined;
 
   // Selection follows edits: drop it if the passage is gone.
@@ -51,7 +70,7 @@ export default function Report(p: Props) {
     el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash");
   }, [selected]);
 
-  const select = (sid: number, kind: "m" | "c", idx: number) => {
+  const select = (sid: number, kind: MKind, idx: number) => {
     const n = bySource(sid, kind).length;
     if (n) { setSel({ kind, sid, idx: (idx + n) % n }); setTab("overview"); }
   };
@@ -62,10 +81,17 @@ export default function Report(p: Props) {
     const { text, toks } = doc;
     const close = new Map(r.close.map((c) => [c.b, c]));
     const pass = new Map(r.passages.map((x) => [x.b, x]));
+    const hmap = new Map<number, HPassage>([...hyb.n, ...hyb.p].map((h) => [h.b, h]));
     let pos = 0;
     for (let i = 0; i < toks.length; ) {
-      const m = pass.get(i), c = close.get(i);
-      if (m) {
+      const m = pass.get(i), c = close.get(i), h = hmap.get(i);
+      if (!m && !c && h) {
+        const k = h.type === "near-verbatim" ? "n" : "p";
+        out.push(text.slice(pos, h.s));
+        out.push(<span key={h.id} className={k === "n" ? "nv" : "pp"} data-pid={h.id} tabIndex={0} data-sid={h.sid} data-kind={k}
+          title={`${MATCH_LABEL[k]} of ${all[h.sid].name} (${Math.round(100 * h.similarity)}% similar) — not counted in the index`}>{text.slice(h.s, h.end)}</span>);
+        pos = h.end; i = h.e;
+      } else if (m) {
         out.push(text.slice(pos, m.s));
         out.push(<mark key={m.id} className="m" data-pid={m.id} tabIndex={0} title={all[m.sid].name} style={{ ["--c" as string]: color.get(m.sid) }}
           data-sid={m.sid} data-kind="m"><sup>{num.get(m.sid)}</sup>{text.slice(m.s, m.end)}</mark>);
@@ -84,18 +110,24 @@ export default function Report(p: Props) {
     }
     out.push(text.slice(pos));
     return out;
-  }, [doc, r, all, color, num]);
+  }, [doc, r, all, color, num, hyb]);
 
   const onDocActivate = (el: HTMLElement | null) => {
     const m = el?.closest<HTMLElement>("[data-pid]");
     if (!m) return;
-    const sid = Number(m.dataset.sid), kind = m.dataset.kind as "m" | "c";
+    const sid = Number(m.dataset.sid), kind = m.dataset.kind as MKind;
     select(sid, kind, bySource(sid, kind).findIndex((x) => x.id === m.dataset.pid));
   };
 
   /* ---------- remedies ---------- */
   const sourcePassage = (x: Passage, ctxWords = 0) => {
-    const src = all[x.sid], [j0, j1] = sourceSpan(r, x, src), st = src.toks;
+    const src = all[x.sid], st = src.toks, h = x as Partial<HPassage>;
+    let j0: number, j1: number;
+    if (h.srcStart != null && h.srcEnd != null) { // hybrid matches carry their source offsets
+      j0 = Math.max(0, st.findIndex((t) => t.s >= h.srcStart!));
+      const last = st.findLastIndex((t) => t.e <= h.srcEnd!);
+      j1 = Math.max(j0, last);
+    } else [j0, j1] = sourceSpan(r, x, src);
     const a = Math.max(0, j0 - ctxWords), z = Math.min(st.length - 1, j1 + ctxWords);
     return { before: (a > 0 ? "… " : "") + src.text.slice(st[a].s, st[j0].s), match: src.text.slice(st[j0].s, st[j1].e), after: src.text.slice(st[j1].e, st[z].e) + (z < st.length - 1 ? " …" : "") };
   };
@@ -108,6 +140,10 @@ export default function Report(p: Props) {
     if (kind === "paraphrase") return setPara(x);
     const cite = p.citeFor(src, fresh);
     const t = doc.text.slice(x.s, x.end);
+    if (kind === "cite") { // a paraphrase keeps its wording but credits the source
+      const end = /[.!?]["”’)]*$/.test(t) ? t.replace(/([.!?]["”’)]*)$/, ` ${cite}$1`) : `${t} ${cite}`;
+      return p.applyEdit(x.s, x.end, end, { action: "cited", source: src.name, excerpt: excerpt(t) });
+    }
     p.applyEdit(x.s, x.end, `“${t}” ${cite}`, { action: "cited", source: src.name, excerpt: excerpt(t) });
   };
   const savePara = (x: Passage, mine: string) => {
@@ -141,22 +177,33 @@ export default function Report(p: Props) {
       </div>
       {byKind.own ? <p className="mt-3 flex gap-2 rounded-lg bg-soft p-2.5 text-[13px]"><Info size={16} className="shrink-0 text-accent" aria-hidden />Matches with your own earlier work still need a citation, or your institution’s approval to reuse.</p> : null}
 
+      <div className="mt-4 rounded-lg bg-soft p-3 text-[13px]" id="matchTypes" aria-label="Match types">
+        <div className="flex flex-wrap gap-x-4 gap-y-1">
+          <span><b>{r.passages.length}</b> verbatim <span className="text-mute">(in the index)</span></span>
+          <span><span className="nv">{hyb.n.length}</span> near-verbatim</span>
+          <span><span className="pp">{hyb.p.length}</span> paraphrase</span>
+          {r.close.length > 0 && <span><span className="cp">{r.close.length}</span> stricter-mode</span>}
+        </div>
+        {(p.hybrid.status === "running" || p.hybrid.note) && <p className="mt-1 text-mute" role="status">{p.hybrid.note ?? "Checking for paraphrase…"}</p>}
+        <p className="mt-1 text-mute">Similarity does not prove plagiarism. Quoted or properly cited text may still be flagged.</p>
+      </div>
+
       {selected && <Detail />}
 
       <ul className="-mx-5 mt-4 -mb-5" id="srcRank" aria-label="Matched sources">
         {r.order.map((s) => <SourceRow key={s} s={s} />)}
         {skippedWithRuns.map((s) => <SourceRow key={s} s={s} off />)}
         {!r.order.length && !skippedWithRuns.length && <li className="border-t border-line px-5 py-3 text-sm text-mute">No matching passages found.</li>}
-        {r.close.length > 0 && <li className="border-t border-line px-5 py-3">
-          <div className="text-sm font-semibold"><span className="cp">Possible close paraphrase</span> · not counted in the index</div>
+        {(["n", "p", "c"] as const).map((k) => listOf(k).length > 0 && <li key={k} className="border-t border-line px-5 py-3" data-list={k}>
+          <div className="text-sm font-semibold"><span className={k === "n" ? "nv" : k === "p" ? "pp" : "cp"}>{MATCH_LABEL[k]}</span> · not counted in the index</div>
           <ul className="mt-1.5 grid gap-1">
-            {r.close.map((c) => <li key={c.id}>
-              <button className="w-full truncate text-left text-[13px] text-accent hover:underline cursor-pointer" onClick={() => select(c.sid, "c", bySource(c.sid, "c").indexOf(c))}>
-                “{excerpt(doc.text.slice(c.s, c.end), 9)}” — {all[c.sid].name}
+            {listOf(k).map((c) => <li key={c.id}>
+              <button className="w-full truncate text-left text-[13px] text-accent hover:underline cursor-pointer" onClick={() => select(c.sid, k, bySource(c.sid, k).indexOf(c))}>
+                “{excerpt(doc.text.slice(c.s, c.end), 9)}” — {all[c.sid].name}{(c as Partial<HPassage>).similarity != null ? ` (${Math.round(100 * (c as HPassage).similarity)}%)` : ""}
               </button>
             </li>)}
           </ul>
-        </li>}
+        </li>)}
       </ul>
     </div>
   );
@@ -169,7 +216,8 @@ export default function Report(p: Props) {
           <span className="grid h-6 min-w-6 place-items-center rounded-md px-1 text-xs font-bold text-white" style={{ background: off ? "var(--mute)" : color.get(s) }}>{off ? "–" : num.get(s)}</span>
           <div className="min-w-0 flex-1">
             <div className={cx("truncate text-sm font-semibold", off && "line-through")} title={src.name}>{src.name}</div>
-            <div className="text-[12.5px] text-mute">{KIND_LABEL[src.kind]} · {off ? "excluded" : `${c.toLocaleString()} matched words`}</div>
+            <div className="text-[12.5px] text-mute">{KIND_LABEL[src.kind]}{src.found ? ` · found by ${src.found.adapter}` : ""} · {off ? "excluded" : `${c.toLocaleString()} matched words`}</div>
+            <SourceMeta src={src} />
           </div>
           {!off && <span className="text-[17px] font-bold">{pctText((100 * c) / r.total)}</span>}
         </div>
@@ -186,13 +234,18 @@ export default function Report(p: Props) {
     const list = bySource(sel.sid, sel.kind), src = all[sel.sid];
     const sp = sourcePassage(selected, 25), mine = doc.text.slice(selected.s, selected.end);
     const guide = closeness(mine, sp.match);
-    const c = sel.kind === "m" ? color.get(sel.sid)! : "var(--close)";
+    const c = sel.kind === "m" ? color.get(sel.sid) ?? "var(--accent)" : sel.kind === "n" ? "var(--mid2)" : "var(--close)";
+    const sim = sel.kind === "m" ? 1 : (selected as Partial<HPassage>).similarity;
     return (
       <div className="no-print mt-4 rounded-lg border border-line p-3" style={{ ["--c" as string]: c }} id="detail">
         <div className="flex items-center gap-2">
           <div className="min-w-0 flex-1">
-            <h3 className="truncate text-sm font-semibold" title={src.name}>{sel.kind === "m" ? `${num.get(sel.sid)}. ` : ""}{src.name}</h3>
-            <div className="text-[12.5px] text-mute">{sel.kind === "c" ? "Possible close paraphrase (not counted)" : KIND_LABEL[src.kind]}</div>
+            <h3 className="truncate text-sm font-semibold" title={src.name}>{sel.kind === "m" && num.get(sel.sid) ? `${num.get(sel.sid)}. ` : ""}{src.name}</h3>
+            <div className="text-[12.5px] text-mute" id="dType">
+              <b className="text-ink">{MATCH_LABEL[sel.kind]}</b>{sim != null ? ` · ${Math.round(100 * sim)}% similar` : ""}{sel.kind !== "m" ? " · not counted in the index" : ""}
+              {src.found ? ` · found by ${src.found.adapter}` : ` · ${KIND_LABEL[src.kind]}`}
+            </div>
+            <SourceMeta src={src} />
           </div>
           <Button size="sm" variant="ghost" onClick={() => setSel(null)}>Show all</Button>
         </div>
@@ -217,15 +270,17 @@ export default function Report(p: Props) {
           {guide.reasons.map((x) => <li key={x} className="flex gap-1.5"><AlertTriangle size={14} className="mt-0.5 shrink-0 text-mid" aria-hidden />{x}</li>)}
           <li className="flex gap-1.5 text-mute"><Info size={14} className="mt-0.5 shrink-0" aria-hidden />Start with your own point, then use the source as evidence — quoted or in your own words, and cited.</li>
         </ul>
-        {sel.kind === "m" && <Remedies x={selected} />}
+        {sel.kind !== "c" && <Remedies x={selected} kind={sel.kind} />}
       </div>
     );
   }
 
-  function Remedies({ x, compact }: { x: Passage; compact?: boolean }) {
+  function Remedies({ x, compact, kind = "m" }: { x: Passage; compact?: boolean; kind?: MKind }) {
     return (
       <div className={cx("flex flex-wrap gap-1.5", compact ? "mt-1.5" : "mt-3")}>
-        <Button size="sm" onClick={() => remedy("quote", x)}><Quote size={14} />Mark as quoted &amp; cited</Button>
+        {kind === "p"
+          ? <Button size="sm" onClick={() => remedy("cite", x)}><Quote size={14} />Cite this source</Button>
+          : <Button size="sm" onClick={() => remedy("quote", x)}><Quote size={14} />Mark as quoted &amp; cited</Button>}
         <Button size="sm" onClick={() => remedy("paraphrase", x)}><PenLine size={14} />Rewrite in my own words</Button>
         <Button size="sm" variant="danger" onClick={() => remedy("remove", x)}><Trash2 size={14} />Remove</Button>
       </div>
@@ -254,7 +309,7 @@ export default function Report(p: Props) {
       const fam = c.meta.authors[0]?.family?.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
       return !entries.some((e) => p.ctx.style === "ieee" ? e.keys.includes(`#${c.n}`) : fam ? e.fam === fam && e.year === (c.meta.year?.trim() ?? "") : e.text.toLowerCase().includes(c.meta.title.toLowerCase().slice(0, 40)));
     });
-    exportDocx({ docName: doc.name, text: doc.text, headings: doc.headings, style: p.ctx.style, hasBib: bibStart(doc.text) >= 0,
+    exportDocx({ docName: doc.name, text: doc.text, headings: doc.headings, style: p.ctx.style, hasBib: bibStart(doc.text) >= 0, aiAssisted: doc.aiAssisted,
       refs: orderForList(missing, p.ctx.style).map((c) => reference(c.meta, p.ctx.style, c.n)) });
   };
   const exportSummary = () => exportSummaryPdf({
@@ -419,7 +474,7 @@ export default function Report(p: Props) {
       {para && <ParaphraseDialog open onClose={() => setPara(null)} sourceName={all[para.sid].name} original={doc.text.slice(para.s, para.end)}
         sourcePassage={sourcePassage(para).match} cite={p.citeFor(all[para.sid], undefined, false)} onSave={(mine) => savePara(para, mine)} />}
       {citeEdit && <CitationDialog open onClose={() => setCiteEdit(null)} source={all[citeEdit.sid]} initial={p.ctx.metaFor(all[citeEdit.sid])}
-        style={p.ctx.style} internet={!!p.prefs.internet}
+        style={p.ctx.style} internet
         onSave={(m) => {
           p.saveMeta(all[citeEdit.sid].name, m);
           const then = citeEdit.then;
@@ -429,6 +484,25 @@ export default function Report(p: Props) {
             else remedy(then.remedy, then.p, m);
           }
         }} />}
+    </div>
+  );
+}
+
+/** Authors, year, link/DOI and open-access copy of a source, when known. */
+function SourceMeta({ src }: { src: Source }) {
+  const f = src.found, m = src.meta;
+  const authors = f?.authors?.length ? f.authors : m?.authors?.map((a) => [a.given, a.family].filter(Boolean).join(" ")).filter(Boolean) ?? [];
+  const year = f?.year ?? m?.year;
+  const doi = f?.doi ?? m?.doi;
+  const url = f?.url ?? m?.url;
+  if (!authors.length && !year && !doi && !url && !f?.oaUrl) return null;
+  return (
+    <div className="mt-0.5 flex flex-wrap gap-x-2 text-[12px] text-mute" data-meta>
+      {authors.length > 0 && <span>{authors.slice(0, 2).join(", ")}{authors.length > 2 ? " et al." : ""}</span>}
+      {year && <span>({year})</span>}
+      {doi ? <a className="text-accent underline" href={`https://doi.org/${doi}`} target="_blank" rel="noreferrer">doi:{doi}</a>
+        : url && /^https?:/.test(url) && <a className="max-w-[16rem] truncate text-accent underline" href={url} target="_blank" rel="noreferrer">{url.replace(/^https?:\/\/(www\.)?/, "")}</a>}
+      {f?.oaUrl && <a className="text-low underline" href={f.oaUrl} target="_blank" rel="noreferrer">open-access copy</a>}
     </div>
   );
 }

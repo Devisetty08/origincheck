@@ -1,16 +1,16 @@
 "use client";
 import { useRef, useState } from "react";
-import { BookOpen, ClipboardPaste, FileUp, Files, Globe, Library, Link2, Lock, Search, X } from "lucide-react";
-import { type CiteMeta, type Settings, type Source, tokenize } from "@/lib/similarity";
+import { BookOpen, ClipboardPaste, FileUp, Files, Globe, Library, Link2, Lock, Play, Search, X } from "lucide-react";
+import { type CiteMeta, type Input, type Settings, type Source, tokenize } from "@/lib/similarity";
 import { SUPPORTED, extract } from "@/lib/extract";
 import { CATALOGS, type CatalogItem, type ImportOutcome, importReferences, importUrl, loadCatalog } from "@/lib/importer";
+import type { SourceRun } from "@/lib/checks";
 import { STYLE_LABEL, type Style } from "@/lib/citations";
-import { LT_PUBLIC } from "@/lib/grammar";
 import type { Prefs, SavedDoc } from "@/lib/store";
 import { uid } from "@/lib/store";
 import { plural } from "@/lib/words";
 import { Button, Card, Check, NumberField, cx, inputCls } from "./ui";
-import { type Doc, type HStyle, webOn } from "./App";
+import type { Doc, HStyle, ServerConfig } from "./App";
 
 const ext = (name: string) => (name.match(/\.([^.]+)$/)?.[1] ?? "txt").slice(0, 4);
 const fillMeta = (m: Partial<CiteMeta> | undefined, name: string): CiteMeta | undefined =>
@@ -25,7 +25,7 @@ async function readAll(files: File[]): Promise<{ ok: Read[]; errors: string }> {
       const toks = tokenize(ex.text);
       if (!toks.length) errs.push(`No text found in ${f.name}. If it's a scanned PDF, run OCR on it first.`);
       else ok.push({
-        id: uid(), name: f.name, kind: "file", text: ex.text, toks, meta: fillMeta(ex.meta, f.name),
+        id: uid(), name: f.name, kind: "file", input: "files", text: ex.text, toks, meta: fillMeta(ex.meta, f.name),
         headings: new Map(ex.blocks.filter((b) => b.style !== "p").map((b) => [b.text, b.style as HStyle])),
       });
     } catch (e) {
@@ -34,19 +34,18 @@ async function readAll(files: File[]): Promise<{ ok: Read[]; errors: string }> {
     }
   return { ok, errors: errs.join(" ") };
 }
-const asSource = (x: Read): Source => ({ id: x.id, name: x.name, kind: x.kind, text: x.text, toks: x.toks, meta: x.meta });
+const asSource = (x: Read): Source => ({ id: x.id, name: x.name, kind: x.kind, input: x.input, text: x.text, toks: x.toks, meta: x.meta });
 
 /** The upload screen: document, sources and settings. Checks start as soon as a document is added. */
 export default function Setup(p: DocProps & SourcesProps & SettingsProps) {
-  const web = webOn(p.prefs), books = !!(p.prefs.internet && p.prefs.books), internet = !!p.prefs.internet;
   return (
     <div className="mx-auto max-w-[1180px] px-4 pt-7 pb-12">
       <div className="mb-6">
         <h1 className="text-[clamp(23px,4vw,30px)] font-bold leading-tight tracking-tight">Check your writing</h1>
-        <p className="mt-1.5 text-[15.5px] text-mute">Add a document and origincheck runs three checks straight away: similarity to your sources, grammar, and an AI indicator.</p>
+        <p className="mt-1.5 text-[15.5px] text-mute">Add a document and origincheck checks similarity to your sources and grammar straight away. Then use <b>Run all sources</b> to search publications, the web and books.</p>
         <p className="mt-3 inline-flex items-center gap-2 rounded-full bg-soft px-3 py-1.5 text-[13px]">
           <Lock size={15} className="shrink-0 text-accent" aria-hidden />
-          Everything runs in your browser. Nothing is uploaded{p.prefs.lt ? " except the text you send to LanguageTool" : web || books ? " except short search phrases" : internet ? " except the DOIs and web addresses you look up" : ""}.
+          Your document is read and compared in your browser. Searches send only short phrases, never the whole document.
         </p>
       </div>
       <div className="grid gap-[18px] md:grid-cols-2">
@@ -98,18 +97,37 @@ export function DocCard(p: DocProps) {
   );
 }
 
-interface SourcesProps { sources: Source[]; setSources: (f: (s: Source[]) => Source[]) => void; prefs: Prefs; setPrefs: (p: Partial<Prefs>) => void }
+interface SourcesProps {
+  sources: Source[]; setSources: (f: (s: Source[]) => Source[]) => void;
+  prefs: Prefs; setPrefs: (p: Partial<Prefs>) => void;
+  cfg: ServerConfig | null;
+  runs: SourceRun[] | null; running: boolean; canRun: boolean; onRunAll: () => void;
+  confirmPrivacy: (services: string[]) => Promise<boolean>;
+}
+
+const INPUTS: { id: Input; label: string; icon: React.ReactNode; hint: string }[] = [
+  { id: "files", label: "Files", icon: <Files size={15} />, hint: "Upload .txt, .pdf, .docx, .md, .html or .rtf. Read in your browser; nothing is uploaded." },
+  { id: "paste", label: "Paste", icon: <ClipboardPaste size={15} />, hint: "Paste the text of a source." },
+  { id: "url", label: "Web page", icon: <Link2 size={15} />, hint: "Give a web address. origincheck's server fetches the page (safely) and extracts its main text." },
+  { id: "refs", label: "References & DOIs", icon: <Globe size={15} />, hint: "Paste references or DOIs to add open-access full texts. Run all sources also searches scholarly databases." },
+  { id: "web", label: "Search the web", icon: <Search size={15} />, hint: "Run all sources searches distinctive phrases on the web and Wikipedia." },
+  { id: "books", label: "Books (Open Library)", icon: <BookOpen size={15} />, hint: "Run all sources searches inside millions of scanned books." },
+  { id: "lists", label: "Free book lists", icon: <Library size={15} />, hint: "Browse free book catalogues; Run all sources also searches Project Gutenberg." },
+];
+const SERVER_INPUTS: Input[] = ["refs", "web", "books", "lists"];
+export const inputOn = (prefs: Prefs, i: Input) => prefs.inputs?.[i] !== false;
 
 export function SourcesCard(p: SourcesProps & { compact?: boolean }) {
   const [msg, setMsg] = useState("");
-  const [mode, setMode] = useState<"files" | "paste" | "url" | "refs" | "web" | "books" | "lists">("files");
+  const [mode, setMode] = useState<Input>("files");
   const [pName, setPName] = useState("");
   const [pText, setPText] = useState("");
   const [url, setUrl] = useState("");
   const [refs, setRefs] = useState("");
   const [busy, setBusy] = useState("");
   const [outcomes, setOutcomes] = useState<ImportOutcome[]>([]);
-  const internet = !!p.prefs.internet;
+  const on = (i: Input) => inputOn(p.prefs, i);
+  const setOn = (i: Input, v: boolean) => p.setPrefs({ inputs: { ...p.prefs.inputs, [i]: v } });
 
   const onSources = async (files: File[]) => {
     setBusy(`Reading ${plural(files.length, "file")}…`);
@@ -123,86 +141,86 @@ export function SourcesCard(p: SourcesProps & { compact?: boolean }) {
     if (!toks.length) return setMsg("Paste some source text first.");
     const isUrl = /^https?:\/\//i.test(pName.trim());
     const name = pName.trim() || `Pasted source ${p.sources.filter((s) => s.kind === "paste").length + 1}`;
-    p.setSources((s) => [...s, { id: uid(), name, kind: isUrl ? "internet" : "paste", text: pText.replace(/\r\n?/g, "\n"), toks,
+    p.setSources((s) => [...s, { id: uid(), name, kind: isUrl ? "internet" : "paste", input: "paste", text: pText.replace(/\r\n?/g, "\n"), toks,
       meta: isUrl ? { authors: [], title: name, url: name, accessed: new Date().toISOString().slice(0, 10) } : undefined }]);
     setPName(""); setPText(""); setMsg("");
   };
-  const net = { proxy: p.prefs.proxy ?? true, email: p.prefs.email };
-  const addImported = (out: ImportOutcome[]) =>
+  const addImported = (out: ImportOutcome[], input: Input) =>
     p.setSources((s) => [...s, ...out.filter((o) => o.source).map((o) => ({
-      id: uid(), name: o.source!.name, kind: "internet" as const, text: o.source!.text, toks: tokenize(o.source!.text), meta: o.source!.meta,
+      id: uid(), name: o.source!.name, kind: input === "refs" ? ("scholarly" as const) : ("internet" as const), input, text: o.source!.text,
+      toks: tokenize(o.source!.text), meta: o.source!.meta, found: { adapter: input === "refs" ? "References & DOIs" : "Web page", url: o.source!.url },
     }))]);
   const addUrl = async () => {
     if (!/^https?:\/\/\S+$/i.test(url.trim())) return setMsg("Enter a full web address starting with https://");
+    if (!(await p.confirmPrivacy(["the web page you enter (fetched by origincheck's server)"]))) return;
     setBusy("Fetching page…");
-    const o = await importUrl(url.trim(), net);
+    const o = await importUrl(url.trim());
     setBusy("");
     setOutcomes([o]);
-    if (o.source) { addImported([o]); setUrl(""); }
+    if (o.source) { addImported([o], "url"); setUrl(""); }
   };
   const addRefs = async () => {
+    if (!(await p.confirmPrivacy(["Crossref, OpenAlex, Unpaywall and Europe PMC (the references and DOIs you paste)"]))) return;
     setOutcomes([]);
-    const out = await importReferences(refs, net, (d, t) => setBusy(`Looking up ${Math.min(d + 1, t)} of ${t}…`));
+    const out = await importReferences(refs, (d, t) => setBusy(`Looked up ${d} of ${t}…`));
     setBusy("");
     setOutcomes(out);
-    addImported(out);
+    addImported(out, "refs");
   };
-  const MODES = [["files", "Files", <Files key="i" size={15} />], ["paste", "Paste", <ClipboardPaste key="i" size={15} />], ["url", "Web page", <Link2 key="i" size={15} />],
-    ["refs", "References & DOIs", <Globe key="i" size={15} />], ["web", "Search the web", <Search key="i" size={15} />],
-    ["books", "Books (Open Library)", <BookOpen key="i" size={15} />], ["lists", "Free book lists", <Library key="i" size={15} />]] as const;
+  const adapters = (group: Input) => (p.cfg?.sources ?? []).filter((s) => s.group === group);
+  const enabledServer = SERVER_INPUTS.filter(on);
+  const cur = INPUTS.find((i) => i.id === mode)!;
 
   return (
     <Card aria-labelledby="srcH" className={p.compact ? "border-0 p-0" : undefined}>
       {!p.compact && <>
         <h2 id="srcH" className="font-semibold">2. Sources to compare against</h2>
-        <p className="text-[13.5px] text-mute">Papers, articles and web pages you read or used. The similarity check needs at least one.</p>
+        <p className="text-[13.5px] text-mute">Papers, articles and web pages you read or used.</p>
       </>}
       <div className="mt-3 flex flex-wrap gap-1.5" role="group" aria-label="How to add sources">
-        {MODES.map(([id, label, icon]) => (
-          <Button key={id} size="sm" variant={mode === id ? "primary" : "outline"} aria-pressed={mode === id} onClick={() => { setMode(id); setOutcomes([]); }}>{icon}{label}</Button>
+        {INPUTS.map(({ id, label, icon }) => (
+          <Button key={id} size="sm" variant={mode === id ? "primary" : "outline"} aria-pressed={mode === id} onClick={() => { setMode(id); setOutcomes([]); }}
+            className={cx(!on(id) && mode !== id && "opacity-60")}>
+            {icon}{label}{!on(id) && <span className="text-[11px]">(off)</span>}
+          </Button>
         ))}
       </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg bg-soft px-3 py-2 text-sm">
+        <span className="font-medium">Use “{cur.label}”</span>
+        <span className="inline-flex overflow-hidden rounded-md border border-line" role="radiogroup" aria-label={`Use ${cur.label}`}>
+          {([true, false] as const).map((v) => <button key={String(v)} role="radio" aria-checked={on(mode) === v} onClick={() => setOn(mode, v)} data-toggle={`${mode}-${v ? "yes" : "no"}`}
+            className={cx("cursor-pointer px-3 py-1 text-[13px] font-semibold", on(mode) === v ? "bg-accent text-accent-ink" : "bg-panel text-mute")}>{v ? "Yes" : "No"}</button>)}
+        </span>
+        <span className="text-[12.5px] text-mute">{cur.hint}</span>
+      </div>
+
       {mode === "files" && <Drop id={p.compact ? "srcDrop2" : "srcDrop"} multiple label="Choose source files" onFiles={onSources} icon={<Files aria-hidden />} title="Drop files here or click to browse" sub="Add as many as you like" />}
       {mode === "paste" && <div className="mt-3 grid gap-2">
         <input className={inputCls} aria-label="Source name or URL" placeholder="Name or URL (optional)" value={pName} onChange={(e) => setPName(e.target.value)} />
         <textarea className={cx(inputCls, "min-h-28")} aria-label="Source text" placeholder="Paste the source text here" value={pText} onChange={(e) => setPText(e.target.value)} />
         <div><Button size="sm" variant="primary" onClick={addPasted}>Add source</Button></div>
       </div>}
-      {mode !== "files" && mode !== "paste" && !internet && <div className="mt-3 rounded-lg bg-soft p-3 text-sm">
-        <p>{mode === "web" || mode === "books" ? "Searching sends short phrases (24 words each) from your document — never the whole document."
-          : mode === "lists" ? "Browsing the free book lists downloads them from GitHub, and adding a book fetches its page. Your document is never sent."
-          : `Adding sources from the web sends ${mode === "url" ? "the address you enter" : "the references and DOIs you paste"} to look them up. Your document is never sent.`}</p>
-        <Button size="sm" variant="primary" className="mt-2" onClick={() => p.setPrefs({ internet: true })}>Turn on internet features</Button>
-      </div>}
-      {mode === "url" && internet && <div className="mt-3 flex gap-2">
+      {mode === "url" && <div className="mt-3 flex gap-2">
         <input className={inputCls} type="url" aria-label="Web page address" placeholder="https://…" value={url} onChange={(e) => setUrl(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addUrl()} />
         <Button variant="primary" onClick={addUrl} disabled={!!busy}>Add</Button>
       </div>}
-      {mode === "refs" && internet && <div className="mt-3 grid gap-2">
-        <textarea className={cx(inputCls, "min-h-32")} aria-label="Reference list or DOIs" value={refs} onChange={(e) => setRefs(e.target.value)}
+      {mode === "refs" && <div className="mt-3 grid gap-2">
+        <textarea className={cx(inputCls, "min-h-28")} aria-label="Reference list or DOIs" value={refs} onChange={(e) => setRefs(e.target.value)}
           placeholder={"One reference or DOI per line, e.g.\n10.1038/s41586-020-2649-2\nSmith, J. (2020). Title of the article. Journal, 12(3), 45–67."} />
         <div><Button size="sm" variant="primary" onClick={addRefs} disabled={!!busy || !refs.trim()}>Find open-access full text</Button></div>
+        <AdapterList list={adapters("refs")} />
       </div>}
-      {mode === "web" && internet && <div className="mt-3 grid gap-3 text-sm">
-        <Check id="sWeb" checked={p.prefs.webSearch !== false} onChange={(v) => p.setPrefs({ webSearch: v })}
-          label="Search the web for matching text"
-          hint="Picks evenly spaced 24-word phrases from your document, searches each as an exact phrase and compares the top pages." />
-        <label className="grid gap-1">Search API key (Jina)
-          <input className={inputCls} type="password" autoComplete="off" value={p.prefs.searchKey ?? ""} onChange={(e) => p.setPrefs({ searchKey: e.target.value })} placeholder="jina_…" id="searchKey" />
-          <span className="text-[12.5px] text-mute">Free key with trial credit at <a className="text-accent underline" href="https://jina.ai/api-dashboard" target="_blank" rel="noreferrer">jina.ai</a>. Stored only in this browser.</span>
-        </label>
-        <NumberField id="sQueries" label="Phrases to search" value={p.prefs.webQueries ?? 10} min={1} max={40} onChange={(v) => p.setPrefs({ webQueries: v })} />
-      </div>}
-      {mode === "books" && internet && <div className="mt-3 grid gap-3 text-sm">
-        <Check id="sBooks" checked={!!p.prefs.books} onChange={(v) => p.setPrefs({ books: v })}
-          label="Search inside books on Open Library"
-          hint="Searches the full text of millions of scanned books at the Internet Archive for evenly spaced 24-word phrases from your document. No key needed." />
-        <NumberField id="sBookQueries" label="Phrases to search" value={p.prefs.bookQueries ?? 10} min={1} max={40} onChange={(v) => p.setPrefs({ bookQueries: v })} />
-      </div>}
-      {mode === "lists" && internet && <Catalogs net={net} onAdd={(item, text) => p.setSources((s) => [...s, {
-        id: uid(), name: item.title, kind: "internet", text, toks: tokenize(text),
-        meta: { authors: [], title: item.title, url: item.url, accessed: new Date().toISOString().slice(0, 10) },
-      }])} />}
+      {mode === "web" && <AdapterList list={adapters("web")} note="Korean Wikipedia joins automatically when your text contains Korean." />}
+      {mode === "books" && <AdapterList list={adapters("books")} />}
+      {mode === "lists" && <>
+        <AdapterList list={adapters("lists")} />
+        <Catalogs onAdd={(item, text) => p.setSources((s) => [...s, {
+          id: uid(), name: item.title, kind: "internet", input: "lists", text, toks: tokenize(text), found: { adapter: "Free book lists", url: item.url },
+          meta: { authors: [], title: item.title, url: item.url, accessed: new Date().toISOString().slice(0, 10) },
+        }])} confirmPrivacy={p.confirmPrivacy} />
+      </>}
+
       {busy && <p className="mt-2 text-sm text-mute" role="status">{busy}</p>}
       {outcomes.length > 0 && <ul className="mt-3 grid gap-1.5 text-[13px]" aria-label="Import results">
         {outcomes.map((o, i) => <li key={i} className={cx("rounded-md border-l-4 bg-bg px-2.5 py-1.5", o.ok ? "border-low" : "border-high")}>
@@ -211,53 +229,78 @@ export function SourcesCard(p: SourcesProps & { compact?: boolean }) {
         </li>)}
       </ul>}
       {p.sources.length > 0 && <ul className="mt-3" aria-label="Sources added">
-        {p.sources.map((s) => <FileRow key={s.id} tag={s.kind === "internet" ? "web" : s.kind === "paste" ? "text" : ext(s.name)} name={s.name} words={s.toks.length}
-          onRemove={() => p.setSources((all) => all.filter((x) => x.id !== s.id))} />)}
+        {p.sources.map((s) => <FileRow key={s.id} tag={s.input === "refs" || s.kind === "scholarly" ? "doi" : s.kind === "internet" ? "web" : s.kind === "paste" ? "text" : ext(s.name)}
+          name={s.name} words={s.toks.length} off={!!s.input && !on(s.input)} onRemove={() => p.setSources((all) => all.filter((x) => x.id !== s.id))} />)}
       </ul>}
       {msg && <p role="alert" className="mt-2.5 text-[13.5px] text-high">{msg}</p>}
+
+      <div className="mt-4 grid gap-2 border-t border-line pt-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <Button variant="primary" onClick={p.onRunAll} disabled={!p.canRun || p.running || !enabledServer.length} id="runAll"><Play size={15} />{p.running ? "Searching…" : "Run all sources"}</Button>
+          <span className="text-[12.5px] text-mute">
+            {!p.canRun ? "Add your document first." : !enabledServer.length ? "Turn on at least one search input (References, Web, Books or Free book lists)."
+              : `Searches ${enabledServer.map((i) => INPUTS.find((x) => x.id === i)!.label).join(", ")} with up to ${p.cfg?.maxQueries ?? 8} short phrases from your document.`}
+          </span>
+        </div>
+        {p.runs && <RunTable runs={p.runs} />}
+      </div>
     </Card>
   );
 }
 
+const STATUS_STYLE: Record<string, string> = {
+  success: "bg-low/12 text-low", "no results": "bg-soft text-mute", failed: "bg-high/12 text-high",
+  "rate-limited": "bg-mid/12 text-mid", "not configured": "bg-soft text-mute", running: "bg-accent/12 text-accent",
+};
+
+export function RunTable({ runs }: { runs: SourceRun[] }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-[13px]" aria-label="Source status">
+        <thead><tr className="text-left text-mute"><th className="py-1 pr-2 font-medium">Source</th><th className="pr-2 font-medium">Status</th><th className="pr-2 text-right font-medium">Results</th><th className="text-right font-medium">Time</th></tr></thead>
+        <tbody>{runs.map((r) => <tr key={r.source} className="border-t border-line" data-source={r.source} data-status={r.status}>
+          <td className="py-1.5 pr-2">{r.label}{r.error && r.status !== "success" && <div className="text-[11.5px] text-mute">{r.error}</div>}</td>
+          <td className="pr-2"><span className={cx("rounded-full px-2 py-0.5 text-[12px] font-medium", STATUS_STYLE[r.status])}>{r.status}</span></td>
+          <td className="pr-2 text-right">{r.status === "running" ? "…" : r.results.length}</td>
+          <td className="text-right text-mute">{r.status === "running" || r.status === "not configured" ? "—" : `${(r.ms / 1000).toFixed(1)} s`}</td>
+        </tr>)}</tbody>
+      </table>
+    </div>
+  );
+}
+
+function AdapterList({ list, note }: { list: ServerConfig["sources"]; note?: string }) {
+  if (!list.length) return null;
+  return (
+    <ul className="mt-3 grid gap-1 text-[13px]" aria-label="Sources searched">
+      {list.map((a) => <li key={a.id} className="flex items-center gap-2">
+        <span className={cx("size-2 rounded-full", a.missing ? "bg-mute" : "bg-low")} aria-hidden />
+        <span className="font-medium">{a.label}</span><span className="text-mute">{a.missing ? `— not configured (${a.missing})` : "— ready"}</span>
+      </li>)}
+      {note && <li className="text-[12px] text-mute">{note}</li>}
+    </ul>
+  );
+}
+
 interface SettingsProps {
-  settings: Settings; setSettings: (s: Settings) => void; prefs: Prefs; setPrefs: (p: Partial<Prefs>) => void;
+  settings: Settings; setSettings: (s: Settings) => void; prefs: Prefs; setPrefs: (p: Partial<Prefs>) => void; cfg: ServerConfig | null;
   saved: SavedDoc[]; useSaved: boolean; setUseSaved: (v: boolean) => void; drafts: number;
 }
 
 const LT_LANGS = [["auto", "Detect automatically"], ["en-US", "English (US)"], ["en-GB", "English (UK)"], ["de-DE", "German"], ["fr", "French"],
-  ["es", "Spanish"], ["pt-PT", "Portuguese"], ["nl", "Dutch"], ["it", "Italian"], ["pl-PL", "Polish"], ["uk-UA", "Ukrainian"]] as const;
+  ["es", "Spanish"], ["pt-PT", "Portuguese"], ["nl", "Dutch"], ["it", "Italian"], ["pl-PL", "Polish"], ["ko-KR", "Korean"]] as const;
 
 export function SettingsCard(p: SettingsProps & { className?: string }) {
   const s = p.settings, set = (patch: Partial<Settings>) => p.setSettings({ ...s, ...patch });
-  const internet = !!p.prefs.internet;
   return (
     <Card className={p.className} aria-labelledby="setH">
       <h2 id="setH" className="font-semibold">Settings</h2>
-      <h3 className="mt-3 text-[13px] font-semibold uppercase tracking-wide text-mute">Checks</h3>
-      <div className="mt-2 grid gap-3.5 sm:grid-cols-2">
-        <Check id="sAi" label="AI indicator" checked={p.prefs.ai !== false} onChange={(v) => p.setPrefs({ ai: v })}
-          hint="Runs on your device. Downloads about 210 MB of models the first time, then uses the browser cache." />
-        <div className="grid gap-2">
-          <Check id="sLt" label="Extra grammar rules with LanguageTool" checked={!!p.prefs.lt} onChange={(v) => p.setPrefs({ lt: v })}
-            hint="Sends your text to LanguageTool (more rules, 30+ languages). Off by default; Harper always runs on your device." />
-          {p.prefs.lt && <div className="ml-7 grid gap-2 text-sm">
-            <label className="grid gap-1">Language
-              <select className="h-8 rounded-md border border-line bg-bg px-2" value={p.prefs.ltLang ?? "auto"} onChange={(e) => p.setPrefs({ ltLang: e.target.value })}>
-                {LT_LANGS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-              </select>
-            </label>
-            <label className="grid gap-1">Server (optional)
-              <input className={inputCls} type="url" placeholder={LT_PUBLIC} value={p.prefs.ltUrl ?? ""} onChange={(e) => p.setPrefs({ ltUrl: e.target.value })} />
-              <span className="text-[12px] text-mute">Leave empty for the public API (20 requests and 75 KB a minute), or enter your own server’s /v2/check address.</span>
-            </label>
-          </div>}
-        </div>
-      </div>
-      <h3 className="mt-4 text-[13px] font-semibold uppercase tracking-wide text-mute">Similarity</h3>
+      <h3 className="mt-3 text-[13px] font-semibold uppercase tracking-wide text-mute">Similarity</h3>
       <div className="mt-2 grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
-        <Check id="sQuotes" label="Exclude quotes" checked={s.quotes} onChange={(v) => set({ quotes: v })} />
+        <Check id="sQuotes" label="Ignore quotes and cited passages" hint="Excluded from the index and from search queries." checked={s.quotes} onChange={(v) => set({ quotes: v })} />
         <Check id="sBib" label="Exclude bibliography" checked={s.bib} onChange={(v) => set({ bib: v })} />
-        <Check id="sStrict" label="Stricter mode" hint="Also flag lightly reworded copying (word stems and common synonyms) as possible close paraphrase. It doesn't change the index." checked={s.strict} onChange={(v) => set({ strict: v })} />
+        <Check id="sPara" label="Detect paraphrase" hint="Compares meaning with an on-device model (downloads about 120 MB once). Reported separately, not in the index." checked={p.prefs.paraphrase !== false} onChange={(v) => p.setPrefs({ paraphrase: v })} />
+        <Check id="sStrict" label="Stricter mode" hint="Also flag lightly reworded copying by word stems and common synonyms." checked={s.strict} onChange={(v) => set({ strict: v })} />
         <NumberField id="sMin" label="Exclude matches under" suffix="words" value={s.minWords} min={1} max={200} onChange={(v) => set({ minWords: v })} />
         <NumberField id="sNgram" label="Fingerprint size" suffix="words" value={s.ngram} min={2} max={12} onChange={(v) => set({ ngram: v })} />
         <label className="flex items-center gap-2 text-sm">Citation style
@@ -266,25 +309,30 @@ export function SettingsCard(p: SettingsProps & { className?: string }) {
           </select>
         </label>
       </div>
+      <h3 className="mt-4 text-[13px] font-semibold uppercase tracking-wide text-mute">Other checks</h3>
+      <div className="mt-2 grid gap-3.5 sm:grid-cols-2">
+        {p.cfg?.aiLikelihood
+          ? <Check id="sAi" label="AI-likelihood signal" checked={p.prefs.ai !== false} onChange={(v) => p.setPrefs({ ai: v })}
+              hint="A probabilistic signal, never a verdict. Runs on your device; downloads about 210 MB of models the first time." />
+          : <p className="text-[13px] text-mute">AI-likelihood signal: off on this server (ENABLE_AI_LIKELIHOOD).</p>}
+        {p.cfg?.languageTool
+          ? <div className="grid gap-2">
+              <Check id="sLt" label="Second opinion from LanguageTool" checked={!!p.prefs.lt} onChange={(v) => p.setPrefs({ lt: v })}
+                hint="Sends your text to this site's LanguageTool server. Harper always runs on your device." />
+              {p.prefs.lt && <label className="ml-7 grid gap-1 text-sm">Language
+                <select className="h-8 rounded-md border border-line bg-bg px-2" value={p.prefs.ltLang ?? "auto"} onChange={(e) => p.setPrefs({ ltLang: e.target.value })}>
+                  {LT_LANGS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                </select>
+              </label>}
+            </div>
+          : <p className="text-[13px] text-mute">LanguageTool: not enabled on this server (ENABLE_LANGUAGETOOL, LANGUAGETOOL_URL).</p>}
+      </div>
       {(p.saved.length > 0 || p.drafts > 0) && <div className="mt-4 grid gap-2 border-t border-line pt-4">
         {p.saved.length > 0 && <Check id="useSaved" checked={p.useSaved} onChange={p.setUseSaved}
           label={`Also compare with my ${plural(p.saved.length, "saved document")}`}
           hint={p.saved.some((d) => d.own) ? "Documents marked as your earlier work are reported separately (self-plagiarism check)." : undefined} />}
         {p.drafts > 0 && <p className="text-sm text-mute">{plural(p.drafts, "previous draft")} of this document will be compared too, excluded from the index by default.</p>}
       </div>}
-      <details className="mt-4 border-t border-line pt-4">
-        <summary className="cursor-pointer text-sm font-semibold">Internet features {internet ? "(on)" : "(off)"}</summary>
-        <div className="mt-3 grid gap-3">
-          <Check id="sNet" checked={internet} onChange={(v) => p.setPrefs({ internet: v })} label="Allow web search, book search and looking up DOIs, references and web pages"
-            hint="Searches send short phrases from your document; lookups send only what you enter. Never your whole document." />
-          <Check id="sProxy" checked={p.prefs.proxy ?? true} onChange={(v) => p.setPrefs({ proxy: v })} label="Use a reader service when a site blocks in-browser downloads"
-            hint="Sends the page or PDF address (not your document) to r.jina.ai, which returns the page's readable text." />
-          <label className="grid max-w-md gap-1 text-sm">Email for Unpaywall (optional)
-            <input className={inputCls} type="email" value={p.prefs.email ?? ""} onChange={(e) => p.setPrefs({ email: e.target.value })} placeholder="you@university.edu" />
-            <span className="text-[12.5px] text-mute">Unpaywall asks for an email with each lookup. Without one, origincheck uses OpenAlex only.</span>
-          </label>
-        </div>
-      </details>
     </Card>
   );
 }
@@ -313,11 +361,11 @@ function Drop({ id, label, onFiles, icon, title, sub, multiple }:
   );
 }
 
-function FileRow({ tag, name, words, onRemove }: { tag: string; name: string; words: number; onRemove: () => void }) {
+function FileRow({ tag, name, words, onRemove, off }: { tag: string; name: string; words: number; onRemove: () => void; off?: boolean }) {
   return (
-    <li className="flex items-center gap-2.5 border-t border-line py-2 text-sm first:border-t-0">
+    <li className={cx("flex items-center gap-2.5 border-t border-line py-2 text-sm first:border-t-0", off && "opacity-55")}>
       <span className="min-w-[42px] shrink-0 rounded-[5px] bg-soft px-1.5 py-0.5 text-center text-[10.5px] font-bold uppercase tracking-wide text-accent">{tag}</span>
-      <span className="min-w-0 flex-1 truncate" title={name}>{name}</span>
+      <span className="min-w-0 flex-1 truncate" title={name}>{name}{off && <span className="ml-1 text-[11.5px] text-mute">(input off)</span>}</span>
       <span className="shrink-0 text-[12.5px] text-mute">{words.toLocaleString()} words</span>
       <button onClick={onRemove} aria-label={`Remove ${name}`} className="grid size-7 shrink-0 cursor-pointer place-items-center rounded-md text-mute hover:bg-soft hover:text-high"><X size={16} /></button>
     </li>
@@ -325,7 +373,7 @@ function FileRow({ tag, name, words, onRemove }: { tag: string; name: string; wo
 }
 
 /** Browse the free-book catalogues (EbookFoundation/free-programming-books, 44bits/awesome-opensource-documents) and add titles as sources. */
-function Catalogs({ net, onAdd }: { net: { proxy: boolean; email?: string }; onAdd: (item: CatalogItem, text: string) => void }) {
+function Catalogs({ onAdd, confirmPrivacy }: { onAdd: (item: CatalogItem, text: string) => void; confirmPrivacy: (s: string[]) => Promise<boolean> }) {
   const [cat, setCat] = useState<string>(CATALOGS[0].id);
   const [items, setItems] = useState<Record<string, CatalogItem[]>>({});
   const [status, setStatus] = useState("");
@@ -337,7 +385,7 @@ function Catalogs({ net, onAdd }: { net: { proxy: boolean; email?: string }; onA
     if (items[id]) return;
     setStatus("Loading list…");
     try {
-      const list = await loadCatalog(CATALOGS.find((c) => c.id === id)!.url);
+      const list = await loadCatalog(id);
       setItems((m) => ({ ...m, [id]: list }));
       setStatus("");
     } catch (e) { setStatus(`Couldn't load the list (${(e as Error).message}).`); }
@@ -346,8 +394,9 @@ function Catalogs({ net, onAdd }: { net: { proxy: boolean; email?: string }; onA
   const terms = q.toLowerCase().split(/\s+/).filter(Boolean).map((t) => new RegExp(`(^|[^a-z0-9])${t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
   const shown = (current ?? []).filter((it) => terms.every((t) => t.test(`${it.title} ${it.section} ${it.note}`.toLowerCase()))).slice(0, 40);
   const add = async (it: CatalogItem) => {
+    if (!(await confirmPrivacy(["the book's web page (fetched by origincheck's server)"]))) return;
     setState((s) => ({ ...s, [it.url]: "Fetching…" }));
-    const o = await importUrl(it.url, net);
+    const o = await importUrl(it.url);
     if (o.source) onAdd(it, o.source.text);
     setState((s) => ({ ...s, [it.url]: o.ok ? "Added" : o.message }));
   };

@@ -27,6 +27,36 @@ interface Props {
   onAcceptAllSpelling: () => void;
   onEditText: (t: string) => void;
   onDownload: (kind: "docx" | "txt") => void;
+  onAddWord: (word: string) => void;
+  englishOnly: boolean;
+  korean: boolean;
+  children?: React.ReactNode; // extra side cards (Improve my writing)
+}
+
+type Lookup = { synonyms: string[]; definitions: { partOfSpeech: string; definition: string }[] };
+const lookups = new Map<string, Promise<Lookup | null>>();
+/** Synonyms (Datamuse) and definitions (Free Dictionary) through origincheck's server, cached. */
+function lookupWord(w: string) {
+  const key = w.toLowerCase();
+  if (!lookups.has(key))
+    lookups.set(key, fetch(`/api/words?w=${encodeURIComponent(key)}`).then((r) => (r.ok ? r.json() : null)).catch(() => null));
+  return lookups.get(key)!;
+}
+
+function WordInfo({ word, onPick }: { word: string; onPick: (w: string) => void }) {
+  const [info, setInfo] = useState<Lookup | null | undefined>(undefined);
+  useEffect(() => { let live = true; lookupWord(word).then((x) => { if (live) setInfo(x); }); return () => { live = false; }; }, [word]);
+  if (info === undefined) return <p className="mt-2 text-[12px] text-mute">Looking up “{word}”…</p>;
+  if (!info || (!info.synonyms.length && !info.definitions.length)) return null;
+  return (
+    <div className="mt-2 rounded-lg bg-bg p-2 text-[12.5px]" id="wordInfo">
+      {info.definitions.slice(0, 2).map((d, i) => <p key={i}><i className="text-mute">{d.partOfSpeech}</i> {d.definition}</p>)}
+      {info.synonyms.length > 0 && <div className="mt-1 flex flex-wrap items-center gap-1">
+        <span className="text-mute">Synonyms:</span>
+        {info.synonyms.slice(0, 6).map((s) => <button key={s} className="cursor-pointer rounded bg-soft px-1.5 py-0.5 hover:text-accent" onClick={() => onPick(s)}>{s}</button>)}
+      </div>}
+    </div>
+  );
 }
 
 export default function GrammarTab(p: Props) {
@@ -89,6 +119,10 @@ export default function GrammarTab(p: Props) {
           <span><span className="underline decoration-mid decoration-2 underline-offset-4">solid</span> warning</span>
           <span><span className="underline decoration-accent decoration-dotted decoration-2 underline-offset-4">dotted</span> style</span>
         </p>
+        {p.englishOnly && <p className="mb-3 rounded-lg bg-soft p-3 text-sm" role="status" id="englishOnly">
+          <b>Grammar checking is English-only.</b> This text isn&apos;t mostly English, so Harper wasn&apos;t run.
+          {p.korean && " For Korean, CopyKiller (under “Check externally” on the Similarity tab) and a Korean spell checker are better options."}
+        </p>}
         {editing
           ? <EditBox text={p.text} onChange={p.onEditText} />
           : <div ref={docRef} id="gDoc" className="font-serif text-[16.5px] leading-[1.9] whitespace-pre-wrap wrap-anywhere">{body}</div>}
@@ -124,6 +158,7 @@ export default function GrammarTab(p: Props) {
           {fb.long.length > 0 && <details className="mt-2"><summary className="cursor-pointer text-[13px] font-medium">Long sentences</summary>
             <ul className="mt-1 grid list-disc gap-1 pl-5 text-[12.5px]">{fb.long.map((l) => <li key={l.at}>{l.words} words: {l.text.split(/\s+/).slice(0, 14).join(" ")} …</li>)}</ul></details>}
         </Card>
+        {p.children}
       </aside>
 
       <Popover.Root open={!!current} onOpenChange={(o) => !o && setOpen(null)}>
@@ -141,12 +176,16 @@ export default function GrammarTab(p: Props) {
             {current.suggestions.length > 0 && <div className="mt-2.5 flex flex-wrap gap-1.5" aria-label="Suggestions">
               {current.suggestions.map((s, k) => <Button key={k} size="sm" variant="primary" data-accept={k}
                 onClick={() => { p.onAccept(current, s); setOpen(null); }}>
-                {s.kind === "remove" ? "Remove" : s.kind === "insertAfter" ? `Add “${s.text}”` : `Accept “${s.text || "∅"}”`}
+                {s.kind === "remove" ? "Apply: remove" : s.kind === "insertAfter" ? `Apply: add “${s.text}”` : `Apply “${s.text || "∅"}”`}
               </Button>)}
             </div>}
-            <div className="mt-2.5 flex gap-3 border-t border-line pt-2">
-              <Button variant="link" onClick={() => { p.onIgnore(current); setOpen(null); }}>Ignore</Button>
+            {/^[A-Za-z][A-Za-z'-]{1,30}$/.test(p.text.slice(current.start, current.end)) &&
+              <WordInfo word={p.text.slice(current.start, current.end)} onPick={(w) => { p.onAccept(current, { text: w, kind: "replace" }); setOpen(null); }} />}
+            <div className="mt-2.5 flex flex-wrap gap-3 border-t border-line pt-2">
+              <Button variant="link" onClick={() => { p.onIgnore(current); setOpen(null); }} id="dismissIssue">Dismiss</Button>
               <Button variant="link" onClick={() => { p.onIgnoreRule(current.rule); setOpen(null); }}>Ignore rule</Button>
+              {current.category === "spelling" && <Button variant="link" id="addWord"
+                onClick={() => { p.onAddWord(p.text.slice(current.start, current.end)); setOpen(null); }}>Add to dictionary</Button>}
             </div>
           </Popover.Content>}
         </Popover.Portal>

@@ -59,7 +59,7 @@ function markup(text: string, toks: { s: number; e: number }[], r: Result, num: 
 
 export function reportHtml(o: {
   docName: string; text: string; toks: { s: number; e: number }[]; r: Result | null; sources: Source[]; settings: Settings; checked: Date;
-  grammar?: { score: number; issues: Issue[] }; ai?: { result: AiResult | null; signals?: AiSignals; note?: string };
+  aiAssisted?: number; grammar?: { score: number; issues: Issue[] }; ai?: { result: AiResult | null; signals?: AiSignals; note?: string };
 }) {
   const { r, sources } = o;
   const num = new Map((r?.order ?? []).map((s, i) => [s, i + 1]));
@@ -115,7 +115,8 @@ table{width:100%;border-collapse:collapse;font-size:14px}td{border-top:1px solid
 .caveat{border:1px solid #d9770666;background:#d977061a;border-radius:10px;padding:10px 12px}
 .foot{color:var(--mute);font-size:12px;margin-top:14px;border-top:1px solid var(--line);padding-top:10px}
 </style></head><body><header>origincheck · Report</header><div class="page">
-<div><h1>${esc(o.docName)}</h1><div class="meta">Checked ${o.checked.toLocaleString()}</div></div>
+<div><h1>${esc(o.docName)}</h1><div class="meta">Checked ${o.checked.toLocaleString()}</div>
+${o.aiAssisted ? `<p class="caveat"><b>AI-assisted.</b> ${o.aiAssisted} passage${o.aiAssisted > 1 ? "s were" : " was"} revised with an AI writing assistant in origincheck (“Improve my writing”) and accepted by the writer.</p>` : ""}</div>
 <div class="scores">
 ${card("Similarity index", r ? `${r.index}%` : "—", r ? b!.label : "Not run: no sources were added", b?.color ?? "inherit")}
 ${card("Writing score", g ? String(g.score) : "—", g ? `${g.issues.length} grammar suggestions` : "Not run", "#0078d4")}
@@ -138,7 +139,7 @@ ${ai ? `<p><b>${ai.score}/100 — ${ai.label}.</b> ${ai.reasons.map(esc).join(" 
 </div></body></html>`;
 }
 
-export async function exportDocx(o: { docName: string; text: string; headings: Map<string, "h1" | "h2" | "h3">; refs: Seg[][]; style: Style; hasBib: boolean; fileName?: string }) {
+export async function exportDocx(o: { docName: string; text: string; headings: Map<string, "h1" | "h2" | "h3">; refs: Seg[][]; style: Style; hasBib: boolean; fileName?: string; aiAssisted?: number }) {
   const { Document, HeadingLevel, Packer, Paragraph, TextRun } = await import("docx");
   const H = { h1: HeadingLevel.HEADING_1, h2: HeadingLevel.HEADING_2, h3: HeadingLevel.HEADING_3 };
   const paras = o.text.split(/\n\s*\n+/).map((p) => p.trim()).filter(Boolean).map((p) => {
@@ -155,6 +156,7 @@ export async function exportDocx(o: { docName: string; text: string; headings: M
   }
   const doc = new Document({
     creator: "origincheck",
+    ...(o.aiAssisted ? { keywords: "AI-assisted", description: `AI-assisted: ${o.aiAssisted} passage(s) revised with an AI writing assistant (origincheck "Improve my writing").` } : {}),
     styles: { default: { document: { run: { font: "Calibri", size: 24 } } } },
     sections: [{ children: paras }],
   });

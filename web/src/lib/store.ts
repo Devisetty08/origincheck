@@ -27,18 +27,15 @@ export interface DraftCheck {
 export interface Prefs {
   theme?: "light" | "dark";
   style?: "apa" | "harvard" | "ieee";
-  internet?: boolean;
-  proxy?: boolean;
-  email?: string;
-  webSearch?: boolean; // search the web for matching phrases on each check
-  searchKey?: string; // the user's own Jina API key, kept in this browser only
-  webQueries?: number;
-  books?: boolean; // search inside Open Library's scanned books (opt-in, needs internet features)
-  ai?: boolean; // AI indicator; on unless turned off
-  lt?: boolean; // LanguageTool grammar (sends text); off by default
-  ltUrl?: string;
+  /** Yes/No per "Sources to compare against" input. Missing = yes. */
+  inputs?: Partial<Record<"files" | "paste" | "url" | "refs" | "web" | "books" | "lists", boolean>>;
+  /** External services the user has been told about and accepted (privacy notice), sorted and joined. */
+  privacyAck?: string;
+  ai?: boolean; // AI-likelihood signal (only when the server enables it); on by default when available
+  paraphrase?: boolean; // paraphrase detection with the on-device embedding model; on by default
+  lt?: boolean; // LanguageTool second opinion (only when the server enables it); off by default
   ltLang?: string;
-  bookQueries?: number;
+  dictionary?: string[]; // words added to the grammar dictionary
 }
 
 async function safeGet<T>(key: string, fallback: T): Promise<T> {
