@@ -17,6 +17,9 @@ export const config = {
   get semanticScholarKey() { return env("SEMANTIC_SCHOLAR_API_KEY"); },
   get googleKey() { return env("GOOGLE_API_KEY"); },
   get googleCx() { return env("GOOGLE_CSE_ID"); },
+  get googleBooksKey() { return env("GOOGLE_BOOKS_API_KEY") ?? env("GOOGLE_API_KEY"); },
+  get libreTranslateUrl() { return env("LIBRETRANSLATE_URL")?.replace(/\/$/, ""); },
+  get libreTranslateKey() { return env("LIBRETRANSLATE_API_KEY"); },
   get aiProvider() { return (env("AI_PROVIDER") ?? "anthropic") as "anthropic" | "ollama"; },
   get anthropicKey() { return env("ANTHROPIC_API_KEY"); },
   get anthropicModel() { return env("ANTHROPIC_MODEL") ?? "claude-opus-5-5"; },
@@ -51,7 +54,7 @@ export function publicConfig() {
 /** Strip anything that looks like a secret before it reaches a log line. */
 export function redact(s: string) {
   let out = s;
-  for (const v of [config.braveKey, config.jinaKey, config.coreKey, config.semanticScholarKey, config.googleKey, config.anthropicKey, config.copyleaksKey])
+  for (const v of [config.braveKey, config.jinaKey, config.coreKey, config.semanticScholarKey, config.googleKey, config.anthropicKey, config.copyleaksKey, config.googleBooksKey, config.libreTranslateKey])
     if (v) out = out.split(v).join("[redacted]");
   return out.replace(/(api[_-]?key|token|key|authorization)=([^&\s]+)/gi, "$1=[redacted]");
 }

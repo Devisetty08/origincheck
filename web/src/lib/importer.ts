@@ -20,7 +20,8 @@ export async function importUrl(url: string): Promise<ImportOutcome> {
     if (text.split(/\s+/).length < 30) throw new Error("no readable text found");
     const host = new URL(j.url).hostname.replace(/^www\./, "");
     const meta: CiteMeta = { authors: j.byline ? [{ family: j.byline }] : [], title: j.title || host, container: host, url: j.url, accessed: today() };
-    return { entry: url, ok: true, message: "Added", source: { name: j.title ? `${j.title} (${host})` : j.url, text, meta, url: j.url } };
+    return { entry: url, ok: true, message: j.archived ? "Added from the Internet Archive (the live page couldn't be fetched)" : "Added",
+      source: { name: j.title ? `${j.title} (${host})` : j.url, text, meta, url: j.url } };
   } catch (e) {
     return { entry: url, ok: false, message: `Couldn't fetch the page: ${(e as Error).message}. Save it from your browser (Ctrl+S) and upload the file instead.`, link: url };
   }

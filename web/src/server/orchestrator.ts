@@ -88,7 +88,7 @@ export async function runSource(a: Adapter, queries: string[], opts: Options = {
 
 /** Run all sources, calling `emit` as each one finishes (for streaming). */
 export async function runAll(adapters: Adapter[], queries: string[], emit: (e: SourceEvent) => void | Promise<void>, opts: Options = {}) {
-  const limit = opts.concurrency ?? 6;
+  const limit = opts.concurrency ?? 12; // different services in parallel; each still has its own rate limiter
   const queue = [...adapters];
   const workers = Array.from({ length: Math.min(limit, queue.length) }, async () => {
     for (let a = queue.shift(); a; a = queue.shift()) {

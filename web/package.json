@@ -21,6 +21,7 @@
     "docx": "^9.13.0",
     "fast-xml-parser": "^5.11.2",
     "fastest-levenshtein": "^1.0.16",
+    "franc-min": "^6.2.0",
     "harper.js": "^2.13.0",
     "idb-keyval": "^6.3.0",
     "ipaddr.js": "^2.5.0",
@@ -36,8 +37,10 @@
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "recharts": "^3.10.1",
+    "sentiment": "^5.0.2",
     "server-only": "^0.0.1",
-    "stemmer": "^2.0.1"
+    "stemmer": "^2.0.1",
+    "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",
@@ -45,6 +48,7 @@
     "@types/node": "^22.20.5",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/sentiment": "^5.0.4",
     "eslint": "^9",
     "eslint-config-next": "16.4.2",
     "playwright": "^1.64.1",

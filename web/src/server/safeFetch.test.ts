@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
-import { BlockedError, type Transport, isPublicAddress, safeFetch } from "./safeFetch";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
+import { BlockedError, type Transport, isPublicAddress, nodeTransport, pinnedLookup, safeFetch } from "./safeFetch";
 
 const DNS: Record<string, string[]> = {
   "public.test": ["93.184.216.34"],
@@ -20,6 +22,26 @@ function transport(routes: Record<string, { status: number; location?: string; b
     },
   };
 }
+
+describe("pinned connection (real Node networking)", () => {
+  it("answers both lookup styles with the checked address", () => {
+    const one = vi.fn(), all = vi.fn();
+    pinnedLookup("93.184.216.34")("example.com", 0, one);
+    pinnedLookup("2606:2800::1")("example.com", { all: true }, all);
+    expect(one).toHaveBeenCalledWith(null, "93.184.216.34", 4);
+    expect(all).toHaveBeenCalledWith(null, [{ address: "2606:2800::1", family: 6 }]);
+  });
+  it("connects a made-up host name to the pinned address through Node's own request path", async () => {
+    const server = createServer((_q, res) => res.end("pinned ok"));
+    await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+    const { port } = server.address() as AddressInfo;
+    try {
+      const res = await nodeTransport.request(new URL(`http://no-such-host.example:${port}/`), "127.0.0.1", AbortSignal.timeout(5000));
+      expect(res.status).toBe(200);
+      expect(res.body.toString()).toBe("pinned ok");
+    } finally { server.close(); }
+  });
+});
 
 describe("isPublicAddress", () => {
   it.each([

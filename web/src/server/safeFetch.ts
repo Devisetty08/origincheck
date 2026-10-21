@@ -28,6 +28,17 @@ export interface Transport {
   request(url: URL, ip: string, signal: AbortSignal): Promise<{ status: number; headers: Record<string, string | undefined>; body: Buffer }>;
 }
 
+type LookupCb = (e: Error | null, address: string | { address: string; family: number }[], family?: number) => void;
+/**
+ * A DNS lookup that always answers with the address we already checked (no DNS-rebinding window). Node asks with
+ * `{ all: true }` when it races IPv4/IPv6 (the default since Node 20) and then expects a list, not a single address.
+ */
+export function pinnedLookup(ip: string) {
+  const family = ip.includes(":") ? 6 : 4;
+  return (_host: string, opts: { all?: boolean } | number | undefined, cb: LookupCb) =>
+    typeof opts === "object" && opts?.all ? cb(null, [{ address: ip, family }]) : cb(null, ip, family);
+}
+
 export const nodeTransport: Transport = {
   async resolve(host) {
     return (await lookup(host, { all: true, verbatim: true })).map((r) => r.address);
@@ -39,7 +50,7 @@ export const nodeTransport: Transport = {
         method: "GET", signal, servername: url.hostname,
         headers: { "User-Agent": config.userAgent, Accept: "text/html,application/xhtml+xml,text/plain,application/pdf;q=0.9,*/*;q=0.5" },
         // connect to the address we checked, not whatever a second DNS lookup returns
-        lookup: (_h: string, _o: object, cb: (e: Error | null, a: string, f: number) => void) => cb(null, ip, ip.includes(":") ? 6 : 4),
+        lookup: pinnedLookup(ip) as unknown as http.RequestOptions["lookup"],
       }, (res) => {
         const chunks: Buffer[] = [];
         let size = 0;

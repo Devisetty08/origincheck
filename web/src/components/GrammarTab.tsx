@@ -33,24 +33,27 @@ interface Props {
   children?: React.ReactNode; // extra side cards (Improve my writing)
 }
 
-type Lookup = { synonyms: string[]; definitions: { partOfSpeech: string; definition: string }[] };
+type Lookup = { synonyms: string[]; definitions: { partOfSpeech: string; definition: string }[]; definitionSource?: string;
+  entity?: { label: string; description: string; url: string } };
 const lookups = new Map<string, Promise<Lookup | null>>();
-/** Synonyms (Datamuse) and definitions (Free Dictionary) through origincheck's server, cached. */
+/** Synonyms (Datamuse), definitions (Free Dictionary or Wiktionary) and known names (Wikidata) through origincheck's server, cached. */
 function lookupWord(w: string) {
-  const key = w.toLowerCase();
-  if (!lookups.has(key))
-    lookups.set(key, fetch(`/api/words?w=${encodeURIComponent(key)}`).then((r) => (r.ok ? r.json() : null)).catch(() => null));
-  return lookups.get(key)!;
+  if (!lookups.has(w))
+    lookups.set(w, fetch(`/api/words?w=${encodeURIComponent(w)}`).then((r) => (r.ok ? r.json() : null)).catch(() => null));
+  return lookups.get(w)!;
 }
 
 function WordInfo({ word, onPick }: { word: string; onPick: (w: string) => void }) {
   const [info, setInfo] = useState<Lookup | null | undefined>(undefined);
   useEffect(() => { let live = true; lookupWord(word).then((x) => { if (live) setInfo(x); }); return () => { live = false; }; }, [word]);
   if (info === undefined) return <p className="mt-2 text-[12px] text-mute">Looking up “{word}”…</p>;
-  if (!info || (!info.synonyms.length && !info.definitions.length)) return null;
+  if (!info || (!info.synonyms.length && !info.definitions.length && !info.entity)) return null;
   return (
     <div className="mt-2 rounded-lg bg-bg p-2 text-[12.5px]" id="wordInfo">
+      {info.entity && <p className="mb-1" id="wordEntity"><b>Known name:</b> {info.entity.label} — {info.entity.description}{" "}
+        <a className="text-accent hover:underline" href={info.entity.url} target="_blank" rel="noreferrer">Wikidata</a>. If you meant it, add it to your dictionary.</p>}
       {info.definitions.slice(0, 2).map((d, i) => <p key={i}><i className="text-mute">{d.partOfSpeech}</i> {d.definition}</p>)}
+      {info.definitionSource && <p className="text-[11px] text-mute">Definitions: {info.definitionSource}</p>}
       {info.synonyms.length > 0 && <div className="mt-1 flex flex-wrap items-center gap-1">
         <span className="text-mute">Synonyms:</span>
         {info.synonyms.slice(0, 6).map((s) => <button key={s} className="cursor-pointer rounded bg-soft px-1.5 py-0.5 hover:text-accent" onClick={() => onPick(s)}>{s}</button>)}
@@ -184,7 +187,7 @@ export default function GrammarTab(p: Props) {
                 {s.kind === "remove" ? "Apply: remove" : s.kind === "insertAfter" ? `Apply: add “${s.text}”` : `Apply “${s.text || "∅"}”`}
               </Button>)}
             </div>}
-            {/^[A-Za-z][A-Za-z'-]{1,30}$/.test(p.text.slice(current.start, current.end)) &&
+            {/^[A-Za-z][A-Za-z0-9'-]{1,30}$/.test(p.text.slice(current.start, current.end)) &&
               <WordInfo word={p.text.slice(current.start, current.end)} onPick={(w) => { p.onAccept(current, { text: w, kind: "replace" }); setOpen(null); }} />}
             <div className="mt-2.5 flex flex-wrap gap-3 border-t border-line pt-2">
               <Button variant="link" onClick={() => { p.onIgnore(current); setOpen(null); }} id="dismissIssue">Dismiss</Button>

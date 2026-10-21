@@ -1,14 +1,15 @@
 import "server-only";
 import { config } from "../config";
 import { getJson } from "../http";
-import { openlibrary, gutendex } from "./books";
-import { arxiv, core, crossref, europepmc, openalex, semanticScholar } from "./scholarly";
+import { googlebooks, gutendex, openlibrary, poetrydb } from "./books";
+import { arxiv, core, crossref, datacite, europepmc, inspire, openalex, osf, pubmed, semanticScholar } from "./scholarly";
 import type { Adapter, NormalizedResult, SourceId } from "./types";
 import { brave, google, jina } from "./web";
 import { wikipedia } from "./wikipedia";
 
 export const ADAPTERS: Adapter[] = [
-  wikipedia("en"), wikipedia("ko"), crossref, openalex, semanticScholar, arxiv, core, europepmc, openlibrary, gutendex, brave, jina, google,
+  wikipedia("en"), wikipedia("ko"), crossref, openalex, semanticScholar, arxiv, core, europepmc, pubmed, datacite, osf, inspire,
+  openlibrary, googlebooks, gutendex, poetrydb, brave, jina, google,
 ];
 
 export const GROUPS = { refs: "References & DOIs", web: "Search the web", books: "Books (Open Library)", lists: "Free book lists" } as const;

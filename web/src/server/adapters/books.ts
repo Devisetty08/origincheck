@@ -1,6 +1,7 @@
 // Books: Open Library (full-text search inside scanned books) and Project Gutenberg.
 import "server-only";
-import { getJson, getText } from "../http";
+import { config } from "../config";
+import { getJson, getText, stripTags } from "../http";
 import type { Adapter, NormalizedResult } from "./types";
 import { STOP } from "./stopwords";
 
@@ -24,6 +25,39 @@ export const openlibrary: Adapter = {
         authors: creator ? [creator] : [], source: "openlibrary", text: passages.join("\n\n") || undefined,
       };
     });
+  },
+};
+
+/** Google Books: search inside books by exact phrase; the matching snippet is returned. Needs a (free) API key. */
+export const googlebooks: Adapter = {
+  id: "googlebooks", label: "Google Books", group: "books", minIntervalMs: 200,
+  missing: () => (config.googleBooksKey ? null : "needs a free GOOGLE_BOOKS_API_KEY (Google Cloud console, Books API)"),
+  async search(query, { signal }) {
+    type V = { id: string; volumeInfo: { title?: string; authors?: string[]; publishedDate?: string; infoLink?: string }; searchInfo?: { textSnippet?: string } };
+    const j = await getJson<{ items?: V[] }>(`https://www.googleapis.com/books/v1/volumes?q=${enc(`"${query}"`)}&maxResults=3&key=${enc(config.googleBooksKey!)}`, { signal });
+    return (j.items ?? []).map(({ id, volumeInfo: v, searchInfo }): NormalizedResult => {
+      const snippet = stripTags(searchInfo?.textSnippet).replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, "&");
+      return { title: v.title ?? id, snippet, url: v.infoLink ?? `https://books.google.com/books?id=${id}`, authors: v.authors ?? [],
+        year: Number(v.publishedDate?.slice(0, 4)) || undefined, source: "googlebooks", text: snippet || undefined };
+    });
+  },
+};
+
+/** PoetryDB: poems searched by a run of words within one line, so a short part of the phrase is sent. */
+export const poetrydb: Adapter = {
+  id: "poetrydb", label: "PoetryDB (poems)", group: "lists", missing: () => null, minIntervalMs: 200,
+  async search(query, { signal }) {
+    const words = query.split(/\s+/);
+    if (words.length < 3) return [];
+    const part = words.slice(0, 4).join(" "); // a poem line is short: three or four words rarely span a line break
+    type P = { title: string; author: string; lines: string[] };
+    let j: P[] | { status: number };
+    try { j = await getJson<P[] | { status: number }>(`https://poetrydb.org/lines/${enc(part)}/title,author,lines`, { signal }); }
+    catch (e) { if ((e as { status?: number }).status === 404) return []; throw e; }
+    if (!Array.isArray(j)) return []; // PoetryDB answers 200 {"status":404} when nothing matches
+    return j.slice(0, 3).map((p): NormalizedResult => ({
+      title: p.title, snippet: p.lines.slice(0, 2).join(" / "), url: `https://poetrydb.org/title/${enc(p.title)}`, authors: [p.author], source: "poetrydb", text: p.lines.join("\n"),
+    }));
   },
 };
 

@@ -105,6 +105,86 @@ export const core: Adapter = {
   },
 };
 
+/** DataCite: DOIs for theses, dissertations, datasets and reports that Crossref doesn't hold, with their abstracts. */
+export const datacite: Adapter = {
+  id: "datacite", label: "DataCite (theses & datasets)", group: "refs", missing: () => null, minIntervalMs: 200,
+  async search(query, { signal }) {
+    type D = { id: string; attributes: { doi?: string; url?: string; publicationYear?: number; titles?: { title: string }[];
+      descriptions?: { description?: string; descriptionType?: string }[]; creators?: { name?: string }[] } };
+    const j = await getJson<{ data: D[] }>(`https://api.datacite.org/dois?query=${enc(`"${query}"`)}&page%5Bsize%5D=3&fields%5Bdois%5D=doi,url,publicationYear,titles,descriptions,creators`, { signal });
+    return j.data.map(({ id, attributes: a }): NormalizedResult => {
+      const abs = stripTags((a.descriptions?.find((d) => d.descriptionType === "Abstract") ?? a.descriptions?.[0])?.description);
+      const doi = a.doi ?? id;
+      return { title: a.titles?.[0]?.title ?? doi, snippet: snip(abs), doi, url: `https://doi.org/${doi}`, year: a.publicationYear,
+        authors: (a.creators ?? []).map((c) => c.name ?? "").filter(Boolean), source: "datacite", text: abs || undefined };
+    });
+  },
+};
+
+/** Text of an XML node that may be a string, an object with "#text", or a list of either (inline markup splits text). */
+const xmlText = (x: unknown): string =>
+  x == null ? "" : typeof x === "string" || typeof x === "number" ? String(x) : Array.isArray(x) ? x.map(xmlText).join(" ")
+    : typeof x === "object" ? Object.entries(x as Record<string, unknown>).filter(([k]) => !/^[A-Z][a-z]+$|^Label$|^NlmCategory$/.test(k) || k === "#text").map(([, v]) => xmlText(v)).join(" ") : "";
+
+// titles and abstracts can contain inline markup (<i>, <sup>…); keep them as raw text so word order survives
+const pubmedXml = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "", stopNodes: ["*.ArticleTitle", "*.AbstractText"] });
+
+/** PubMed (NCBI E-utilities): search, then fetch the abstracts. NCBI allows 3 requests a second without a key. */
+export const pubmed: Adapter = {
+  id: "pubmed", label: "PubMed", group: "refs", missing: () => null, minIntervalMs: 700, // two requests per search
+  async search(query, { signal }) {
+    const who = `&tool=origincheck${config.contactEmail ? `&email=${enc(config.contactEmail)}` : ""}`;
+    const ids = (await getJson<{ esearchresult?: { idlist?: string[] } }>(
+      `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=${enc(`"${query}"`)}&retmax=3&retmode=json${who}`, { signal })).esearchresult?.idlist ?? [];
+    if (!ids.length) return [];
+    const doc = pubmedXml.parse(await getText(`https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id=${ids.join(",")}&retmode=xml${who}`, { signal }));
+    const arts = [doc.PubmedArticleSet?.PubmedArticle ?? []].flat() as { MedlineCitation: { PMID: unknown; Article: Record<string, unknown> } }[];
+    return arts.map(({ MedlineCitation: m }): NormalizedResult => {
+      const a = m.Article as { ArticleTitle?: unknown; Abstract?: { AbstractText?: unknown }; AuthorList?: { Author?: unknown };
+        Journal?: { JournalIssue?: { PubDate?: { Year?: unknown } } }; ELocationID?: unknown };
+      const abs = stripTags(xmlText(a.Abstract?.AbstractText)).replace(/\s+/g, " ").trim();
+      const pmid = xmlText(m.PMID).trim();
+      const authors = [a.AuthorList?.Author ?? []].flat().map((x) => { const p = x as { ForeName?: string; LastName?: string; CollectiveName?: string }; return p.CollectiveName ?? [p.ForeName, p.LastName].filter(Boolean).join(" "); }).filter(Boolean);
+      const doi = [a.ELocationID ?? []].flat().map((e) => e as { EIdType?: string; "#text"?: string }).find((e) => e.EIdType === "doi")?.["#text"];
+      const year = Number(xmlText(a.Journal?.JournalIssue?.PubDate?.Year)) || undefined;
+      return { title: stripTags(xmlText(a.ArticleTitle)).replace(/\s+/g, " ").trim() || `PubMed ${pmid}`, snippet: snip(abs), doi, url: `https://pubmed.ncbi.nlm.nih.gov/${pmid}/`,
+        authors, year, source: "pubmed", text: abs || undefined };
+    });
+  },
+};
+
+/** OSF preprints (PsyArXiv, SocArXiv and others) through the SHARE full-text index. */
+export const osf: Adapter = {
+  id: "osf", label: "OSF Preprints", group: "refs", missing: () => null, minIntervalMs: 300,
+  async search(query, { signal }) {
+    type V = { "@value"?: string }[] | undefined;
+    type C = { "@id": string; title?: V; description?: V; creator?: { name?: V }[]; dateCreated?: V; identifier?: V };
+    const j = await getJson<{ data?: C[] }>(`https://share.osf.io/api/v3/index-card-search?cardSearchText=${enc(`"${query}"`)}&cardSearchFilter%5BresourceType%5D=Preprint&page%5Bsize%5D=3&acceptMediatype=application/json`,
+      { signal, headers: { Accept: "application/json" } });
+    const v = (x: V) => x?.[0]?.["@value"] ?? "";
+    return (j.data ?? []).map((c): NormalizedResult => {
+      const abs = v(c.description);
+      const doi = c.identifier?.map((i) => i["@value"] ?? "").find((i) => i.includes("doi.org/"));
+      return { title: v(c.title) || c["@id"], snippet: snip(abs), url: c["@id"], doi: doiOf(doi), authors: (c.creator ?? []).map((p) => v(p.name)).filter(Boolean),
+        year: Number(v(c.dateCreated).slice(0, 4)) || undefined, source: "osf", text: abs || undefined };
+    });
+  },
+};
+
+/** INSPIRE-HEP: high-energy physics literature with abstracts. Allows 15 requests per 5 seconds. */
+export const inspire: Adapter = {
+  id: "inspire", label: "INSPIRE-HEP (physics)", group: "refs", missing: () => null, minIntervalMs: 350,
+  async search(query, { signal }) {
+    type M = { control_number: number; titles?: { title: string }[]; abstracts?: { value: string }[]; authors?: { full_name: string }[]; dois?: { value: string }[]; publication_info?: { year?: number }[] };
+    const j = await getJson<{ hits: { hits: { metadata: M }[] } }>(`https://inspirehep.net/api/literature?q=${enc(`abstracts.value:"${query}"`)}&size=3&fields=control_number,titles,abstracts,authors.full_name,dois,publication_info.year`, { signal });
+    return j.hits.hits.map(({ metadata: m }): NormalizedResult => {
+      const abs = stripTags(m.abstracts?.[0]?.value);
+      return { title: m.titles?.[0]?.title ?? `INSPIRE ${m.control_number}`, snippet: snip(abs), url: `https://inspirehep.net/literature/${m.control_number}`,
+        doi: m.dois?.[0]?.value, authors: (m.authors ?? []).slice(0, 20).map((a) => a.full_name), year: m.publication_info?.[0]?.year, source: "inspire", text: abs || undefined };
+    });
+  },
+};
+
 export const europepmc: Adapter = {
   id: "europepmc", label: "Europe PMC", group: "refs", missing: () => null, minIntervalMs: 100,
   async search(query, { signal }) {

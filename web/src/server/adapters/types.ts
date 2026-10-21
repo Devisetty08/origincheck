@@ -1,6 +1,7 @@
 export type SourceId =
   | "wikipedia" | "wikipedia-ko" | "crossref" | "openalex" | "semanticscholar" | "arxiv" | "core" | "europepmc"
-  | "openlibrary" | "gutendex" | "brave" | "jina" | "google";
+  | "openlibrary" | "gutendex" | "brave" | "jina" | "google"
+  | "datacite" | "pubmed" | "osf" | "inspire" | "googlebooks" | "poetrydb";
 
 /** One search hit, the same shape for every source. `text` is the fuller passage used for matching, when the API gives one. */
 export interface NormalizedResult {

@@ -15,6 +15,7 @@ beforeAll(async () => {
   vi.stubEnv("GOOGLE_CSE_ID", "cx-test");
   vi.stubEnv("UNPAYWALL_EMAIL", "real@uni.edu");
   vi.stubEnv("CORE_API_KEY", "core-test");
+  vi.stubEnv("GOOGLE_BOOKS_API_KEY", "books-test");
   A = await import("./index");
 });
 afterEach(() => vi.unstubAllGlobals());
@@ -56,6 +57,45 @@ const FIX: Record<string, { ok: (url: string) => Response; empty: () => Response
     ok: () => json({ results: [{ title: "CORE work", abstract: "Abs.", fullText: "Full text body.", authors: [{ name: "C" }], yearPublished: 2000, doi: "10.4/w", downloadUrl: "https://core/dl.pdf", links: [{ type: "display", url: "https://core.ac.uk/works/1" }] }] }),
     empty: () => json({ results: [] }),
     expect: { title: "CORE work", text: "Full text body.", url: "https://core.ac.uk/works/1", year: 2000 },
+  },
+  datacite: {
+    ok: () => json({ data: [{ id: "10.25432/thesis", type: "dois", attributes: { doi: "10.25432/thesis", publicationYear: 2021, titles: [{ title: "A thesis" }],
+      descriptions: [{ descriptionType: "Other", description: "Note" }, { descriptionType: "Abstract", description: "Thesis <i>abstract</i>." }], creators: [{ name: "Negretto, Vittore" }] } }] }),
+    empty: () => json({ data: [], meta: { total: 0 } }),
+    expect: { title: "A thesis", doi: "10.25432/thesis", url: "https://doi.org/10.25432/thesis", year: 2021, text: "Thesis abstract.", authors: ["Negretto, Vittore"] },
+  },
+  pubmed: {
+    ok: (u) => u.includes("esearch") ? json({ esearchresult: { idlist: ["42901363"] } }) : text(`<?xml version="1.0" ?><PubmedArticleSet><PubmedArticle><MedlineCitation Status="Publisher" Owner="NLM">
+      <PMID Version="1">42901363</PMID><Article><Journal><JournalIssue><PubDate><Year>2026</Year></PubDate></JournalIssue></Journal>
+      <ArticleTitle>CRISPR <i>in</i> plants.</ArticleTitle><ELocationID EIdType="pii">S1</ELocationID><ELocationID EIdType="doi" ValidYN="Y">10.6/crispr</ELocationID>
+      <Abstract><AbstractText Label="BACKGROUND">First part.</AbstractText><AbstractText Label="RESULTS">Second part.</AbstractText></Abstract>
+      <AuthorList><Author><LastName>Doudna</LastName><ForeName>Jennifer</ForeName></Author><Author><CollectiveName>CRISPR Group</CollectiveName></Author></AuthorList>
+      </Article></MedlineCitation></PubmedArticle></PubmedArticleSet>`),
+    empty: () => json({ esearchresult: { idlist: [] } }),
+    expect: { title: "CRISPR in plants.", doi: "10.6/crispr", year: 2026, text: "First part. Second part.", authors: ["Jennifer Doudna", "CRISPR Group"], url: "https://pubmed.ncbi.nlm.nih.gov/42901363/" },
+  },
+  osf: {
+    ok: () => json({ data: [{ "@id": "https://osf.io/uf3cn", title: [{ "@value": "Ego depletion" }], description: [{ "@value": "Preprint abstract." }],
+      creator: [{ name: [{ "@value": "Roy Baumeister" }] }], dateCreated: [{ "@value": "2019-09-04" }], identifier: [{ "@value": "https://doi.org/10.31234/osf.io/uf3cn" }, { "@value": "https://osf.io/uf3cn" }] }] }),
+    empty: () => json({ data: [] }),
+    expect: { title: "Ego depletion", url: "https://osf.io/uf3cn", doi: "10.31234/osf.io/uf3cn", year: 2019, text: "Preprint abstract.", authors: ["Roy Baumeister"] },
+  },
+  inspire: {
+    ok: () => json({ hits: { hits: [{ metadata: { control_number: 3184278, titles: [{ title: "Dark matter deficient galaxies" }], abstracts: [{ value: "Physics abstract." }],
+      authors: [{ full_name: "Doe, J." }], dois: [{ value: "10.7/hep" }], publication_info: [{ year: 2026 }] } }] } }),
+    empty: () => json({ hits: { hits: [] } }),
+    expect: { title: "Dark matter deficient galaxies", url: "https://inspirehep.net/literature/3184278", doi: "10.7/hep", year: 2026, text: "Physics abstract.", authors: ["Doe, J."] },
+  },
+  googlebooks: {
+    ok: () => json({ items: [{ id: "abc", volumeInfo: { title: "Pride and Prejudice", authors: ["Jane Austen"], publishedDate: "1813", infoLink: "https://books.google.com/books?id=abc" },
+      searchInfo: { textSnippet: "It is a <b>truth universally acknowledged</b>, that a single man&#39;s fortune" } }] }),
+    empty: () => json({ totalItems: 0 }),
+    expect: { title: "Pride and Prejudice", authors: ["Jane Austen"], year: 1813, text: "It is a truth universally acknowledged, that a single man's fortune" },
+  },
+  poetrydb: {
+    ok: () => json([{ title: "Because I could not stop for Death", author: "Emily Dickinson", lines: ["Because I could not stop for Death,", "He kindly stopped for me;"] }]),
+    empty: () => json({ status: 404, reason: "Not found" }),
+    expect: { title: "Because I could not stop for Death", authors: ["Emily Dickinson"], text: "Because I could not stop for Death,\nHe kindly stopped for me;" },
   },
   europepmc: {
     ok: () => json({ resultList: { result: [{ title: "PMC <i>title</i>", abstractText: "<b>Abs</b> text", doi: "10.5/v", authorString: "Vatkar AJ, Kale S.", pubYear: "2025" }] } }),
@@ -139,7 +179,7 @@ describe("keys and selection", () => {
   it("adds Korean Wikipedia only for Hangul text", () => {
     expect(A.pick(["web"], false).map((a) => a.id)).not.toContain("wikipedia-ko");
     expect(A.pick(["web"], true).map((a) => a.id)).toEqual(expect.arrayContaining(["wikipedia", "wikipedia-ko"]));
-    expect(A.pick(["books"], false).map((a) => a.id)).toEqual(["openlibrary"]);
+    expect(A.pick(["books"], false).map((a) => a.id)).toEqual(["openlibrary", "googlebooks"]);
   });
   it("Unpaywall adds open-access links by DOI only", async () => {
     const urls: string[] = [];
