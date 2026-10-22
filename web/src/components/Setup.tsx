@@ -76,7 +76,7 @@ export function DocCard(p: DocProps) {
     <Card aria-labelledby="docH">
       <h2 id="docH" className="font-semibold">1. Your document</h2>
       <p className="text-[13.5px] text-mute">The paper, essay or dissertation you want to check.</p>
-      <Drop id="docDrop" label="Choose your document file" onFiles={onDoc} icon={<FileUp aria-hidden />} title="Drop a file here or click to browse" sub=".docx, .pdf, .txt, .md, .html, .rtf" />
+      <Drop id="docDrop" label="Choose your document file" onFiles={onDoc} icon={<FileUp aria-hidden />} title="Drop a file here or click to browse" sub=".docx, .pdf, .epub, .txt, .md, .html, .rtf" />
       {reading && <p className="mt-2 text-sm text-mute" role="status" id="readingMsg">{reading}</p>}
       {p.doc && <ul className="mt-3"><FileRow tag={p.doc.kind === "paste" ? "text" : ext(p.doc.name)} name={p.doc.name} words={p.doc.toks.length} onRemove={() => p.setDoc(null)} /></ul>}
       {paste === null

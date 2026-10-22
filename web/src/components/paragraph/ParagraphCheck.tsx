@@ -7,6 +7,7 @@ import { AlertCircle, CheckCircle2, Copy, Download, FileText, History, Quote, Re
 import { type Style, STYLE_LABEL } from "@/lib/citations";
 import { type Issue, applyAll } from "@/lib/grammar";
 import { harperCheck } from "@/lib/harper";
+import type { LibraryItem } from "@/lib/store";
 import { type PSource, type RefEntry, citeFor, referenceList } from "@/lib/paragraph/citations";
 import { runParagraph } from "@/lib/paragraph/client";
 import { STATUS_TEXT, type Summary, exportParagraphDocx, exportParagraphHtml, exportParagraphTxt } from "@/lib/paragraph/export";
@@ -48,7 +49,7 @@ export function StatusBadge({ status }: { status: Status }) {
     <Icon size={13} aria-hidden /><span aria-hidden>{S.emoji}</span>{STATUS_TEXT[status]}</span>;
 }
 
-export default function ParagraphCheck({ seed, defaultStyle = "apa" }: { seed?: Seed | null; defaultStyle?: Style }) {
+export default function ParagraphCheck({ seed, defaultStyle = "apa", library = [] }: { seed?: Seed | null; defaultStyle?: Style; library?: LibraryItem[] }) {
   const [text, setTextRaw] = useState(seed?.text ?? "");
   // undo history: each step keeps the text and how many grammar fixes had been applied
   const [past, setPast] = useState<Step[]>([]), [future, setFuture] = useState<Step[]>([]), [typedAt, setTypedAt] = useState(-1e9);
@@ -194,7 +195,7 @@ export default function ParagraphCheck({ seed, defaultStyle = "apa" }: { seed?: 
             </div>
             <p className="mt-1.5 text-[12px] text-mute">Shortcuts: Ctrl+Enter check · Alt+↓/↑ next or previous issue · Ctrl+Z / Ctrl+Y undo / redo</p>
           </Card>
-          <Card><SourcesPanel sources={sources} setSources={setSources} style={style} paragraph={text} findOn={findOn} setFindOn={setFindOn} /></Card>
+          <Card><SourcesPanel sources={sources} setSources={setSources} style={style} paragraph={text} findOn={findOn} setFindOn={setFindOn} library={library} /></Card>
           <Card className="grid gap-2.5 text-sm">
             <h2 className="font-semibold">Settings</h2>
             <label className="flex items-center gap-2">Citation style

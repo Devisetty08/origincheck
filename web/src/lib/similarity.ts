@@ -3,7 +3,7 @@
 import { canon } from "./strict";
 
 export type Tok = { w: string; s: number; e: number };
-export type Kind = "file" | "paste" | "internet" | "scholarly" | "library" | "saved" | "own" | "draft";
+export type Kind = "file" | "paste" | "internet" | "scholarly" | "library" | "mylib" | "saved" | "own" | "draft";
 /** The "Sources to compare against" input a source came from (each input has a Yes/No toggle). */
 export type Input = "files" | "paste" | "url" | "refs" | "web" | "books" | "lists";
 export type Run = [b: number, e: number, j: number]; // doc words [b, e), source start word j
@@ -19,6 +19,7 @@ export interface CiteMeta {
   publisher?: string;
   url?: string;
   doi?: string;
+  isbn?: string;
   accessed?: string; // yyyy-mm-dd
 }
 
@@ -73,6 +74,7 @@ export const KIND_LABEL: Record<Kind, string> = {
   internet: "Internet",
   scholarly: "Publications",
   library: "Books (Open Library)",
+  mylib: "My library",
   saved: "Saved documents",
   own: "Your earlier work",
   draft: "Previous drafts",

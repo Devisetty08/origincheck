@@ -10,16 +10,20 @@ import { importUrl } from "@/lib/importer";
 import { type PSource, citeFor } from "@/lib/paragraph/citations";
 import { findPossibleSources, fromDoi, fromIsbn, fromWikipedia, hitToSource } from "@/lib/paragraph/client";
 import type { CiteMeta } from "@/lib/similarity";
+import type { LibraryItem } from "@/lib/store";
+import { CopyLinks } from "../MyLibrary";
 import { Button, Check, cx, inputCls } from "../ui";
 
-type Mode = "paste" | "file" | "doi" | "isbn" | "wiki";
-const MODES: { id: Mode; label: string }[] = [{ id: "paste", label: "Paste" }, { id: "file", label: "File" }, { id: "doi", label: "DOI" }, { id: "isbn", label: "ISBN" }, { id: "wiki", label: "Wikipedia" }];
+type Mode = "paste" | "file" | "library" | "doi" | "isbn" | "wiki";
+const MODES: { id: Mode; label: string }[] = [{ id: "paste", label: "Paste" }, { id: "file", label: "File" }, { id: "library", label: "My library" }, { id: "doi", label: "DOI" }, { id: "isbn", label: "ISBN" }, { id: "wiki", label: "Wikipedia" }];
 const uid = () => Math.random().toString(36).slice(2, 10);
 const today = () => new Date().toISOString().slice(0, 10);
 
 interface Props {
   sources: PSource[]; setSources: (s: PSource[]) => void; style: Style; paragraph: string;
   findOn: boolean; setFindOn: (v: boolean) => void;
+  /** My library: books and papers the user added on the Library page. */
+  library?: LibraryItem[];
 }
 
 export default function SourcesPanel(p: Props) {
@@ -82,6 +86,7 @@ export default function SourcesPanel(p: Props) {
               if (!r.ok || !r.source) throw new Error(r.message);
               update(i, { text: r.source.text });
             })}><Globe size={14} />Load the open-access full text</Button>}
+            <div className="text-mute">Need the book? <CopyLinks meta={s.meta} /></div>
             <label className="grid gap-1">Paste the passage you used, so its wording can be compared
               <textarea className={cx(inputCls, "min-h-16")} onBlur={(e) => e.target.value.trim() && update(i, { text: e.target.value.trim() })} data-source-text={i} />
             </label>
@@ -104,6 +109,16 @@ export default function SourcesPanel(p: Props) {
             <input className={inputCls} aria-label="Source title or URL (optional)" placeholder="Title or URL (optional)" value={pasteTitle} onChange={(e) => setPasteTitle(e.target.value)} id="pSourceTitle" />
             <Button size="sm" onClick={addPaste} id="pAddSource">Add source</Button>
           </>}
+          {mode === "library" && (!p.library?.length
+            ? <p className="text-mute">Your library is empty. Add books and papers you own on the Library page (the books icon at the top).</p>
+            : <ul className="grid max-h-56 gap-1 overflow-auto">{p.library.map((b) => {
+              const added = p.sources.some((s) => s.id === b.id);
+              return <li key={b.id} className="flex items-center gap-2 rounded-md bg-soft p-1.5">
+                <span className="min-w-0 flex-1 truncate" title={b.name}>{b.name}</span>
+                <Button size="sm" disabled={added} data-lib-add={b.id}
+                  onClick={() => p.setSources([...p.sources, { id: b.id, title: b.name, text: b.text, meta: b.meta ?? { authors: [], title: b.name } }])}>{added ? "Added" : "Add"}</Button>
+              </li>;
+            })}</ul>)}
           {mode === "file" && <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-line p-3 hover:border-accent">
             <FileUp size={16} aria-hidden />Choose a file ({SUPPORTED.replace(/,/g, ", ")})
             <input type="file" accept={SUPPORTED} className="sr-only" onChange={(e) => onFile(e.target.files?.[0])} data-testid="pSourceFile" />

@@ -26,6 +26,9 @@ export const config = {
   get gatewayUrl() { return env("GATEWAY_BASE_URL")?.replace(/\/$/, ""); },
   get gatewayKey() { return env("GATEWAY_API_KEY"); },
   get gatewayModel() { return env("GATEWAY_MODEL") ?? "auto"; },
+  /** Your Zotero library (personal key): import references and the full text Zotero indexed from your PDFs. */
+  get zoteroUserId() { return env("ZOTERO_USER_ID"); },
+  get zoteroKey() { return env("ZOTERO_API_KEY"); },
   get anthropicKey() { return env("ANTHROPIC_API_KEY"); },
   get anthropicModel() { return env("ANTHROPIC_MODEL") ?? "claude-opus-5-5"; },
   get ollamaUrl() { return env("OLLAMA_BASE_URL") ?? "http://localhost:11434"; },
@@ -64,7 +67,7 @@ export function publicConfig() {
 /** Strip anything that looks like a secret before it reaches a log line. */
 export function redact(s: string) {
   let out = s;
-  for (const v of [config.tavilyKey, config.braveKey, config.jinaKey, config.coreKey, config.semanticScholarKey, config.googleKey, config.anthropicKey, config.copyleaksKey, config.googleBooksKey, config.libreTranslateKey, config.gatewayKey])
+  for (const v of [config.tavilyKey, config.braveKey, config.jinaKey, config.coreKey, config.semanticScholarKey, config.googleKey, config.anthropicKey, config.copyleaksKey, config.googleBooksKey, config.libreTranslateKey, config.gatewayKey, config.zoteroKey])
     if (v) out = out.split(v).join("[redacted]");
   return out.replace(/(api[_-]?key|token|key|authorization)=([^&\s]+)/gi, "$1=[redacted]");
 }

@@ -5,7 +5,7 @@ export interface Block { style: "h1" | "h2" | "h3" | "p"; text: string }
 export interface Extracted { text: string; blocks: Block[]; meta?: Partial<CiteMeta>; scanned?: boolean; ocr?: boolean }
 
 const BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
-export const SUPPORTED = ".docx,.pdf,.txt,.md,.html,.htm,.rtf";
+export const SUPPORTED = ".docx,.pdf,.epub,.txt,.md,.html,.htm,.rtf";
 
 /** HTML to text with paragraph breaks; also returns heading/paragraph blocks for .docx export. */
 export function htmlToText(html: string, readable = false): Extracted {
@@ -38,6 +38,41 @@ export function htmlToText(html: string, readable = false): Extracted {
   });
   const title = d.querySelector("title")?.textContent?.trim();
   return { text, blocks, meta: title ? { title } : undefined };
+}
+
+/**
+ * EPUB (an e-book you own): a zip of XHTML chapters, read in the order the package's spine lists them, with the
+ * title, authors, publisher, date and ISBN from its metadata. DRM-protected e-books can't be read and are refused.
+ */
+export async function epub(buf: ArrayBuffer): Promise<Extracted> {
+  const JSZip = (await import("jszip")).default;
+  const zip = await JSZip.loadAsync(buf);
+  const xml = (s: string) => new DOMParser().parseFromString(s, "application/xml");
+  const all = (d: Document, local: string) => [...d.querySelectorAll("*")].filter((e) => (e.localName || e.tagName).split(":").pop() === local); // "dc:title" → title
+  const enc = await zip.file("META-INF/encryption.xml")?.async("string");
+  if (enc && /URI="[^"]+\.x?html?"/i.test(enc)) throw new Error("this e-book is protected by DRM, so its text can't be read. Use a DRM-free copy, or paste the passages you used.");
+  const container = await zip.file("META-INF/container.xml")?.async("string");
+  const opfPath = container ? all(xml(container), "rootfile")[0]?.getAttribute("full-path") : null;
+  const opfText = opfPath ? await zip.file(opfPath)?.async("string") : null;
+  if (!opfPath || !opfText) throw new Error("not a valid EPUB file (no package document).");
+  const opf = xml(opfText), dir = opfPath.includes("/") ? opfPath.slice(0, opfPath.lastIndexOf("/") + 1) : "";
+  const href = new Map(all(opf, "item").map((i) => [i.getAttribute("id"), i.getAttribute("href")]));
+  const texts: string[] = [], blocks: Block[] = [];
+  for (const ref of all(opf, "itemref")) {
+    const h = href.get(ref.getAttribute("idref"));
+    const html = h ? await zip.file(decodeURIComponent(dir + h).replace(/\/\.\//g, "/"))?.async("string") : null;
+    if (!html) continue;
+    const ex = htmlToText(html);
+    if (ex.text.trim()) { texts.push(ex.text); blocks.push(...ex.blocks); }
+  }
+  const dc = (local: string) => all(opf, local).map((e) => (e.textContent ?? "").trim()).filter(Boolean);
+  const isbn = dc("identifier").map((x) => x.replace(/^urn:isbn:/i, "").replace(/[-\s]/g, "")).find((x) => /^(97[89])?\d{9}[\dX]$/i.test(x));
+  const meta: Partial<CiteMeta> = {
+    title: dc("title")[0], publisher: dc("publisher")[0], year: dc("date")[0]?.match(/\d{4}/)?.[0], isbn,
+    authors: dc("creator").map((n) => n.includes(",") ? { family: n.split(",")[0].trim(), given: n.split(",").slice(1).join(",").trim() || undefined }
+      : n.split(/\s+/).length > 1 ? { family: n.split(/\s+/).pop()!, given: n.split(/\s+/).slice(0, -1).join(" ") } : { family: n }),
+  };
+  return { text: texts.join("\n\n"), blocks, meta };
 }
 
 export function rtfToText(raw: string) {
@@ -154,7 +189,7 @@ export const PARSE_TIMEOUT_MS = 60_000;
  */
 export async function extract(file: File, onProgress?: (msg: string) => void): Promise<Extracted> {
   const ext = (file.name.match(/\.[^.]+$/)?.[0] ?? "").toLowerCase();
-  if (!SUPPORTED.split(",").includes(ext)) throw new Error(`${file.name}: unsupported file type. Use .docx, .pdf, .txt, .md, .html or .rtf.`);
+  if (!SUPPORTED.split(",").includes(ext)) throw new Error(`${file.name}: unsupported file type. Use .docx, .pdf, .epub, .txt, .md, .html or .rtf.`);
   if (file.size > MAX_FILE_MB * 1e6) throw new Error(`${file.name} is larger than ${MAX_FILE_MB} MB.`);
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_, reject) => {
@@ -173,12 +208,13 @@ async function read(file: File, ext: string): Promise<Extracted> {
   let ex: Extracted;
   if (ext === ".docx") ex = await docx(await file.arrayBuffer());
   else if (ext === ".pdf") ex = await pdf(await file.arrayBuffer());
+  else if (ext === ".epub") ex = await epub(await file.arrayBuffer()).catch((e: Error) => { throw new Error(`${file.name}: ${e.message}`); });
   else {
     const raw = await file.text();
     if (ext === ".html" || ext === ".htm") ex = htmlToText(raw);
     else if (ext === ".rtf") { const t = rtfToText(raw); ex = { text: t, blocks: plainBlocks(t) }; }
     else if (ext === ".txt" || ext === ".md") ex = { text: raw, blocks: plainBlocks(raw) };
-    else throw new Error(`${file.name}: unsupported file type. Use .docx, .pdf, .txt, .md, .html or .rtf.`);
+    else throw new Error(`${file.name}: unsupported file type. Use .docx, .pdf, .epub, .txt, .md, .html or .rtf.`);
   }
   ex.text = ex.text.replace(/\r\n?/g, "\n");
   return ex;

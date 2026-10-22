@@ -387,6 +387,43 @@ test("a flagged passage opens in Paragraph check with its source", async ({ page
   await expect(page.locator('#pView [data-status="too-close"]').first()).toBeVisible();
 });
 
+test("My library: a book you own is compared in every check; free books are added, others get find-a-copy links", async ({ page }) => {
+  await page.route("**/api/books?q=*", (r) => r.fulfill({ json: { books: [
+    { title: "The Wealth of Nations", authors: ["Adam Smith"], source: "Project Gutenberg", get: "gutenberg:3300", note: "Public domain: the full text comes from Project Gutenberg." },
+    { title: "Database Design for Mere Mortals", authors: ["Michael J. Hernandez"], isbn: "9780201694710", source: "Open Library", note: "In copyright: borrow it from Open Library, or find it in a library." },
+  ] } }));
+  await page.route("**/api/books?get=*", (r) => r.fulfill({ json: { text: "It is not from the benevolence of the butcher, the brewer, or the baker, that we expect our dinner. ".repeat(20) } }));
+  await page.route("**/api/zotero?*", (r) => r.fulfill({ json: r.request().url().includes("text=")
+    ? { text: "Zotero indexed text of a paper about schema conversion and data type mapping between database engines. ".repeat(10) }
+    : { items: [{ key: "AAAA0001", itemType: "journalArticle", textKey: "PDF00001", meta: { title: "Schema conversion in practice", authors: [{ family: "Lee", given: "Min" }], year: "2022" } }] } }));
+  await page.goto("./");
+  await page.waitForLoadState("networkidle");
+  await page.getByRole("button", { name: "My library and saved documents" }).click();
+  await page.getByTestId("libFiles").setInputFiles(`${EX}references/azure.txt`);
+  await expect(page.locator("#libItems li")).toHaveCount(1);
+
+  await page.locator('[data-lib-tab="books"]').click();
+  await page.locator("#bookQuery").fill("wealth of nations");
+  await page.locator("#bookQuery").press("Enter");
+  await expect(page.locator('[data-book="links"]')).toContainText("borrow it from Open Library");
+  await expect(page.locator('[data-book="links"] a').filter({ hasText: "WorldCat" })).toHaveAttribute("href", "https://search.worldcat.org/search?q=bn:9780201694710");
+  await page.locator('[data-book="free"]').getByRole("button", { name: "Add the full text to my library" }).click();
+  await expect(page.locator("#libItems li")).toHaveCount(2);
+
+  await page.locator('[data-lib-tab="zotero"]').click();
+  await page.getByRole("button", { name: "Show" }).click();
+  await page.getByRole("button", { name: "Add to my library" }).click();
+  await expect(page.locator("#libItems li")).toHaveCount(3);
+  await expect(page.locator("#libItems")).toContainText("from Zotero");
+
+  // a document copied from the book in the library is caught without adding any source
+  await openTool(page, "check");
+  await page.getByTestId("docDrop-input").setInputFiles(`${EX}draft.docx`);
+  await expect(page.locator("#simRing text")).not.toHaveText("0%", { timeout: 30_000 });
+  await openTool(page, "similarity");
+  await expect(page.locator("#srcRank")).toContainText("My library");
+});
+
 test("each tool in the sidebar has its own page and opens on its results", async ({ page }) => {
   await page.goto("./");
   await page.waitForLoadState("networkidle");

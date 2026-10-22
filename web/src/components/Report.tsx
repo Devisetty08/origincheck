@@ -2,6 +2,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Copy, FileDown, Quote, PenLine, Trash2, Undo2, CheckCircle2, AlertTriangle, Info, Pilcrow } from "lucide-react";
 import type { PSource } from "@/lib/paragraph/citations";
+import { CopyLinks } from "./MyLibrary";
 import { type CiteMeta, type Passage, type Settings, type Source, KIND_LABEL, bibStart } from "@/lib/similarity";
 import { type Style, STYLE_LABEL, checkCitations, findCitations, findEntries, orderForList, reference, segText } from "@/lib/citations";
 import { closeness } from "@/lib/closeness";
@@ -470,6 +471,7 @@ function SourceMeta({ src }: { src: Source }) {
       {doi ? <a className="text-accent underline" href={`https://doi.org/${doi}`} target="_blank" rel="noreferrer">doi:{doi}</a>
         : url && /^https?:/.test(url) && <a className="max-w-[16rem] truncate text-accent underline" href={url} target="_blank" rel="noreferrer">{url.replace(/^https?:\/\/(www\.)?/, "")}</a>}
       {f?.oaUrl && <a className="text-low underline" href={f.oaUrl} target="_blank" rel="noreferrer">open-access copy</a>}
+      {src.kind === "library" && <span className="basis-full">Only the matching passages are shown. To read the book: <CopyLinks meta={{ title: src.name, authors: m?.authors ?? [], isbn: m?.isbn }} /></span>}
     </div>
   );
 }

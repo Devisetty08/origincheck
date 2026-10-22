@@ -25,6 +25,7 @@ A word of caution: these scores are signals, not proof. A match can be a properl
 - **Estimate how likely text is to be machine-written,** if you switch it on, sentence by sentence and with the reasons, always marked as a signal rather than a verdict.
 - **Record how you wrote a document** (writing history), so you can show your process if your work is questioned.
 - **Point out confidential names** you list, such as your employer, clients or internal systems, and rank your sections so you fix the worst ones first.
+- **Keep your own reference library** of books and papers you own (PDF, EPUB, Word), your Zotero items, a .bib or .ris export, and free open-access or public-domain books, and compare every check against it.
 - **Give you reports and files:** a PDF or HTML originality report, a corrected .docx, and the paragraph with its references.
 - **Work from the command line** for batches of documents, with the same matching as the web app.
 
@@ -36,6 +37,7 @@ A word of caution: these scores are signals, not proof. A match can be a properl
 - **It can't know what you read or what your institution allows.** It can't tell whether you read a source you cite, whether a claim is common knowledge, or what your course's rules on AI and reuse are. It tells you where to look; you make the call.
 - **It doesn't search every sentence.** By default it searches 8 phrases per document. For long documents, raise "Passages searched per run" in Settings.
 - **It can't read paywalled papers.** They're matched on their abstracts only. If you have the full text, add it as a source.
+- **It won't get you copies of copyrighted books.** Book search adds full texts only for open-access and public-domain books. For the rest it shows where to borrow or buy them, and you add the copy you own. DRM-protected e-books can't be read.
 - **Some checks are English only.** Grammar, tone and OCR work in English. Other languages are detected and skipped, with a note. OCR also covers only the first 30 pages, and poor scans can be misread.
 - **It only catches translation if a translation server is set up,** and only for documents in Latin script or Korean.
 - **It can't run as a static website,** such as GitHub Pages. Searching and lookups go through its own server, which keeps API keys safe, so it needs Node.js or a host such as Vercel.
@@ -98,6 +100,17 @@ The AI won't reword the red sentences. Rewording copied text is still copying, s
 **Grammar.** Spelling, grammar, punctuation and style, checked on your own device. Each suggestion has Accept and Dismiss. You also get definitions and synonyms for any word, a readability score, the tone of the text, and a corrected .docx.
 
 **AI indicator.** Off by default. When on, it estimates how likely the text is machine-written, shows a sentence-by-sentence heatmap and explains why. It's an estimate, never a verdict.
+
+**My library.** Your own reference books and papers, kept in your browser and compared in every check, so copying from a book you own is caught even when it isn't online. Open it from the books icon at the top. You can add to it in four ways:
+
+- **Your files:** books and papers you own, as PDF, EPUB, Word and other formats. E-books with DRM can't be read; use a DRM-free copy.
+- **Find a book:** search by title, author or subject. A full text is added only when there's a free, legal copy: an open-access book (through OpenAlex), a public-domain scan on the Internet Archive, or Project Gutenberg. For other books you get links to borrow it (Open Library), find it in a library near you (WorldCat) or preview it (Google Books).
+- **A reference file:** a .bib or .ris export from Zotero, Mendeley, EndNote and others. Each reference is looked up and its free full text added when there is one. The rest are listed with where to find a copy.
+- **Zotero:** with your own Zotero key (Settings, My library), import items along with the full text Zotero has indexed from the PDFs in your library. This only works when origincheck runs on your own computer.
+
+Paragraph check can use any book in your library as a source, too.
+
+**Will it get me a copy of any book?** No. It never downloads copyrighted books, and it won't use sites that share them without permission. For a book that isn't free, add the copy you own, or paste the passage you used.
 
 **History.** Your scores across drafts, with a chart.
 
@@ -228,6 +241,7 @@ Open Settings in the app, paste a key and press Save settings. Keys are saved on
 | Anthropic key (paid, optional) | Rewrite with Claude, capped at 500 requests a month | [console.anthropic.com](https://console.anthropic.com/) |
 | Gateway address, key and model (optional, personal use) | Rewrite through FreeLLMAPI or OmniRoute on your own computer, capped at 1,000 requests a month | [FreeLLMAPI](https://github.com/tashfeenahmed/freellmapi), [OmniRoute](https://github.com/diegosouzapw/OmniRoute) |
 | Copyleaks email and key (paid, optional) | The Copyleaks scan, capped at 20 scans a month | [copyleaks.com](https://copyleaks.com/) |
+| Zotero user ID and key (free, optional) | Importing your Zotero library into My library (on your own computer only) | [zotero.org/settings/keys](https://www.zotero.org/settings/keys) |
 | AI indicator | The AI-likelihood estimate | A switch in Settings |
 | Confidential words | Flags names you shouldn't hand in, such as your employer, clients or internal systems, on the overview and the Write page | Type them in Settings (kept in your browser) |
 
@@ -257,6 +271,7 @@ Your document, saved documents, history and settings stay in your browser. Anyth
 | Translated search | The same short phrases, to your translation server |
 | Adding a web page or references | Only the addresses, DOIs and references you enter |
 | Word lookup | The one word, to Datamuse, the Free Dictionary API, Wiktionary and Wikidata |
+| My library | Your files stay in your browser. Book search sends what you type to OpenAlex, Open Library and the Internet Archive. A reference file sends its references, never your document. Zotero import uses your key to read your own library. |
 | Paragraph check lookups | Only what you enter: a DOI (to Crossref and Unpaywall, through the server), an ISBN (to Open Library or Google Books) or a Wikipedia title. With "Find possible sources" on: up to 4 short phrases, to Wikipedia, Crossref and OpenAlex. |
 | Scanned PDFs, language detection, tone | Nothing. These run in your browser. |
 | Rewrite | Nothing with Ollama. With Anthropic, the passage you picked. With a free-model gateway, the passage you picked, to whichever free provider the gateway chooses. |

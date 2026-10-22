@@ -12,10 +12,10 @@ const INK: RGB = [33, 37, 41], MUTE: RGB = [108, 117, 125], RED: RGB = [209, 52,
 
 /** Source-type columns of the summary. */
 export const CATEGORY: Record<Kind, "internet" | "publications" | "yours" | "saved"> = {
-  internet: "internet", scholarly: "publications", library: "publications", file: "yours", paste: "yours", saved: "saved", own: "saved", draft: "saved",
+  internet: "internet", scholarly: "publications", library: "publications", mylib: "yours", file: "yours", paste: "yours", saved: "saved", own: "saved", draft: "saved",
 };
 export const TYPE_LABEL: Record<Kind, string> = {
-  internet: "Internet Source", scholarly: "Publication", library: "Book", file: "Uploaded file", paste: "Pasted text",
+  internet: "Internet Source", scholarly: "Publication", library: "Book", mylib: "My library", file: "Uploaded file", paste: "Pasted text",
   saved: "Saved document", own: "Your earlier work", draft: "Earlier draft",
 };
 

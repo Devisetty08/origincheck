@@ -20,8 +20,8 @@ import { harperCheck, isEnglish, languageToolCheck, setUserWords, warmGrammar } 
 import { baseName, download, exportDocx, reportHtml } from "@/lib/exporters";
 import { extract } from "@/lib/extract";
 import {
-  type DraftCheck, type Prefs, type SavedDoc, loadHistory, loadMeta, loadPrefs, loadSaved, projectKey,
-  storeHistory, storeMeta, storePrefs, storeSaved, uid,
+  type DraftCheck, type LibraryItem, type Prefs, type SavedDoc, loadHistory, loadLibrary, loadMeta, loadPrefs, loadSaved, projectKey,
+  storeHistory, storeLibrary, storeMeta, storePrefs, storeSaved, uid,
 } from "@/lib/store";
 import { Button, Dialog, Logo, type Status, cx } from "./ui";
 import Setup, { SettingsCard, SourcesCard } from "./Setup";
@@ -35,6 +35,7 @@ import ParagraphCheck, { type Seed } from "./paragraph/ParagraphCheck";
 import { FixMatches, WriteMatches } from "./remedies";
 import Drafts from "./Drafts";
 import Library from "./Library";
+import MyLibrary from "./MyLibrary";
 import Dashboard, { NextSteps, type Step, type Tab } from "./Dashboard";
 import GrammarTab from "./GrammarTab";
 import ImproveWriting from "./ImproveWriting";
@@ -125,6 +126,8 @@ export default function App() {
   const whOn = prefs.writingHistory !== false; // writing history: on unless the user turns it off (shown on the Write page)
   const [useSaved, setUseSaved] = useState(true);
   const [saved, setSaved] = useState<SavedDoc[]>([]);
+  const [library, setLibraryState] = useState<LibraryItem[]>([]); // My library: the user's reference books and papers
+  const setLibrary = (items: LibraryItem[]) => { setLibraryState(items); storeLibrary(items); };
   const [history, setHistory] = useState<DraftCheck[]>([]);
   const [meta, setMeta] = useState<Record<string, CiteMeta>>({});
   const [citeOrder, setCiteOrder] = useState<string[]>([]);
@@ -146,9 +149,10 @@ export default function App() {
   useEffect(() => {
     warmGrammar();
     loadCfg();
-    Promise.all([loadSaved(), loadHistory(), loadMeta()]).then(([s, h, m]) => {
+    Promise.all([loadSaved(), loadHistory(), loadMeta(), loadLibrary()]).then(([s, h, m, lib]) => {
       setPrefsState(loadPrefs());
       setSaved(s);
+      setLibrary(lib);
       setHistory(h);
       setMeta(m);
     });
@@ -351,11 +355,15 @@ export default function App() {
 
   /* ---------- similarity: re-runs when the text, sources or settings change ---------- */
   const inputs = prefs.inputs;
+  // My library, tokenized once per change (books are long)
+  const libSources = useMemo(() => library.map((b): Source => ({ id: b.id, name: b.name, kind: "mylib", text: b.text, toks: tokenize(b.text), meta: b.meta })), [library]);
+  const useLibrary = prefs.useLibrary !== false;
   const allSources = useMemo(() => {
     const all: Source[] = [...sources, ...found].filter((s) => !s.input || inputs?.[s.input] !== false).map((s) => ({ ...s, meta: meta[s.name] ?? s.meta }));
     if (useSaved && doc) for (const d of saved) if (d.text !== doc.text) all.push({ id: d.id, name: d.name, kind: d.own ? "own" : "saved", text: d.text, toks: tokenize(d.text), meta: meta[d.name] });
+    if (useLibrary) for (const b of libSources) all.push({ ...b, meta: meta[b.name] ?? b.meta });
     return [...all, ...priorDrafts];
-  }, [sources, found, useSaved, saved, priorDrafts, doc, meta, inputs]);
+  }, [sources, found, useSaved, saved, priorDrafts, doc, meta, inputs, useLibrary, libSources]);
 
   /* ---------- hybrid pass: near-verbatim (lexical) then paraphrase (embeddings), after each similarity result ---------- */
   const paraphraseOn = prefs.paraphrase !== false;
@@ -631,7 +639,7 @@ export default function App() {
         {doc && view === "check" && <div className="hidden min-w-0 flex-1 truncate text-sm opacity-90 sm:block" title={doc.name}>{doc.name}</div>}
         <div className="ml-auto flex shrink-0 items-center gap-1.5">
           {doc && <TopBtn onClick={newCheck} label="New check" short="New" />}
-          <TopBtn onClick={() => go(view === "library" ? "check" : "library")} label="Saved documents" icon={<LibIcon size={15} />} iconOnly pressed={view === "library"} />
+          <TopBtn onClick={() => go(view === "library" ? "check" : "library")} label="My library and saved documents" icon={<LibIcon size={15} />} iconOnly pressed={view === "library"} />
           <a href={`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/guide/`} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-white/30 bg-white/12 px-2.5 text-[13.5px] font-medium hover:bg-white/22" aria-label="Guide to avoiding plagiarism">
             <BookOpen size={15} /><span className="hidden lg:inline">Guide</span>
           </a>
@@ -654,8 +662,9 @@ export default function App() {
         <main className="min-w-0 flex-1 pb-24 md:pb-10">
           {view === "history" && <Drafts history={history} setHistory={(h) => { setHistory(h); storeHistory(h); }} />}
           {view === "library" && <Library saved={saved} setSaved={(s) => { setSaved(s); storeSaved(s); }}
-            onDeletedAll={() => { setSaved([]); setHistory([]); setMeta({}); setPrefsState({}); delete document.documentElement.dataset.theme; }} />}
-          {view === "paragraph" && <ParagraphCheck key={paraSeed?.key ?? 0} seed={paraSeed} defaultStyle={style} />}
+            myLibrary={<MyLibrary items={library} setItems={setLibrary} on={useLibrary} setOn={(v) => setPrefs({ useLibrary: v })} />}
+            onDeletedAll={() => { setSaved([]); setLibraryState([]); setHistory([]); setMeta({}); setPrefsState({}); delete document.documentElement.dataset.theme; }} />}
+          {view === "paragraph" && <ParagraphCheck key={paraSeed?.key ?? 0} seed={paraSeed} defaultStyle={style} library={library} />}
           {view === "settings" && <div className="mx-auto grid grid-cols-[minmax(0,1fr)] max-w-[1180px] gap-[18px] px-4 pt-7 pb-12">
             <div>
               <h1 className="text-[clamp(23px,4vw,30px)] font-bold leading-tight tracking-tight">Settings</h1>

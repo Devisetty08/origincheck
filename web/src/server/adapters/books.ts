@@ -80,7 +80,7 @@ const CATALOG = "https://www.gutenberg.org/cache/epub/feeds/pg_catalog.csv";
 let catalog: { at: number; books: Promise<Book[]> } | null = null;
 
 /** Project Gutenberg's official catalogue (≈20 MB CSV, published for programs to use), loaded once a day per server. */
-function gutenbergCatalog() {
+export function gutenbergCatalog() {
   if (!catalog || Date.now() - catalog.at > 24 * 3600_000) {
     const books = getText(CATALOG, { timeoutMs: 40_000 }).then((csv) => {
       const out: Book[] = [];

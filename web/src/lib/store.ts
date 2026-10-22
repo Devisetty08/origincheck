@@ -10,6 +10,17 @@ export interface SavedDoc {
   savedAt: string;
 }
 
+/** A book or paper in the user's reference library: compared in every check (when on), kept in this browser. */
+export interface LibraryItem {
+  id: string;
+  name: string;
+  text: string;
+  meta?: CiteMeta;
+  addedAt: string;
+  /** Where it came from: an uploaded file, Zotero, a .bib/.ris import, or an open-access / public-domain book. */
+  origin: "file" | "zotero" | "bib" | "openbook";
+}
+
 export interface DraftCheck {
   id: string;
   project: string; // groups drafts of the same document
@@ -39,6 +50,7 @@ export interface Prefs {
   lt?: boolean; // LanguageTool second opinion (only when the server enables it); off by default
   ltLang?: string;
   dictionary?: string[]; // words added to the grammar dictionary
+  useLibrary?: boolean; // compare every check against My library; on by default
   confidential?: string[]; // names to keep out of the document (employer, client, internal systems); flagged on the Write page
 }
 
@@ -63,9 +75,12 @@ export function storePrefs(p: Prefs) {
   try { localStorage.setItem("oc-prefs", JSON.stringify(p)); } catch {}
 }
 
+export const loadLibrary = () => safeGet<LibraryItem[]>("library", []);
+export const storeLibrary = (items: LibraryItem[]) => safeSet("library", items);
+
 export async function exportAll() {
   return JSON.stringify(
-    { app: "origincheck", exported: new Date().toISOString(), saved: await loadSaved(), history: await loadHistory(), meta: await loadMeta() },
+    { app: "origincheck", exported: new Date().toISOString(), saved: await loadSaved(), history: await loadHistory(), meta: await loadMeta(), library: await loadLibrary() },
     null, 2,
   );
 }

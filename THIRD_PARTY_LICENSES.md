@@ -72,11 +72,13 @@ origincheck uses the open-source components below. Versions are the ones pinned 
 
 ## Online services and their content
 
-These are called through public APIs under their own terms of service and are not bundled with origincheck: Wikipedia (MediaWiki API), Wiktionary, Wikidata, Crossref, OpenAlex, Unpaywall, Semantic Scholar, arXiv, CORE, Europe PMC, PubMed (NCBI E-utilities), DataCite, OSF Preprints (SHARE), INSPIRE-HEP, Open Library and the Wayback Machine (Internet Archive), Google Books, Project Gutenberg (its official catalogue and book texts), PoetryDB, Brave Search, Jina, Google Programmable Search (existing customers only), Datamuse, the Free Dictionary API, Tavily (default web search), LibreTranslate (optional), Copyleaks (paid, optional), Anthropic (optional) and Ollama ([MIT](https://github.com/ollama/ollama), runs locally).
+These are called through public APIs under their own terms of service and are not bundled with origincheck: Wikipedia (MediaWiki API), Wiktionary, Wikidata, Crossref, OpenAlex, Unpaywall, Semantic Scholar, arXiv, CORE, Europe PMC, PubMed (NCBI E-utilities), DataCite, OSF Preprints (SHARE), INSPIRE-HEP, Open Library and the Internet Archive (search, public-domain book texts and the Wayback Machine), Google Books, the Zotero Web API (your own library, optional), Project Gutenberg (its official catalogue and book texts), PoetryDB, Brave Search, Jina, Google Programmable Search (existing customers only), Datamuse, the Free Dictionary API, Tavily (default web search), LibreTranslate (optional), Copyleaks (paid, optional), Anthropic (optional) and Ollama ([MIT](https://github.com/ollama/ollama), runs locally).
 
 - **Wikipedia** text is licensed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). origincheck shows matched Wikipedia passages with the article link and "Wikipedia contributors" as the author, which is the attribution the licence asks for.
 - **OpenAlex**, **Open Library** and **Wikidata** data are CC0; **Wiktionary** definitions are CC BY-SA, shown with their source; **arXiv** metadata is CC0; full texts keep their own licences (shown per paper by Unpaywall / Europe PMC where known).
 - **Project Gutenberg** texts are public domain in the USA; the Project Gutenberg name is a trademark and is used only to identify the source.
+- **Internet Archive** book texts are downloaded only for items that aren't lending-restricted (public-domain scans). Lending-only books are never downloaded; My library links to Open Library to borrow them instead.
+- **Open-access books** found through OpenAlex keep their own licences (usually Creative Commons), shown on the publisher's page.
 
 Duplichecker and CopyKiller have no public API and are never called: the "Check externally" panel only opens them in a new tab.
 
