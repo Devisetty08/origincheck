@@ -1,0 +1,27 @@
+name: Remove old GitHub Pages deployments
+
+# One-off. GitHub Pages is off (origincheck needs its own server), but six github-pages deployments from 2026-10-21
+# still show as failed on the repository page. This marks them inactive and deletes them.
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/clean-deployments.yml"]
+  workflow_dispatch:
+
+permissions:
+  deployments: write
+
+jobs:
+  clean:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+    steps:
+      - name: Delete the github-pages deployments
+        run: |
+          for id in $(gh api "repos/$REPO/deployments?environment=github-pages&per_page=100" --jq '.[].id'); do
+            gh api -X POST "repos/$REPO/deployments/$id/statuses" -f state=inactive > /dev/null
+            gh api -X DELETE "repos/$REPO/deployments/$id"
+            echo "Deleted deployment $id"
+          done
