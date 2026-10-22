@@ -12,7 +12,10 @@ const GOALS: { id: Goal; label: string }[] = [
   { id: "casual", label: "More casual" }, { id: "plain", label: "Plain language" }, { id: "nofiller", label: "Cut filler" },
 ];
 type Part = { keep: string } | { del: string; add: string; on: boolean };
-const PROVIDER = { anthropic: "Anthropic (Claude)", ollama: "the local model" } as const;
+const PROVIDER = {
+  anthropic: "Anthropic (Claude)", ollama: "the local model",
+  gateway: "Your free-model gateway (FreeLLMAPI or OmniRoute), which passes it to one of its free AI providers (such as Gemini, Groq, OpenRouter or Mistral). Free tiers may keep or learn from what they receive.",
+} as const;
 
 /** Word diff grouped into changes: each run of removed/added words between unchanged text is one change. */
 export function toParts(a: string, b: string): Part[] {
@@ -30,7 +33,7 @@ export const joinParts = (parts: Part[]) => parts.map((p) => ("keep" in p ? p.ke
 interface Props {
   text: string;
   picked: { s: number; e: number } | null; // the passage chosen on the Rewrite page
-  provider: "anthropic" | "ollama" | null;
+  provider: "anthropic" | "ollama" | "gateway" | null;
   model?: string;
   setupNote?: string; // why Rewrite isn't available yet, from the server
   flagged: [number, number][]; // char ranges matched by the similarity check
@@ -65,7 +68,7 @@ export default function ImproveWriting(p: Props) {
     if (!pk || !original.trim()) return setMsg("Click a sentence or paragraph on the left first.");
     if (original.length > 4000) return setMsg("That passage is too long. Select up to 4,000 characters.");
     if (locked) return setMsg("This passage matches a source. Quote and cite it, or rewrite it in your own words — AI rewriting is off for it.");
-    if (p.provider === "anthropic" && !(await p.confirmPrivacy([PROVIDER.anthropic]))) return; // the local model sends nothing
+    if (p.provider && p.provider !== "ollama" && !(await p.confirmPrivacy([PROVIDER[p.provider]]))) return; // the local model sends nothing
     setBusy(true); setSel(pk);
     try {
       const r = await fetch("/api/improve", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: original, goal }) });
@@ -129,6 +132,7 @@ export default function ImproveWriting(p: Props) {
       </div>}
       <p className="mt-3 text-[11.5px] text-mute">{p.provider === "ollama"
         ? `Runs on this computer (${p.model ?? "local model"} via Ollama): your text stays here.`
+        : p.provider === "gateway" ? `Only the chosen passage is sent, through your gateway (model ${p.model ?? "auto"}) to one of its free providers.`
         : "Only the chosen passage is sent to Anthropic (Claude)."} Changes you use mark your document as AI-assisted in exports and in its writing history.</p>
     </Card>
   );

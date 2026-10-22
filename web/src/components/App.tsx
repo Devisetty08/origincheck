@@ -63,7 +63,7 @@ export const DEFAULT_SETTINGS: Settings = { quotes: true, bib: true, minWords: 8
 export interface ServerConfig {
   aiLikelihood: boolean;
   languageTool: boolean;
-  improve: "anthropic" | "ollama" | null;
+  improve: "anthropic" | "ollama" | "gateway" | null;
   maxQueries: number;
   paid?: { label: string; missing: string | null; sandbox: boolean };
   translate?: boolean;

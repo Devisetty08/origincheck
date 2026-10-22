@@ -80,6 +80,17 @@ These are called through public APIs under their own terms of service and are no
 
 Duplichecker and CopyKiller have no public API and are never called: the "Check externally" panel only opens them in a new tab.
 
+## Software you can run alongside (not bundled)
+
+origincheck talks to these over their APIs when you set them up; none of their code is included.
+
+| Project | Licence | Used for |
+|---|---|---|
+| [Ollama](https://github.com/ollama/ollama) | MIT | Running the default Rewrite model on your own computer |
+| [LibreTranslate](https://github.com/LibreTranslate/LibreTranslate) | AGPL-3.0 | Optional translation server, for catching text translated from English |
+| [FreeLLMAPI](https://github.com/tashfeenahmed/freellmapi) | MIT | Optional free-model gateway for Rewrite (personal use) |
+| [OmniRoute](https://github.com/diegosouzapw/OmniRoute) | MIT | Optional free-model gateway for Rewrite (personal use) |
+
 ## Command-line tool
 
 `origincheck.py` uses [python-docx](https://github.com/python-openxml/python-docx) (MIT) and [pypdf](https://github.com/py-pdf/pypdf) (BSD-3-Clause).

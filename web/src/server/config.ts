@@ -21,7 +21,11 @@ export const config = {
   get googleBooksKey() { return env("GOOGLE_BOOKS_API_KEY") ?? env("GOOGLE_API_KEY"); },
   get libreTranslateUrl() { return env("LIBRETRANSLATE_URL")?.replace(/\/$/, ""); },
   get libreTranslateKey() { return env("LIBRETRANSLATE_API_KEY"); },
-  get aiProvider() { return (env("AI_PROVIDER") ?? "ollama") as "anthropic" | "ollama"; }, // free local model unless switched
+  get aiProvider() { return (env("AI_PROVIDER") ?? "ollama") as "anthropic" | "ollama" | "gateway"; }, // free local model unless switched
+  /** An OpenAI-compatible free-model gateway on your own computer (FreeLLMAPI, OmniRoute). Personal use only. */
+  get gatewayUrl() { return env("GATEWAY_BASE_URL")?.replace(/\/$/, ""); },
+  get gatewayKey() { return env("GATEWAY_API_KEY"); },
+  get gatewayModel() { return env("GATEWAY_MODEL") ?? "auto"; },
   get anthropicKey() { return env("ANTHROPIC_API_KEY"); },
   get anthropicModel() { return env("ANTHROPIC_MODEL") ?? "claude-opus-5-5"; },
   get ollamaUrl() { return env("OLLAMA_BASE_URL") ?? "http://localhost:11434"; },
@@ -41,7 +45,7 @@ export const config = {
   get caps() {
     const n = (k: string, d: number) => { const v = Number(env(k)); return Number.isFinite(v) && v >= 0 ? v : d; };
     return { tavily: n("TAVILY_MONTHLY_CREDIT_CAP", 900), brave: n("BRAVE_MONTHLY_QUERY_CAP", 800),
-      anthropic: n("ANTHROPIC_MONTHLY_REQUEST_CAP", 500), copyleaks: n("COPYLEAKS_MONTHLY_SCAN_CAP", 20) };
+      anthropic: n("ANTHROPIC_MONTHLY_REQUEST_CAP", 500), copyleaks: n("COPYLEAKS_MONTHLY_SCAN_CAP", 20), gateway: n("GATEWAY_MONTHLY_REQUEST_CAP", 1000) };
   },
   get maxQueries() { return Math.max(1, Math.min(40, Number(env("SEARCH_MAX_QUERIES") ?? 8) || 8)); },
 };
@@ -60,7 +64,7 @@ export function publicConfig() {
 /** Strip anything that looks like a secret before it reaches a log line. */
 export function redact(s: string) {
   let out = s;
-  for (const v of [config.tavilyKey, config.braveKey, config.jinaKey, config.coreKey, config.semanticScholarKey, config.googleKey, config.anthropicKey, config.copyleaksKey, config.googleBooksKey, config.libreTranslateKey])
+  for (const v of [config.tavilyKey, config.braveKey, config.jinaKey, config.coreKey, config.semanticScholarKey, config.googleKey, config.anthropicKey, config.copyleaksKey, config.googleBooksKey, config.libreTranslateKey, config.gatewayKey])
     if (v) out = out.split(v).join("[redacted]");
   return out.replace(/(api[_-]?key|token|key|authorization)=([^&\s]+)/gi, "$1=[redacted]");
 }

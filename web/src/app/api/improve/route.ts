@@ -18,8 +18,8 @@ export async function POST(req: Request) {
   if (!text || text.length > MAX_CHARS) return Response.json({ error: `Select between 1 and ${MAX_CHARS} characters.` }, { status: 400 });
   if (!Object.hasOwn(GOALS, goal)) return Response.json({ error: "Unknown goal." }, { status: 400 });
   try {
-    const revised = await improve(text, goal, req.signal);
-    return Response.json({ revised, provider, model: provider === "ollama" ? config.ollamaModel : config.anthropicModel });
+    const { revised, model } = await improve(text, goal, req.signal);
+    return Response.json({ revised, provider, model });
   } catch (e) {
     if (e instanceof ImproveError) return Response.json({ error: e.message }, { status: e.status });
     console.error("improve failed:", redact((e as Error).message));

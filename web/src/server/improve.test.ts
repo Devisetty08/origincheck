@@ -91,6 +91,49 @@ describe("/api/improve", () => {
   });
 });
 
+describe("/api/improve through a free-model gateway (FreeLLMAPI, OmniRoute)", () => {
+  const GW = { AI_PROVIDER: "gateway", GATEWAY_BASE_URL: "http://localhost:20128/v1/", GATEWAY_API_KEY: "omni-key", GATEWAY_MODEL: "qwen/qwen3-32b",
+    USAGE_FILE: join(mkdtempSync(join(tmpdir(), "oc-usage-")), "u.json") };
+  const calls: { url: string; init: RequestInit }[] = [];
+  const answer = () => vi.stubGlobal("fetch", vi.fn(async (url: string, init: RequestInit) => {
+    calls.push({ url, init });
+    return new Response(JSON.stringify({ model: "groq/qwen3-32b", choices: [{ message: { content: "The results were clear." } }] }), { status: 200 });
+  }));
+  afterEach(() => { vi.unstubAllGlobals(); calls.length = 0; });
+
+  it("sends only the passage to the OpenAI-compatible endpoint, with the key, the pinned model and temperature 0", async () => {
+    answer();
+    const POST = await route(GW);
+    const r = await POST(post({ text: "The results, they were very clear.", goal: "shorter" }));
+    expect(await r.json()).toMatchObject({ revised: "The results were clear.", provider: "gateway", model: "groq/qwen3-32b" });
+    expect(calls[0].url).toBe("http://localhost:20128/v1/chat/completions");
+    expect(new Headers(calls[0].init.headers).get("authorization")).toBe("Bearer omni-key");
+    const body = JSON.parse(calls[0].init.body as string);
+    expect(body).toMatchObject({ model: "qwen/qwen3-32b", temperature: 0 });
+    expect(body.messages[1].content).toContain("The results, they were very clear.");
+    expect(create).not.toHaveBeenCalled();
+  });
+  it("is refused on a hosted deployment: free tiers are for personal use", async () => {
+    answer();
+    const POST = await route({ ...GW, VERCEL: "1" });
+    const r = await POST(post({ text: "Some text.", goal: "clearer" }));
+    expect(r.status).toBe(503);
+    expect((await r.json()).error).toMatch(/personal use/);
+    expect(calls).toHaveLength(0);
+  });
+  it("needs the address and key, stops at the monthly cap, and reports rate limits", async () => {
+    answer();
+    expect((await (await route({ ...GW, GATEWAY_API_KEY: "" }))(post({ text: "Some text.", goal: "clearer" }))).status).toBe(503);
+    const POST = await route({ ...GW, GATEWAY_MONTHLY_REQUEST_CAP: "1", USAGE_FILE: join(mkdtempSync(join(tmpdir(), "oc-usage-")), "u.json") });
+    expect((await POST(post({ text: "First passage.", goal: "clearer" }))).status).toBe(200);
+    expect((await POST(post({ text: "Second passage.", goal: "clearer" }))).status).toBe(429);
+    expect(calls).toHaveLength(1);
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 429 })));
+    const r = await (await route({ ...GW, USAGE_FILE: join(mkdtempSync(join(tmpdir(), "oc-usage-")), "u.json") }))(post({ text: "Some text.", goal: "clearer" }));
+    expect((await r.json()).error).toMatch(/rate-limited/);
+  });
+});
+
 describe("diff helpers", () => {
   const a = "The results, they were very clear and obvious.", b = "The results were clear.";
   it("accepting every change gives the revision; rejecting every change gives the original", () => {

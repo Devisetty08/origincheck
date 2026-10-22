@@ -185,6 +185,23 @@ It's about 4.7 GB. The first rewrite takes a minute or so while the model loads,
 
 Any change you keep is labelled AI-assisted in the writing history, the reports and the .docx properties.
 
+### Using a free-model gateway (FreeLLMAPI or OmniRoute)
+
+If your computer is too slow for a local model, Rewrite can use a free-model gateway that runs on your computer and passes each request to one of the free AI tiers you've signed up for: Gemini, Groq, OpenRouter, Mistral and others. Two open-source gateways work:
+
+- [FreeLLMAPI](https://github.com/tashfeenahmed/freellmapi) (MIT) rotates across about 34 free providers. Install the desktop app or run it with Docker, add your free provider keys on its Keys page, and copy the unified `freellmapi-…` key.
+- [OmniRoute](https://github.com/diegosouzapw/OmniRoute) (MIT) is a gateway with a dashboard and automatic fallback. Install it with `npm install -g omniroute`, run `omniroute`, connect providers, and copy the key from its Endpoints page.
+
+Then, in origincheck's Settings, set Provider to `gateway`, and fill in the gateway address (FreeLLMAPI `http://localhost:3001/v1`, or `http://localhost:31415/v1` for its desktop app; OmniRoute `http://localhost:20128/v1`), the key, and a model.
+
+Before you switch, know what changes:
+
+- **Your passage leaves your computer.** It goes to whichever free provider the gateway picks, and free tiers may keep or learn from what they receive. origincheck tells you this before the first request.
+- **Pin a model.** With `auto`, a different model may answer each time, and smaller ones are more likely to change names and numbers. Choose one strong model in Gateway model, and read every change before keeping it.
+- **Turn OmniRoute's prompt compression off for this.** It shortens text before it reaches the model, which would change the very passage you asked to have rewritten.
+- **It's for personal use only.** FreeLLMAPI describes itself as "for personal experimentation and learning, not production", and each provider's own terms still apply. So origincheck refuses the gateway on a hosted deployment such as Vercel. Use Ollama or Anthropic there.
+- **It's capped too:** 1,000 requests a month by default, so it can't use up your free quotas without you noticing.
+
 ## Writing history
 
 The Write page can record how your document grows, so you can show your process if anyone asks. It's on by default. You'll see a "Writing history is on" notice and a switch to turn it off.
@@ -209,13 +226,14 @@ Open Settings in the app, paste a key and press Save settings. Keys are saved on
 | LibreTranslate server | Searching in English for documents in other languages | [Self-host](https://github.com/LibreTranslate/LibreTranslate) or [libretranslate.com](https://libretranslate.com/) |
 | Ollama | Rewrite on your own computer (the default) | [ollama.com](https://ollama.com/) |
 | Anthropic key (paid, optional) | Rewrite with Claude, capped at 500 requests a month | [console.anthropic.com](https://console.anthropic.com/) |
+| Gateway address, key and model (optional, personal use) | Rewrite through FreeLLMAPI or OmniRoute on your own computer, capped at 1,000 requests a month | [FreeLLMAPI](https://github.com/tashfeenahmed/freellmapi), [OmniRoute](https://github.com/diegosouzapw/OmniRoute) |
 | Copyleaks email and key (paid, optional) | The Copyleaks scan, capped at 20 scans a month | [copyleaks.com](https://copyleaks.com/) |
 | AI indicator | The AI-likelihood estimate | A switch in Settings |
 | Confidential words | Flags names you shouldn't hand in, such as your employer, clients or internal systems, on the overview and the Write page | Type them in Settings (kept in your browser) |
 
 ### Keeping costs under control
 
-Nothing that charges per use is on by default. Every paid service needs its own key and has a monthly cap: Tavily 900 credits, Brave 800 searches, Anthropic 500 requests, Copyleaks 20 scans. The count is checked before every call, retries included. When a cap is reached the call simply isn't made, and the service shows "cap reached". You can see usage and change the caps in Settings. Counts reset each month and are kept in `web/.data/usage.json`, which git ignores.
+Nothing that charges per use is on by default. Every paid service needs its own key and has a monthly cap: Tavily 900 credits, Brave 800 searches, Anthropic 500 requests, Copyleaks 20 scans. The free-model gateway is capped too (1,000 requests), so it can't drain your free quotas unnoticed. The count is checked before every call, retries included. When a cap is reached the call simply isn't made, and the service shows "cap reached". You can see usage and change the caps in Settings. Counts reset each month and are kept in `web/.data/usage.json`, which git ignores.
 
 ### The services' rules
 
@@ -241,7 +259,7 @@ Your document, saved documents, history and settings stay in your browser. Anyth
 | Word lookup | The one word, to Datamuse, the Free Dictionary API, Wiktionary and Wikidata |
 | Paragraph check lookups | Only what you enter: a DOI (to Crossref and Unpaywall, through the server), an ISBN (to Open Library or Google Books) or a Wikipedia title. With "Find possible sources" on: up to 4 short phrases, to Wikipedia, Crossref and OpenAlex. |
 | Scanned PDFs, language detection, tone | Nothing. These run in your browser. |
-| Rewrite | Nothing with Ollama. With Anthropic, the passage you picked. |
+| Rewrite | Nothing with Ollama. With Anthropic, the passage you picked. With a free-model gateway, the passage you picked, to whichever free provider the gateway chooses. |
 | Writing history | Nothing |
 | LanguageTool (optional) | The document text, to the LanguageTool server you set up |
 | Copyleaks (optional) | The whole document. It isn't added to their database and is deleted after 24 hours. |

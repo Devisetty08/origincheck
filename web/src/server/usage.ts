@@ -7,12 +7,13 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { config } from "./config";
 
-export type Metered = "tavily" | "brave" | "anthropic" | "copyleaks";
+export type Metered = "tavily" | "brave" | "anthropic" | "copyleaks" | "gateway";
 export const METERED: { id: Metered; label: string; unit: string }[] = [
   { id: "tavily", label: "Tavily web search", unit: "credits" },
   { id: "brave", label: "Brave Search", unit: "searches" },
   { id: "anthropic", label: "Anthropic (Rewrite)", unit: "requests" },
   { id: "copyleaks", label: "Copyleaks scans", unit: "scans" },
+  { id: "gateway", label: "Free-model gateway (Rewrite)", unit: "requests" },
 ];
 
 export class CapReachedError extends Error {
