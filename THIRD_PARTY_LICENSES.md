@@ -96,3 +96,5 @@ origincheck talks to these over their APIs when you set them up; none of their c
 ## Command-line tool
 
 `origincheck.py` uses [python-docx](https://github.com/python-openxml/python-docx) (MIT) and [pypdf](https://github.com/py-pdf/pypdf) (BSD-3-Clause).
+
+Prose Inspector (`prose-inspector/`) uses [Streamlit](https://github.com/streamlit/streamlit) (Apache-2.0) and python-docx (MIT).

@@ -10,7 +10,7 @@
 ![No keys needed to start](https://img.shields.io/badge/API_keys-optional-16a34a)
 ![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)
 
-[Quick start](#quick-start) · [Screenshots](#screenshots) · [Feature guide](#feature-guide) · [FAQ](#faq)
+[Quick start](#quick-start) · [Screenshots](#screenshots) · [Examples](example/README.md) · [Feature guide](#feature-guide) · [FAQ](#faq) · [Licence](LICENSE) · [Third-party licences](THIRD_PARTY_LICENSES.md)
 
 ![The overview: plagiarism, grammar and AI indicator scores, with a "What to do next" list](docs/screenshots/overview.png)
 <sub>The overview after adding a draft and its two sources: three scores and one next step per check.</sub>
@@ -34,7 +34,7 @@
 - [Command-line tool and Prose Inspector](#command-line-tool)
 - [Contributing](#contributing)
 - [Disclaimer](#disclaimer)
-- [Credits and licences](#credits-and-licences)
+- [Credits and licences](#credits-and-licences) ([LICENSE](LICENSE), [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md))
 
 ## Why this exists
 
@@ -72,7 +72,7 @@ npm run dev
 
 Open **http://localhost:3100** and drop in a document. The plagiarism check, grammar check, book search and all the free sources work straight away, with no account and no keys. Add keys later in the app's Settings page if you want more sources (see [Settings and API keys](#settings-and-api-keys)).
 
-To try it with real data, use the files in [`example/`](example): `draft.docx` as the document and the two files in `example/references/` as sources. You should see a 47% similarity index.
+To try it with real data, use the files in [`example/`](example): `draft.docx` as the document and the two files in `example/references/` as sources. You should see a 47% similarity index. The same folder has a paragraph to try in Paragraph check, a `.bib` file for My library, and the reports origincheck made from them (PDF, web report, Paragraph check report and .docx), so you can see the results before installing anything. See [example/README.md](example/README.md).
 
 ## Screenshots
 
@@ -331,7 +331,7 @@ Similarity index: 47%
    21.0%  ora2pg.pdf
 ```
 
-It writes a colour-coded HTML report, like [example/sample_report.html](example/sample_report.html). Options: `-s DIR` (a source folder, repeatable), `-o FILE`, `--exclude-quotes`, `--exclude-bib`, `--min-words N`, `--ngram N`, `--exclude-source-pct X`, `--web` (Brave, needs `BRAVE_API_KEY`), `--save-to-repo`, `--no-repo` and `--json`.
+It writes a colour-coded HTML report, like [example/reports/command_line_report.html](example/reports/command_line_report.html). Options: `-s DIR` (a source folder, repeatable), `-o FILE`, `--exclude-quotes`, `--exclude-bib`, `--min-words N`, `--ngram N`, `--exclude-source-pct X`, `--web` (Brave, needs `BRAVE_API_KEY`), `--save-to-repo`, `--no-repo` and `--json`.
 
 **Prose Inspector** (`prose-inspector/`) is a small Streamlit app that reports sentence rhythm, stock phrases and repetition. It only analyses; it doesn't rewrite.
 
@@ -368,7 +368,7 @@ web/                    the app (Next.js)
   src/components/       the interface
   src/workers/          matching, embedding, AI-indicator and Paragraph check workers
 docs/screenshots/       the images in this README
-example/                a sample document, sources and report
+example/                sample inputs, and the reports origincheck made from them
 origincheck.py          command-line tool
 prose-inspector/        Streamlit writing-pattern report
 ```
@@ -383,4 +383,12 @@ It uses public APIs under their own terms. Keep to them, especially for paid ser
 
 origincheck is released under the [MIT licence](LICENSE). You can use, copy, change and share it, including commercially, as long as you keep the copyright notice.
 
-It stands on a lot of open-source work, including [Harper](https://github.com/Automattic/harper), [Transformers.js](https://github.com/huggingface/transformers.js), [pdf.js](https://github.com/mozilla/pdf.js), [mammoth.js](https://github.com/mwilliamson/mammoth.js), [Readability](https://github.com/mozilla/readability), [citation-js](https://github.com/citation-js/citation-js), [Next.js](https://github.com/vercel/next.js) and [React](https://github.com/facebook/react). Matched Wikipedia text is CC BY-SA and is always shown with its article link. Every library, model and service, with versions and licences, is listed in [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
+It stands on a lot of open-source work, including [Harper](https://github.com/Automattic/harper), [Transformers.js](https://github.com/huggingface/transformers.js), [pdf.js](https://github.com/mozilla/pdf.js), [mammoth.js](https://github.com/mwilliamson/mammoth.js), [Readability](https://github.com/mozilla/readability), [citation-js](https://github.com/citation-js/citation-js), [Next.js](https://github.com/vercel/next.js) and [React](https://github.com/facebook/react). Matched Wikipedia text is CC BY-SA and is always shown with its article link.
+
+**[THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md)** lists everything origincheck uses, with versions and licences:
+
+- the libraries bundled with the app (for example Harper, Transformers.js, pdf.js, citation-js and the CSL styles)
+- the AI models it downloads on first use
+- the online services it calls, and their terms
+- the software you can run alongside it (Ollama, LibreTranslate, FreeLLMAPI and OmniRoute)
+- the Python packages behind the command-line tool
