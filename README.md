@@ -2,6 +2,8 @@
 
 **Check your writing for plagiarism, grammar and AI text, fix what it finds, and find the books and papers you need. One free, open-source app that runs on your laptop.**
 
+[![CI](https://github.com/Devisetty08/origincheck/actions/workflows/ci.yml/badge.svg)](https://github.com/Devisetty08/origincheck/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/Devisetty08/origincheck?label=release)](https://github.com/Devisetty08/origincheck/releases)
 [![MIT licence](https://img.shields.io/badge/licence-MIT-blue)](LICENSE)
 ![Node.js 22](https://img.shields.io/badge/Node.js-22-339933?logo=nodedotjs&logoColor=white)
 ![Next.js 16](https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs&logoColor=white)
@@ -10,7 +12,7 @@
 ![No keys needed to start](https://img.shields.io/badge/API_keys-optional-16a34a)
 ![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)
 
-[Quick start](#quick-start) · [Screenshots](#screenshots) · [Examples](example/README.md) · [Feature guide](#feature-guide) · [FAQ](#faq) · [Licence](LICENSE) · [Third-party licences](THIRD_PARTY_LICENSES.md)
+[Quick start](#quick-start) · [Screenshots](#screenshots) · [Examples](example/README.md) · [Feature guide](#feature-guide) · [FAQ](#faq) · [Changelog](CHANGELOG.md) · [Licence](LICENSE) · [Third-party licences](THIRD_PARTY_LICENSES.md)
 
 ![The overview: plagiarism, grammar and AI indicator scores, with a "What to do next" list](docs/screenshots/overview.png)
 <sub>The overview after adding a draft and its two sources: three scores and one next step per check.</sub>

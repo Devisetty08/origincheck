@@ -6,7 +6,7 @@ import { copyleaks } from "./paid/copyleaks";
 const env = (k: string) => process.env[k]?.trim() || undefined;
 
 export const config = {
-  get userAgent() { return env("HTTP_USER_AGENT") ?? `origincheck/0.2 (contact: ${env("CONTACT_EMAIL") ?? "unknown"})`; },
+  get userAgent() { return env("HTTP_USER_AGENT") ?? `origincheck/1.0 (+https://github.com/Devisetty08/origincheck; contact: ${env("CONTACT_EMAIL") ?? "unknown"})`; },
   get contactEmail() { return env("CONTACT_EMAIL"); },
   get crossrefMailto() { return env("CROSSREF_MAILTO") ?? env("CONTACT_EMAIL"); },
   get openalexMailto() { return env("OPENALEX_MAILTO") ?? env("CONTACT_EMAIL"); },
