@@ -14,6 +14,45 @@ A word of caution: these scores are signals, not proof. A match can be a properl
 
 ![The overview page with the plagiarism, grammar and AI indicator scores](example/screenshot.png)
 
+## What it can do
+
+- **Find copied and reworded text.** It matches your document against your own sources, the web, journals, books and your earlier drafts. It reports exact copying, lightly edited copying and reworded passages (same meaning, different words) separately, and it can catch text translated from an English source.
+- **Search about 20 public sources** at once, including Wikipedia, Crossref, OpenAlex, PubMed, arXiv, Semantic Scholar, CORE, Open Library and Project Gutenberg (a few need a free key), and show which ones found something, which found nothing and why.
+- **Help you fix each match** by quoting and citing it, citing a paraphrase, rewriting it in your own words with a closeness meter and the source hidden, or removing it. It then re-checks the passage straight away.
+- **Check one paragraph sentence by sentence** (Paragraph check) for copied wording, patchwriting, uncited quotations and ideas, long or heavy quoting, and citations that are missing or in the wrong style. It adds quotation marks, citations and the reference list for you.
+- **Check your referencing:** citations with no reference entry, entries never cited, claims such as statistics with no citation, and quotations of 40 words or more. It formats citations and reference lists in APA 7, Harvard and IEEE.
+- **Check spelling, grammar, punctuation and style** on your own device, with readability, tone, and definitions and synonyms for any word.
+- **Estimate how likely text is to be machine-written,** if you switch it on, sentence by sentence and with the reasons, always marked as a signal rather than a verdict.
+- **Record how you wrote a document** (writing history), so you can show your process if your work is questioned.
+- **Point out confidential names** you list, such as your employer, clients or internal systems, and rank your sections so you fix the worst ones first.
+- **Give you reports and files:** a PDF or HTML originality report, a corrected .docx, and the paragraph with its references.
+- **Work from the command line** for batches of documents, with the same matching as the web app.
+
+## What it can't do
+
+- **It can't see private databases.** Paid plagiarism services also compare against private collections of journals, web archives and past student papers. origincheck only searches public sources, so your institution's report may find matches this one doesn't. The optional Copyleaks scan narrows the gap.
+- **It can't prove plagiarism or AI use.** A match can be a properly quoted line or a common phrase. AI detection is often wrong, especially on short, formal, technical or non-native English text. Every score is a signal for a person to judge.
+- **It won't write your text for you, and it won't hide where text came from.** It has no paraphraser for copied text, no "humanizer" and no way to get past AI detectors. When a passage is too close to a source, you rewrite it yourself. The AI suggestions on the Rewrite page are only for your own sentences, and any you keep are labelled AI-assisted.
+- **It can't know what you read or what your institution allows.** It can't tell whether you read a source you cite, whether a claim is common knowledge, or what your course's rules on AI and reuse are. It tells you where to look; you make the call.
+- **It doesn't search every sentence.** By default it searches 8 phrases per document. For long documents, raise "Passages searched per run" in Settings.
+- **It can't read paywalled papers.** They're matched on their abstracts only. If you have the full text, add it as a source.
+- **Some checks are English only.** Grammar, tone and OCR work in English. Other languages are detected and skipped, with a note. OCR also covers only the first 30 pages, and poor scans can be misread.
+- **It only catches translation if a translation server is set up,** and only for documents in Latin script or Korean.
+- **It can't run as a static website,** such as GitHub Pages. Searching and lookups go through its own server, which keeps API keys safe, so it needs Node.js or a host such as Vercel.
+
+## What's different about it
+
+Most plagiarism and writing tools give you a score, or offer to reword your text until the score drops. origincheck is built around a different idea: it helps you make the work genuinely yours and shows you how close you are.
+
+- **It's free and open source.** Anyone can read how the scores are calculated (the formulas are [below](#how-the-scores-work)), run it on their own computer, or host it.
+- **Your document stays with you.** Matching, grammar, OCR, language detection and the AI indicator all run in your browser. Searches send only short phrases, and every outside service is named before anything is sent. The default Rewrite model runs on your own computer too.
+- **It teaches the fix instead of hiding the problem.** When you rewrite a copied passage, the source is hidden and a meter tells you as you type whether your wording is still too close. Paragraph check goes further: it fixes the mechanics (quotation marks, citations, references, grammar) and leaves the wording to you, with questions about your own work instead of sample sentences.
+- **It catches patchwriting and reworded copying,** not just identical text. It compares meaning with a language model on your device, and word stems and word order sentence by sentence.
+- **It checks referencing as well as wording:** missing citations, mismatched reference lists, citation style, and claims that need a source.
+- **It gives you evidence of your own process.** The writing history records what you typed, pasted or accepted from AI, stays in your browser, and can be exported if you're ever asked how you wrote something.
+- **It's honest about its limits.** It shows which services it searched and which failed, never presents a score as proof, and says plainly what it can't see.
+- **It won't run up costs without asking.** Paid services are off by default, and each has a monthly cap that is checked before every call.
+
 ## Getting started
 
 You need [Node.js 22](https://nodejs.org/).
@@ -227,16 +266,6 @@ Matching works like this. The text is split into words and cut into overlapping 
 The writing score is `100 − (weighted issues per 100 words × 2)`, where errors count 3, warnings 1 and style suggestions 0.5.
 
 The AI indicator is 60% a RoBERTa detector and 40% a language-model signal (how predictable the wording is, and how much that changes from sentence to sentence). Under 30 is low, 30 to 70 unclear, over 70 high. It needs at least 150 words.
-
-## Limits
-
-- It doesn't have a commercial database. Paid plagiarism services compare against private collections of web pages, journals and past student papers. origincheck searches public sources, so your institution's report may find matches this one doesn't. The Copyleaks option narrows the gap.
-- It samples. By default it searches 8 phrases per document. For long documents, raise "Passages searched per run" in Settings.
-- Paywalled papers are matched on their abstracts only. If you have the full text, add it as a source.
-- Grammar and tone checks are English only. Other languages are detected and skipped, with a note.
-- AI detection is unreliable, and the app says so next to every score.
-- OCR is English only and covers the first 30 pages. Poor scans can be misread.
-- Translated text is caught only when a translation server is set up, and only for documents in Latin script or Korean.
 
 ## Command-line tool
 
