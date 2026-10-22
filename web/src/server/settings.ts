@@ -27,7 +27,7 @@ export function readSettings() {
 }
 
 /** Validates, writes .env.local (keeping unrelated lines) and applies to the running process. Empty value = unset. */
-export function saveSettings(values: Record<string, unknown>, file = join(process.cwd(), ".env.local")) {
+export function saveSettings(values: Record<string, unknown>, file = join(/* turbopackIgnore: true */ process.cwd(), ".env.local")) {
   const known = new Set(ENV_VARS.map((v) => v.key));
   const updates: [string, string][] = [];
   for (const [k, raw] of Object.entries(values)) {

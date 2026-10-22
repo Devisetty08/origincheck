@@ -116,7 +116,7 @@ table{width:100%;border-collapse:collapse;font-size:14px}td{border-top:1px solid
 .foot{color:var(--mute);font-size:12px;margin-top:14px;border-top:1px solid var(--line);padding-top:10px}
 </style></head><body><header>origincheck · Report</header><div class="page">
 <div><h1>${esc(o.docName)}</h1><div class="meta">Checked ${o.checked.toLocaleString()}</div>
-${o.aiAssisted ? `<p class="caveat"><b>AI-assisted.</b> ${o.aiAssisted} passage${o.aiAssisted > 1 ? "s were" : " was"} revised with an AI writing assistant in origincheck (“Improve my writing”) and accepted by the writer.</p>` : ""}
+${o.aiAssisted ? `<p class="caveat"><b>AI-assisted.</b> ${o.aiAssisted} passage${o.aiAssisted > 1 ? "s were" : " was"} revised with an AI writing assistant in origincheck (Rewrite) and accepted by the writer.</p>` : ""}
 ${o.history ? `<p class="meta" id="historyLine">Writing history: ${esc(o.history)}. This is process evidence, not proof of authorship by itself.</p>` : ""}</div>
 <div class="scores">
 ${card("Similarity index", r ? `${r.index}%` : "—", r ? b!.label : "Not run: no sources were added", b?.color ?? "inherit")}
@@ -157,7 +157,7 @@ export async function exportDocx(o: { docName: string; text: string; headings: M
   }
   const doc = new Document({
     creator: "origincheck",
-    ...(o.aiAssisted ? { keywords: "AI-assisted", description: `AI-assisted: ${o.aiAssisted} passage(s) revised with an AI writing assistant (origincheck "Improve my writing").` } : {}),
+    ...(o.aiAssisted ? { keywords: "AI-assisted", description: `AI-assisted: ${o.aiAssisted} passage(s) revised with an AI writing assistant (origincheck Rewrite).` } : {}),
     styles: { default: { document: { run: { font: "Calibri", size: 24 } } } },
     sections: [{ children: paras }],
   });

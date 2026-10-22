@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "predev": "node scripts/copy-assets.mjs",
     "dev": "next dev -p 3100",

@@ -2,6 +2,17 @@
 
 All notable changes to origincheck. Dates are in YYYY-MM-DD form.
 
+## v1.0.1 (2026-10-23)
+
+Fixes and housekeeping after the first release.
+
+- **Smaller hosted deployments:** the server no longer bundles the whole project. Two runtime file paths (the settings file and the usage caps) are now marked as data, so the build has no warnings.
+- **Up-to-date wording:** labels and report text that still used old feature names now use the current ones (Search, Rewrite, sentence or paragraph).
+- **Node 22 is declared** in `package.json`, so npm warns early when an older Node is used.
+- **SECURITY.md** explains how to report a vulnerability privately.
+- **Safer ignores:** a root `.env` (for command-line keys) and local copies of earlier versions can't be committed by accident.
+- **README:** the release badge now always points to the latest release.
+
 ## v1.0.0 (2026-10-22)
 
 The first public release: one app on your laptop to check writing for plagiarism, grammar and AI text, fix what it finds, and find the books and papers you need.

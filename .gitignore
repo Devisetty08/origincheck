@@ -1,3 +1,10 @@
+# keys for the command-line tool, if kept in a file
+.env
+.env.*
+!.env.example
+# local copies of an earlier version
+/origincheck/
+/origincheck.zip
 __pycache__/
 repository/
 *_similarity.html

@@ -3,7 +3,7 @@
 **Check your writing for plagiarism, grammar and AI text, fix what it finds, and find the books and papers you need. One free, open-source app that runs on your laptop.**
 
 [![CI](https://github.com/Devisetty08/origincheck/actions/workflows/ci.yml/badge.svg)](https://github.com/Devisetty08/origincheck/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/Devisetty08/origincheck?label=release)](https://github.com/Devisetty08/origincheck/releases)
+[![Release](https://img.shields.io/github/v/release/Devisetty08/origincheck?label=release&sort=semver&color=0078d4)](https://github.com/Devisetty08/origincheck/releases/latest)
 [![MIT licence](https://img.shields.io/badge/licence-MIT-blue)](LICENSE)
 ![Node.js 22](https://img.shields.io/badge/Node.js-22-339933?logo=nodedotjs&logoColor=white)
 ![Next.js 16](https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs&logoColor=white)
@@ -344,7 +344,7 @@ streamlit run prose-inspector/app.py
 
 ## Contributing
 
-Issues and pull requests are welcome. Good first PRs:
+Issues and pull requests are welcome. If you find a security problem, please report it privately as [SECURITY.md](SECURITY.md) explains, not in a public issue. Good first PRs:
 
 - **A new search source:** write an adapter in `web/src/server/adapters/` following `types.ts`, register it in `adapters/index.ts`, and add tests for success, no results, errors, rate limits and timeouts. Only public APIs that allow automated access, please.
 - **More citation styles:** add a CSL style to `web/public/csl/` and wire it into `lib/paragraph/citations.ts`.

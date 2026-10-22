@@ -23,7 +23,7 @@ export class CapReachedError extends Error {
 type Store = { month: string; counts: Partial<Record<Metered, number>> };
 const month = (now: Date) => now.toISOString().slice(0, 7);
 let mem: Store | null = null;
-const file = () => process.env.USAGE_FILE || join(process.cwd(), ".data", "usage.json");
+const file = () => process.env.USAGE_FILE || join(/* turbopackIgnore: true */ process.cwd(), ".data", "usage.json");
 
 function load(now: Date): Store {
   if (!mem) {

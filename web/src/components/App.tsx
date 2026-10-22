@@ -98,7 +98,7 @@ const PRIVACY: Record<PrivacyKind, { title: string; description: string; note: s
 /** What each tool page says before a document is added. */
 const INTRO: Record<Tab, { title: string; text: string }> = {
   write: { title: "Write", text: "Write in origincheck's editor; every check updates as you go." },
-  similarity: { title: "Plagiarism check", text: "Compares your document with your sources, publications, the web and books. Copied wording is highlighted and counted in the similarity index; lightly edited copying and paraphrase are shown separately. Add your document below, then add sources or use Run all sources." },
+  similarity: { title: "Plagiarism check", text: "Compares your document with your sources, publications, the web and books. Copied wording is highlighted and counted in the similarity index; lightly edited copying and paraphrase are shown separately. Add your document below: the internet and publications are searched automatically, and you can add your own sources too." },
   grammar: { title: "Grammar check", text: "Spelling, grammar, punctuation and style, checked on your device. No sources needed: add or paste your document below." },
   ai: { title: "AI indicator", text: "An estimate of how likely the text is machine-written. It is a signal, never proof. Add your document below." },
   rewrite: { title: "Rewrite", text: "Click any paragraph and have it made clearer, shorter, more formal or casual, plainer, or free of filler, accepting each change yourself. It uses a free model on your own computer by default. Passages that match a source are rewritten by you in the plagiarism check. Add your document below." },
@@ -270,9 +270,9 @@ export default function App() {
           });
         }
       });
-      setWebNote(`Run all sources: ${plural(queries.length, "phrase")} searched, ${plural(added.length, "result")} compared.${note}`);
+      setWebNote(`Search: ${plural(queries.length, "phrase")} searched, ${plural(added.length, "result")} compared.${note}`);
     } catch (e) {
-      setWebNote(`Run all sources failed: ${(e as Error).message}`);
+      setWebNote(`The search failed: ${(e as Error).message}`);
     }
     setFound(added);
     setSearching(false);
@@ -624,7 +624,7 @@ export default function App() {
       title: grammar.status !== "done" ? "Checking grammar…" : grammar.englishOnly ? "Grammar check is English-only" : issues.length ? `${plural(issues.length, "grammar suggestion")} to review` : "No grammar issues found",
       text: "Spelling, grammar, punctuation and style. Accept or dismiss each one.", action: "Fix grammar", onClick: () => go("check", "grammar") },
     { id: "rewrite", icon: <PenLine size={18} />, tone: "mute", title: "Polish your wording",
-      text: cfg?.improve ? "Click a paragraph to get clearer or more concise wording, and keep only the changes you like." : "Clearer, shorter wording from a free model on your computer. Needs a one-time setup (see Rewrite).",
+      text: cfg?.improve ? "Click a sentence or paragraph to get clearer or more concise wording, and keep only the changes you like." : "Clearer, shorter wording from a free model on your computer. Needs a one-time setup (see Rewrite).",
       action: "Open Rewrite", onClick: () => go("check", "rewrite") },
     ...(secret.length ? [{ id: "confidential", icon: <ShieldAlert size={18} />, tone: "high" as const, title: `Confidential words found: ${secret.map((h) => h.term).join(", ")}`,
       text: "Leave out or generalise names your organisation hasn't cleared, and describe what you did instead.", action: "Find them", onClick: () => go("check", "write") }] : []),
