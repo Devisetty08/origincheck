@@ -323,6 +323,70 @@ test("confidential words, worst sections first and citation checks", async ({ pa
   await expect(page.locator("#citeIssues")).toContainText("No citation for this claim: \"About 70% of projects");
 });
 
+test("Paragraph check: copied sentence, quote and cite, undo, rewrite in my own words, Ready and exports", async ({ page }) => {
+  await page.goto("./");
+  await page.waitForLoadState("networkidle");
+  await openTool(page, "paragraph");
+  await expect(page.getByRole("heading", { name: "Paragraph check", level: 1 })).toBeVisible();
+  // 1. the example paragraph and its source
+  await page.locator("#pText").fill(readFileSync(`${EX}paragraph/paragraph.txt`, "utf8").trim());
+  await page.locator("#pSourceText").fill(readFileSync(`${EX}paragraph/source.txt`, "utf8").trim());
+  await page.locator("#pSourceTitle").fill("https://learn.microsoft.com/azure/postgresql/flexible-server/overview");
+  await page.locator("#pAddSource").click();
+  await page.locator("#pSources summary").first().click();
+  await page.locator("#p0-authors").fill("Microsoft");
+  await page.locator("#p0-authors").blur();
+  await page.locator("#p0-year").fill("2024");
+  await page.locator("#p0-title").fill("Azure Database for PostgreSQL flexible server overview");
+  const second = page.locator('#pView [data-sentence="1"]');
+  await expect(second).toHaveAttribute("data-status", "too-close");
+  await expect(page.locator('#pIssues [data-kind="copied"]')).toContainText("words in the same order as Source 1 (Microsoft, 2024)");
+  expect(await noSideScroll(page)).toBe(true);
+
+  // 2. quote and cite (previewed first)
+  await page.locator('#pIssues [data-kind="copied"] [data-fix="quote-cite"]').click();
+  await expect(page.locator("#pPreview")).toContainText("(Microsoft, 2024)");
+  await page.locator("#pApplyFix").click();
+  await expect(second).toHaveAttribute("data-status", "quoted");
+  await expect(page.locator("#pFinalText")).toContainText("” (Microsoft, 2024).");
+  await expect(page.locator("#pRefs [data-ref]")).toContainText("Microsoft. (2024). Azure Database for PostgreSQL flexible server overview.");
+
+  // 3. undo, then rewrite the sentence in my own words
+  await page.locator("#pUndo").click();
+  await expect(second).toHaveAttribute("data-status", "too-close");
+  await page.locator('#pIssues [data-kind="copied"] [data-fix="rewrite"]').click();
+  await expect(page.locator("#pRewrite")).toContainText("Writing without looking at the source keeps your wording original.");
+  await page.locator("#pRewriteText").fill("For our migration we picked Azure Database for PostgreSQL flexible server because the managed service let our small team adjust server settings without running the database ourselves.");
+  await expect(page.locator("#pMeter [data-level]")).toHaveAttribute("data-level", "original");
+  await expect(page.locator("#pCiteGuard")).toContainText("(Microsoft, 2024)");
+
+  // 4. apply: every sentence is original and cited where needed
+  await page.locator("#pRewriteApply").click();
+  await expect(second).toHaveAttribute("data-status", "original");
+  await expect(page.locator('#pView [data-sentence="0"]')).toHaveAttribute("data-status", "original");
+  await expect(page.locator("#pVerdict")).toHaveText("Ready");
+  await expect(page.locator("#pFinalText")).toContainText("ourselves (Microsoft, 2024).");
+  await expect(page.locator("#pCheckSummary")).toContainText("1 citation added");
+  for (const [id, name] of [["#pDocx", "paragraph.docx"], ["#pTxt", "paragraph.txt"], ["#pHtml", "paragraph_report.html"]]) {
+    const dl = page.waitForEvent("download");
+    await page.locator(id).click();
+    expect((await dl).suggestedFilename()).toBe(name);
+  }
+  expect(await noSideScroll(page)).toBe(true);
+});
+
+test("a flagged passage opens in Paragraph check with its source", async ({ page }) => {
+  await upload(page);
+  await expect(page.locator("#simRing text")).toHaveText("47%", { timeout: 30_000 });
+  await openTool(page, "similarity");
+  await page.locator("#srcRank li", { hasText: "azure.txt" }).getByRole("button", { name: "View matches" }).click();
+  await page.locator("#fixInParagraph").click();
+  await expect(page.getByRole("heading", { name: "Paragraph check", level: 1 })).toBeVisible();
+  await expect(page.locator("#pText")).toHaveValue(/Azure Database for PostgreSQL flexible server is a fully managed/);
+  await expect(page.locator("#pSources [data-source]")).toContainText("azure.txt");
+  await expect(page.locator('#pView [data-status="too-close"]').first()).toBeVisible();
+});
+
 test("each tool in the sidebar has its own page and opens on its results", async ({ page }) => {
   await page.goto("./");
   await page.waitForLoadState("networkidle");

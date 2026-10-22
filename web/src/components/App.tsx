@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MotionConfig } from "motion/react";
-import { ArrowLeft, BookOpen, Bot, NotebookPen, Download, FileCheck, FileSearch, History, Library as LibIcon, Moon, PenLine, Printer, Settings as SettingsIcon, ShieldAlert, SpellCheck, Sun } from "lucide-react";
+import { ArrowLeft, BookOpen, Bot, NotebookPen, Download, FileCheck, FileSearch, History, Library as LibIcon, Moon, PenLine, Pilcrow, Printer, Settings as SettingsIcon, ShieldAlert, SpellCheck, Sun } from "lucide-react";
 import { findTerms } from "@/lib/confidential";
 import { type CiteMeta, type Result, type Settings, type Source, type Tok, bibStart, tokenize } from "@/lib/similarity";
 import { plural } from "@/lib/words";
@@ -31,6 +31,7 @@ import WritePage from "./WritePage";
 import ExternalCheck from "./ExternalCheck";
 import PaidCheck from "./PaidCheck";
 import Report, { RecheckCard } from "./Report";
+import ParagraphCheck, { type Seed } from "./paragraph/ParagraphCheck";
 import { FixMatches, WriteMatches } from "./remedies";
 import Drafts from "./Drafts";
 import Library from "./Library";
@@ -78,7 +79,7 @@ const GROUP_SERVICES: Record<SourceGroup, string> = {
   books: "Open Library (Internet Archive) and Google Books",
   lists: "Project Gutenberg and PoetryDB",
 };
-type View = "check" | "history" | "library" | "settings";
+type View = "check" | "history" | "library" | "settings" | "paragraph";
 const TOOL_TITLE: Record<Tab, string> = { write: "Write", similarity: "Plagiarism check", grammar: "Grammar", ai: "AI indicator", rewrite: "Rewrite" };
 type PrivacyKind = "search" | "improve" | "paid";
 const PRIVACY: Record<PrivacyKind, { title: string; description: string; note: string }> = {
@@ -104,6 +105,7 @@ type PendingRecheck = { res: Omit<Resolution, "id" | "at">; at: number; len: num
 
 export default function App() {
   const [view, setView] = useState<View>("check");
+  const [paraSeed, setParaSeed] = useState<Seed | null>(null); // a flagged passage sent to Paragraph check
   const [tool, setTool] = useState<"check" | Tab>("check"); // which sidebar tool the user picked
   const [doc, setDoc] = useState<Doc | null>(null);
   const [wh, setWh] = useState<WritingHistory | null>(null);
@@ -587,6 +589,7 @@ export default function App() {
     { id: "grammar", label: "Grammar", short: "Grammar", icon: <SpellCheck size={18} />, on: () => go("check", "grammar"), active: toolActive("grammar") },
     { id: "ai", label: "AI indicator", short: "AI", icon: <Bot size={18} />, on: () => go("check", "ai"), active: toolActive("ai") },
     { id: "rewrite", label: "Rewrite", short: "Rewrite", icon: <PenLine size={18} />, on: () => go("check", "rewrite"), active: toolActive("rewrite") },
+    { id: "paragraph", label: "Paragraph check", short: "Para", icon: <Pilcrow size={18} />, on: () => go("paragraph"), active: view === "paragraph" },
     { id: "history", label: "History", short: "History", icon: <History size={18} />, on: () => go("history"), active: view === "history" },
     { id: "settings", label: "Settings", short: "Settings", icon: <SettingsIcon size={18} />, on: () => go("settings"), active: view === "settings" },
   ];
@@ -652,6 +655,7 @@ export default function App() {
           {view === "history" && <Drafts history={history} setHistory={(h) => { setHistory(h); storeHistory(h); }} />}
           {view === "library" && <Library saved={saved} setSaved={(s) => { setSaved(s); storeSaved(s); }}
             onDeletedAll={() => { setSaved([]); setHistory([]); setMeta({}); setPrefsState({}); delete document.documentElement.dataset.theme; }} />}
+          {view === "paragraph" && <ParagraphCheck key={paraSeed?.key ?? 0} seed={paraSeed} defaultStyle={style} />}
           {view === "settings" && <div className="mx-auto grid grid-cols-[minmax(0,1fr)] max-w-[1180px] gap-[18px] px-4 pt-7 pb-12">
             <div>
               <h1 className="text-[clamp(23px,4vw,30px)] font-bold leading-tight tracking-tight">Settings</h1>
@@ -714,6 +718,7 @@ export default function App() {
 
             {tool === "similarity" && <>
               {run ? <Report doc={doc} run={run} ctx={ctx} webNote={webNote} citeFor={citeFor} prefs={prefs} setPrefs={setPrefs} hybrid={hybrid}
+                  onFixInParagraph={(text, source) => { setParaSeed({ key: Date.now(), text, sources: [source] }); go("paragraph"); }}
                   recompute={recompute} applyEdit={applyEdit} undo={undo} saveDoc={saveDoc} saveMeta={saveMeta} saveDraft={saveDraft} />
                 : <div className="rounded-xl border border-line bg-panel p-5 text-sm" role="status">
                     {sim.status === "needs-sources" ? <><b className="text-base">Nothing to compare against yet.</b>
@@ -751,7 +756,7 @@ export default function App() {
         </main>
       </div>
 
-      <nav aria-label="Tools" className="no-print fixed inset-x-0 bottom-0 z-30 grid grid-cols-7 border-t border-line bg-panel md:hidden">
+      <nav aria-label="Tools" className="no-print fixed inset-x-0 bottom-0 z-30 grid grid-cols-8 border-t border-line bg-panel md:hidden">
         {NAV.filter((n) => n.id !== "settings").map((n) => <button key={n.id} onClick={n.on} aria-current={n.active ? "page" : undefined} data-nav-mobile={n.id}
           className={cx("flex cursor-pointer flex-col items-center gap-0.5 py-2 text-[11px] font-medium", n.active ? "text-accent" : "text-mute")}>
           {n.icon}{n.short}</button>)}

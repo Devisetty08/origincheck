@@ -1,6 +1,7 @@
 "use client";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Copy, FileDown, Quote, PenLine, Trash2, Undo2, CheckCircle2, AlertTriangle, Info } from "lucide-react";
+import { ChevronLeft, ChevronRight, Copy, FileDown, Quote, PenLine, Trash2, Undo2, CheckCircle2, AlertTriangle, Info, Pilcrow } from "lucide-react";
+import type { PSource } from "@/lib/paragraph/citations";
 import { type CiteMeta, type Passage, type Settings, type Source, KIND_LABEL, bibStart } from "@/lib/similarity";
 import { type Style, STYLE_LABEL, checkCitations, findCitations, findEntries, orderForList, reference, segText } from "@/lib/citations";
 import { closeness } from "@/lib/closeness";
@@ -23,6 +24,8 @@ interface Props {
   saveMeta: (name: string, m: CiteMeta) => void;
   saveDraft: (label: string) => Promise<void>;
   hybrid: Hybrid;
+  /** Open a flagged passage's paragraph, with its source, in Paragraph check. */
+  onFixInParagraph?: (paragraph: string, source: PSource) => void;
 }
 /** m = verbatim (counted), c = stricter mode, n = near-verbatim, p = paraphrase (n, c and p are not counted in the %). */
 type MKind = "m" | "c" | "n" | "p";
@@ -243,6 +246,10 @@ export default function Report(p: Props) {
           <li className="flex gap-1.5 text-mute"><Info size={14} className="mt-0.5 shrink-0" aria-hidden />Start with your own point, then use the source as evidence — quoted or in your own words, and cited.</li>
         </ul>
         {sel.kind !== "c" && <Remedies x={selected} kind={sel.kind} />}
+        {p.onFixInParagraph && <Button size="sm" className="mt-1.5" id="fixInParagraph" onClick={() => {
+          const t = doc.text, a = t.lastIndexOf("\n", selected.s - 1) + 1, z = t.indexOf("\n", selected.end);
+          p.onFixInParagraph!(t.slice(a, z < 0 ? t.length : z).trim(), { id: src.id, title: src.name, text: src.text, meta: p.ctx.metaFor(src) ?? { authors: [], title: src.name.replace(/\.[^.]+$/, "") } });
+        }}><Pilcrow size={14} />Fix in Paragraph check</Button>}
       </div>
     );
   }

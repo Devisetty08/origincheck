@@ -1,0 +1,1 @@
+We chose a managed platform. Azure Database for PostgreSQL flexible server is a fully managed database service designed to provide more granular control and flexibility over database management functions and configuration settings.

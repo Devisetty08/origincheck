@@ -54,6 +54,8 @@ The AI won't reword the red sentences. Rewording copied text is still copying, s
 
 **Write.** A built-in editor where every check updates as you type. It can keep a writing history (see below). Next to the editor is a list of the passages that match a source. Pick one and it's selected in the editor, ready for you to rewrite in your own words. While you type, a meter shows whether your version is still too close to the source (the source wording stays hidden unless you ask for it) and whether the passage still matches. When it no longer matches, add the citation with one click.
 
+**Paragraph check.** Paste one paragraph and the source it's based on, and fix it sentence by sentence until every sentence is either your own wording with a citation or a properly quoted and cited passage. See [Paragraph check](#paragraph-check) below.
+
 **Grammar.** Spelling, grammar, punctuation and style, checked on your own device. Each suggestion has Accept and Dismiss. You also get definitions and synonyms for any word, a readability score, the tone of the text, and a corrected .docx.
 
 **AI indicator.** Off by default. When on, it estimates how likely the text is machine-written, shows a sentence-by-sentence heatmap and explains why. It's an estimate, never a verdict.
@@ -63,6 +65,59 @@ The AI won't reword the red sentences. Rewording copied text is still copying, s
 **Download report.** A PDF originality report: a cover page, your document with matches highlighted in each source's colour, the similarity index with its breakdown (internet, publications, your own sources, saved papers), the top sources, the settings used, and a page on grammar, the AI indicator and writing history. There's an interactive HTML version too. Documents in non-Latin scripts such as Korean get the HTML version, because the PDF fonts can't draw them.
 
 ![The plagiarism report with highlighted matches and the source list](example/screenshot-plagiarism.png)
+
+## Paragraph check
+
+Paragraph check is for one paragraph at a time: a literature-review paragraph, say, or a section of a report built on one or two sources. You paste the paragraph, add its sources, and it shows each sentence with a status:
+
+| Status | Meaning |
+|---|---|
+| 🟢 Original | Your own wording, cited where it needs to be |
+| 🟡 Needs citation | Your own wording, but it draws on a source and has no citation |
+| 🟠 Quoted | Quoted and cited. Fine, but it counts towards the quoting limit |
+| 🔴 Too close | Copied wording or patchwriting |
+
+Each status comes with an icon and a label, not just a colour.
+
+You can add sources by pasting text, uploading a file, or entering a DOI (Crossref, plus a free legal copy from Unpaywall when there is one), an ISBN (Open Library, then Google Books) or a Wikipedia link. "Find possible sources" is off by default. When you turn it on, it sends a few short phrases from your paragraph to Wikipedia, Crossref and OpenAlex and offers what it finds. Citation details are filled in from the lookups, and you can correct them.
+
+### The rules
+
+| Check | What it looks for | Severity |
+|---|---|---|
+| Copied wording | 6 or more words in a row that match a source and aren't in quotation marks | Error |
+| Patchwriting | Not copied word for word, but too close to one source sentence: the same content words (stemmed, stop words removed) in much the same order, or 60% of the sentence's content words taken from one source sentence | Error |
+| Quote without citation | A quotation with no citation in the same sentence or the next | Error |
+| Borrowed idea without citation | A sentence that draws on a source, even rewritten, with no citation | Error |
+| Quote too long | A quotation longer than 40 words (you can change the limit) | Warning |
+| Too much quoting | More than 30% of the paragraph inside quotation marks | Warning |
+| Citation without reference | An in-text citation that doesn't match any of your sources | Warning |
+| Citation format | A citation in the wrong style, for example "(Microsoft 2024)" in APA, which wants "(Microsoft, 2024)" | Warning |
+| Grammar and spelling | Harper, on your device | Suggestion |
+
+Technical terms you list, such as "Azure Database for PostgreSQL flexible server", are never counted as borrowed wording. Cited quotations are never counted as copied.
+
+### What it fixes for you, and what you write
+
+It fixes the mechanical things in one click, always with a preview first, and you can undo any of them:
+
+- **Quote and cite** puts the copied words in quotation marks and adds the citation (with a page number if you give one).
+- **Add citation** puts the citation at the end of the sentence, before the full stop.
+- **Fix citation format** rewrites a citation into your chosen style.
+- **The reference list** is built for every source you cite, with [citation-js](https://github.com/citation-js/citation-js) and the official CSL styles for APA 7, Harvard (Cite Them Right) and IEEE. If a style can't load, origincheck's own templates are used.
+- **Grammar suggestions** are accepted one at a time, or all spelling fixes at once.
+
+The new wording is yours to write. When a sentence is too close, **Rewrite in my own words** opens an editor. The source is hidden unless you ask to see it, and a meter tells you as you type whether your sentence is Too close, Borderline or Original wording. The citation is kept, because rewritten ideas still need one. The only help it gives is questions about your own work ("How did this apply in your project?", "What result or decision followed from this?"), never sample sentences.
+
+Paragraph check never generates replacement wording. There's no paraphraser, no "rewrite for me" button, no synonym swapping, no AI humanizer, and no language model writing sentences. The only automatic changes are quotation marks, citations, reference entries, and grammar and spelling fixes you accept yourself. This is deliberate: a paragraph is only non-plagiarised if the wording is genuinely yours, and text a tool rewords for you isn't.
+
+Two other parts of origincheck can change your wording, and both are outside Paragraph check: the AI suggestions on the Rewrite page (for your own sentences only, never for text that matches a source, and labelled AI-assisted when kept), and the synonym list in the Grammar page's word lookup.
+
+When you're done, you get the final paragraph and its references, each with a Copy button, a before-and-after summary, and exports as .docx, .txt or a small HTML report. Recent checks can be saved in your browser. Your paragraph is never sent anywhere unless you turn on "Find possible sources" or look up a DOI.
+
+Shortcuts: Ctrl+Enter checks now, Alt+↓ and Alt+↑ move between issues, and Ctrl+Z and Ctrl+Y undo and redo.
+
+From the plagiarism report, **Fix in Paragraph check** opens a flagged passage's paragraph there, together with its source.
 
 ## Where it searches
 
@@ -145,6 +200,7 @@ Your document, saved documents, history and settings stay in your browser. Anyth
 | Translated search | The same short phrases, to your translation server |
 | Adding a web page or references | Only the addresses, DOIs and references you enter |
 | Word lookup | The one word, to Datamuse, the Free Dictionary API, Wiktionary and Wikidata |
+| Paragraph check lookups | Only what you enter: a DOI (to Crossref and Unpaywall, through the server), an ISBN (to Open Library or Google Books) or a Wikipedia title. With "Find possible sources" on: up to 4 short phrases, to Wikipedia, Crossref and OpenAlex. |
 | Scanned PDFs, language detection, tone | Nothing. These run in your browser. |
 | Rewrite | Nothing with Ollama. With Anthropic, the passage you picked. |
 | Writing history | Nothing |
@@ -239,7 +295,8 @@ web/                    the web app (Next.js)
   src/server/           source adapters, search orchestrator, safe page fetcher, rate limiter,
                         settings, usage caps, Copyleaks
   src/lib/              matching, hybrid matching, query selection, citations, import, exports
-  src/components/       the interface
+  src/lib/paragraph/    Paragraph check: sentences, rules, patchwriting, citations, fixes
+  src/components/       the interface (Paragraph check in components/paragraph/)
   src/workers/          matching, embedding and AI-indicator workers
 origincheck.py          command-line tool
 prose-inspector/        Streamlit writing-pattern report

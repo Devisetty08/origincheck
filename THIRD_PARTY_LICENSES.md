@@ -34,7 +34,9 @@ origincheck uses the open-source components below. Versions are the ones pinned 
 | [jsPDF](https://github.com/parallax/jsPDF) | 4.2.1 | MIT | Self-check summary PDF |
 | [JSZip](https://github.com/Stuk/jszip) | 3.10.1 | MIT or GPL-3.0-or-later (used under MIT) | Reading Word document properties |
 | [idb-keyval](https://github.com/jakearchibald/idb-keyval) | 6.3.0 | Apache-2.0 | Saved documents and history in the browser |
-| [stemmer](https://github.com/words/stemmer) | 2.0.1 | MIT | Stricter matching mode |
+| [stemmer](https://github.com/words/stemmer) | 2.0.1 | MIT | Stricter matching mode, and Paragraph check's patchwriting rule (Porter stemmer) |
+| [citation-js](https://github.com/citation-js/citation-js) (`@citation-js/core`, `@citation-js/plugin-csl`) | 0.9.0 | MIT | Paragraph check's reference list, formatted with CSL styles. The APA style ships with `@citation-js/plugin-csl`. |
+| [CSL styles](https://github.com/citation-style-language/styles): Harvard Cite Them Right (`harvard-cite-them-right.csl`) and IEEE (`ieee.csl`) | copied into `web/public/csl/` | CC BY-SA 3.0 | Harvard and IEEE reference formatting in Paragraph check. © the Citation Style Language project and the styles' authors (named in each file). |
 
 ## Server
 

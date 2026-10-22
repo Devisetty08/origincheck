@@ -13,7 +13,7 @@ const MAX_QUERY_CHARS = 200, MAX_QUERY_WORDS = 16;
 export async function POST(req: Request) {
   const over = limit(req, "search", 6);
   if (over) return over;
-  const body = (await req.json().catch(() => ({}))) as { queries?: unknown; groups?: unknown; korean?: unknown };
+  const body = (await req.json().catch(() => ({}))) as { queries?: unknown; groups?: unknown; korean?: unknown; only?: unknown };
   const queries = Array.isArray(body.queries) ? body.queries.filter((q): q is string => typeof q === "string").map((q) => q.trim()).filter(Boolean) : [];
   const groups = Array.isArray(body.groups) ? body.groups.filter((g): g is Group => typeof g === "string" && g in GROUPS) : [];
   if (!queries.length || !groups.length) return Response.json({ error: "Send at least one query and one source group." }, { status: 400 });
@@ -21,7 +21,9 @@ export async function POST(req: Request) {
   if (queries.some((q) => q.length > MAX_QUERY_CHARS || q.split(/\s+/).length > MAX_QUERY_WORDS))
     return Response.json({ error: `Queries must be short chunks (at most ${MAX_QUERY_WORDS} words); full documents are never accepted.` }, { status: 400 });
 
-  const adapters = pick(groups, body.korean === true);
+  // `only`: limit the run to these adapter ids (Paragraph check searches Wikipedia, Crossref and OpenAlex only)
+  const only = Array.isArray(body.only) ? body.only.filter((x): x is string => typeof x === "string") : null;
+  const adapters = pick(groups, body.korean === true).filter((a) => !only || only.includes(a.id));
   const enc = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {

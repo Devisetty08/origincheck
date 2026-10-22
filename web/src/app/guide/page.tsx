@@ -24,7 +24,7 @@ export default function Guide() {
         <h1 className="text-[clamp(24px,4vw,32px)] font-bold tracking-tight">A short guide to avoiding plagiarism</h1>
         <p className="mt-2 text-mute">Plagiarism is presenting someone else&apos;s words or ideas as your own. The fix is almost always the same: make it clear what came from where.</p>
 
-        <h2 className={H2}>When to quote</h2>
+        <h2 className={H2} id="quote">How to quote</h2>
         <p>Quote when the exact wording matters: a definition, a striking phrase, a claim you are about to analyse, or wording you can&apos;t improve without changing the meaning. Keep quotations short and use them sparingly — most of your text should be your own.</p>
         <ul className="mt-2 list-disc pl-6">
           <li>Copy the words exactly and put them in quotation marks.</li>
@@ -32,7 +32,7 @@ export default function Guide() {
           <li>Explain what the quotation shows. A quote doesn&apos;t make your point for you.</li>
         </ul>
 
-        <h2 className={H2}>How to paraphrase</h2>
+        <h2 className={H2} id="paraphrase">How to paraphrase</h2>
         <p>A paraphrase restates an idea in your own words and your own sentence structure. Swapping a few words for synonyms is not enough — that&apos;s still the source&apos;s sentence.</p>
         <ol className="mt-2 list-decimal pl-6">
           <li>Read the passage until you understand it.</li>
@@ -45,7 +45,7 @@ export default function Guide() {
         <Example label="Too close (synonym swap)" tone="border-high">Moving from Oracle to PostgreSQL needs a careful review of schema objects, stored procedures and data types.</Example>
         <Example label="Paraphrase" tone="border-low">Before switching databases, teams should check which Oracle features — especially procedural code and column types — will need rework in PostgreSQL (Author, 2024).</Example>
 
-        <h2 className={H2}>How to cite</h2>
+        <h2 className={H2} id="cite">How to cite</h2>
         <p>Every idea, fact or wording you took from a source needs an in-text citation and a matching entry in your reference list. Use the style your course asks for — origincheck can format APA 7, Harvard and IEEE.</p>
         <ul className="mt-2 list-disc pl-6">
           <li><b>APA 7:</b> (Smith &amp; Lee, 2021) · reference list sorted by author.</li>
