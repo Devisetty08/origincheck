@@ -3,15 +3,15 @@
 // Added from files they own (PDF, EPUB, Word…), a .bib/.ris export, their Zotero library, or a search for books with a
 // free, legal full text. For other books it only links to where a copy can be borrowed, bought or found.
 import { useState } from "react";
-import { BookOpen, ExternalLink, FileUp, Library as LibIcon, Loader2, Search, Trash2 } from "lucide-react";
+import { ExternalLink, FileUp, Library as LibIcon, Loader2, Search, Trash2 } from "lucide-react";
+import FindBook from "./FindBook";
 import { findCopyLinks, lookupLine, parseReferenceFile, toMeta } from "@/lib/bibimport";
 import { SUPPORTED, extract } from "@/lib/extract";
-import { importReferences, importUrl } from "@/lib/importer";
+import { importReferences } from "@/lib/importer";
 import type { CiteMeta } from "@/lib/similarity";
 import { type LibraryItem, uid } from "@/lib/store";
 import { Button, Card, Check, cx, inputCls } from "./ui";
 
-type BookHit = { title: string; authors: string[]; year?: string; isbn?: string; doi?: string; url?: string; source: string; get?: string; note: string };
 type ZItem = { key: string; meta: CiteMeta; itemType: string; textKey?: string };
 type Missing = { meta: CiteMeta; why: string };
 type Tab = "files" | "books" | "refs" | "zotero";
@@ -19,7 +19,6 @@ const TABS: { id: Tab; label: string }[] = [{ id: "files", label: "My files" }, 
 const ORIGIN: Record<LibraryItem["origin"], string> = { file: "your file", zotero: "Zotero", bib: "reference file", openbook: "free book" };
 const words = (t: string) => t.split(/\s+/).filter(Boolean).length;
 const byline = (m?: CiteMeta) => (m ? [m.authors.map((a) => a.family).filter(Boolean).slice(0, 2).join(", "), m.year].filter(Boolean).join(" · ") : "");
-const splitName = (n: string): CiteMeta["authors"][number] => { const p = n.trim().split(/\s+/); return p.length > 1 ? { family: p[p.length - 1], given: p.slice(0, -1).join(" ") } : { family: n.trim() }; };
 
 type Access = "free" | "borrow" | "preview" | "library" | "paid" | "restricted";
 type Offer = { site: string; url: string; access: Access; price?: string; note: string };
@@ -62,7 +61,7 @@ export default function MyLibrary({ items, setItems, on, setOn }: { items: Libra
   const [tab, setTab] = useState<Tab>("files");
   const [busy, setBusy] = useState(""), [msg, setMsg] = useState("");
   const [missing, setMissing] = useState<Missing[]>([]);
-  const [q, setQ] = useState(""), [books, setBooks] = useState<BookHit[] | null>(null);
+
   const [zq, setZq] = useState(""), [zitems, setZitems] = useState<ZItem[] | null>(null);
 
   const has = (name: string) => items.some((x) => x.name.toLowerCase() === name.toLowerCase());
@@ -104,18 +103,6 @@ export default function MyLibrary({ items, setItems, on, setOn }: { items: Libra
     setMsg(`${add(got)} added with full text. ${miss.length ? `${miss.length} without a free copy are listed below with where to find them.` : ""}`);
   });
 
-  const searchBooks = () => q.trim().length >= 2 && run("Searching books…", async () => setBooks((await json<{ books: BookHit[] }>(`/api/books?q=${encodeURIComponent(q.trim())}`)).books));
-  const addBook = (b: BookHit) => run(`Getting “${b.title}”…`, async () => {
-    const meta: CiteMeta = { authors: b.authors.map(splitName), title: b.title, year: b.year, isbn: b.isbn, doi: b.doi, url: b.url };
-    let text: string;
-    if (b.get!.startsWith("pdf:")) {
-      const r = await importUrl(b.get!.slice(4));
-      if (!r.ok || !r.source) throw new Error(r.message);
-      text = r.source.text;
-    } else text = (await json<{ text: string }>(`/api/books?get=${encodeURIComponent(b.get!)}`)).text;
-    setMsg(add([{ name: b.title, text, meta, origin: "openbook" }]) ? `Added “${b.title}” (${words(text).toLocaleString()} words).` : `“${b.title}” is already in your library.`);
-  });
-
   const searchZotero = () => run("Reading your Zotero library…", async () => setZitems((await json<{ items: ZItem[] }>(`/api/zotero?q=${encodeURIComponent(zq.trim())}`)).items));
   const addZotero = (list: ZItem[]) => run("Importing from Zotero…", async () => {
     const got: Omit<LibraryItem, "id" | "addedAt">[] = [];
@@ -146,21 +133,7 @@ export default function MyLibrary({ items, setItems, on, setOn }: { items: Libra
           </label>
           <p className="text-[12.5px] text-mute">E-books with DRM can&apos;t be read; use a DRM-free copy. Scanned PDFs are read with OCR (English, first 30 pages).</p>
         </>}
-        {tab === "books" && <>
-          <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); searchBooks(); }}>
-            <input className={inputCls} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Title, author or subject" aria-label="Find a book" id="bookQuery" />
-            <Button size="sm" type="submit" disabled={!!busy}><Search size={14} />Search</Button>
-          </form>
-          <p className="text-[12.5px] text-mute">Full texts come only from free, legal copies: open-access books, public-domain scans on the Internet Archive and Project Gutenberg. For other books you get links to borrow, buy or find them in a library; add the file yourself if you own it.</p>
-          {books && !books.length && <p className="text-mute">No books found.</p>}
-          {books?.map((b, i) => <div key={`${b.title}-${i}`} className="rounded-lg border border-line p-2.5" data-book={b.get ? "free" : "links"}>
-            <div className="font-medium">{b.title}</div>
-            <div className="text-[12.5px] text-mute">{[b.authors.slice(0, 2).join(", "), b.year, b.source].filter(Boolean).join(" · ")}</div>
-            <div className="mt-0.5 text-[12.5px]">{b.note}</div>
-            <div className="mt-1.5">{b.get ? <Button size="sm" onClick={() => addBook(b)} disabled={!!busy}><BookOpen size={14} />Add the full text to my library</Button>
-              : <CopyLinks meta={{ title: b.title, isbn: b.isbn, doi: b.doi, authors: b.authors.map(splitName) }} extra={b.url} />}</div>
-          </div>)}
-        </>}
+        {tab === "books" && <FindBook compact onAdd={(x) => add([x]) > 0} />}
         {tab === "refs" && <>
           <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-line p-3 hover:border-accent">
             <FileUp size={16} aria-hidden />Import a reference list exported from Zotero, Mendeley, EndNote… (.bib or .ris)

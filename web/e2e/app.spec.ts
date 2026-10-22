@@ -387,11 +387,50 @@ test("a flagged passage opens in Paragraph check with its source", async ({ page
   await expect(page.locator('#pView [data-status="too-close"]').first()).toBeVisible();
 });
 
+const FIND_RESULT = {
+  mode: "any",
+  sources: [
+    { label: "Open Library and the Internet Archive", status: "ok", count: 1 }, { label: "Text inside books (Open Library)", status: "ok", count: 1 },
+    { label: "Project Gutenberg", status: "ok", count: 1 }, { label: "Google Books", status: "failed", count: 0, note: "needs a free Google Books API key (Settings)" },
+  ],
+  results: [
+    { key: "pg:3300", title: "The Wealth of Nations", authors: ["Adam Smith"], kind: "Book", source: "Project Gutenberg (public domain)", access: "free", get: "gutenberg:3300",
+      readUrl: "https://www.gutenberg.org/ebooks/3300.html.images",
+      downloads: [{ label: "EPUB", url: "https://www.gutenberg.org/ebooks/3300.epub3.images" }, { label: "Plain text", url: "https://www.gutenberg.org/ebooks/3300.txt.utf-8" }] },
+    { key: "inside:lectures", title: "Lectures on Wealth", authors: ["A. Lecturer"], kind: "Book", source: "Inside books (Open Library)", access: "snippet", downloads: [],
+      snippet: "the wealth of nations is the annual produce of land and labour", readUrl: "https://archive.org/details/lectures?q=wealth" },
+    { key: "ol:/works/OL1W", title: "Database Design for Mere Mortals", authors: ["Michael J. Hernandez"], kind: "Book", source: "Open Library", isbn: "9780201694710",
+      access: "details", downloads: [], readUrl: "https://openlibrary.org/works/OL1W" },
+  ],
+};
+
+test("Find a book: every source is listed, free books download and open here, matching text shows, others say where to get them", async ({ page }) => {
+  let asked = "";
+  await page.route("**/api/books?q=*", (r) => { asked = r.request().url(); return r.fulfill({ json: FIND_RESULT }); });
+  await page.route("**/api/books?get=*", (r) => r.fulfill({ json: { text: "BOOK I. Of the causes of improvement in the productive powers of labour. ".repeat(30) + "The wealth of nations grows with the division of labour." } }));
+  await page.goto("./");
+  await page.waitForLoadState("networkidle");
+  await openTool(page, "books");
+  await expect(page.getByRole("heading", { name: "Find a book or paper", level: 1 })).toBeVisible();
+  await page.locator("#findMode").selectOption("keywords");
+  await page.locator("#findQuery").fill("wealth of nations"); // results pop up after a short pause, no button needed
+  await expect(page.locator("#findResults li")).toHaveCount(3);
+  expect(asked).toContain("mode=keywords");
+  await expect(page.locator("#findSources")).toContainText("Google Books: needs a free Google Books API key");
+  const free = page.locator('#findResults [data-access="free"]');
+  await expect(free.locator("[data-download]").first()).toHaveAttribute("href", "https://www.gutenberg.org/ebooks/3300.epub3.images");
+  await expect(page.locator('#findResults [data-access="snippet"] [data-snippet] mark').first()).toBeVisible();
+  await free.locator("[data-read]").click();
+  await expect(page.locator("#reader [data-fulltext]")).toContainText("BOOK I.");
+  await expect(page.locator("#reader")).toContainText("Where your search appears");
+  await page.keyboard.press("Escape");
+  await free.locator("[data-add]").click();
+  await expect(page.locator("#findMsg")).toContainText("Added “The Wealth of Nations” to My library");
+  expect(await noSideScroll(page)).toBe(true);
+});
+
 test("My library: a book you own is compared in every check; free books are added, others get find-a-copy links", async ({ page }) => {
-  await page.route("**/api/books?q=*", (r) => r.fulfill({ json: { books: [
-    { title: "The Wealth of Nations", authors: ["Adam Smith"], source: "Project Gutenberg", get: "gutenberg:3300", note: "Public domain: the full text comes from Project Gutenberg." },
-    { title: "Database Design for Mere Mortals", authors: ["Michael J. Hernandez"], isbn: "9780201694710", source: "Open Library", note: "In copyright: borrow it from Open Library, or find it in a library." },
-  ] } }));
+  await page.route("**/api/books?q=*", (r) => r.fulfill({ json: FIND_RESULT }));
   await page.route("**/api/books?get=*", (r) => r.fulfill({ json: { text: "It is not from the benevolence of the butcher, the brewer, or the baker, that we expect our dinner. ".repeat(20) } }));
   await page.route("**/api/zotero?*", (r) => r.fulfill({ json: r.request().url().includes("text=")
     ? { text: "Zotero indexed text of a paper about schema conversion and data type mapping between database engines. ".repeat(10) }
@@ -403,21 +442,23 @@ test("My library: a book you own is compared in every check; free books are adde
   await expect(page.locator("#libItems li")).toHaveCount(1);
 
   await page.locator('[data-lib-tab="books"]').click();
-  await page.locator("#bookQuery").fill("wealth of nations");
-  await page.locator("#bookQuery").press("Enter");
-  await expect(page.locator('[data-book="links"]')).toContainText("borrow it from Open Library");
-  await expect(page.locator('[data-book="links"] a').filter({ hasText: "WorldCat" })).toHaveAttribute("href", "https://search.worldcat.org/search?q=bn:9780201694710");
+  await page.locator("#findQuery").fill("wealth of nations");
+  await page.locator("#findQuery").press("Enter");
+  const notFree = page.locator('#findResults [data-access="details"]');
+  await expect(notFree).toContainText("Database Design for Mere Mortals");
+  await expect(notFree.locator("a").filter({ hasText: "WorldCat" })).toHaveAttribute("href", "https://search.worldcat.org/search?q=bn:9780201694710");
+  await expect(notFree.locator("[data-download]")).toHaveCount(0); // in copyright: no download
   // a copyrighted book: where it's available, and whether each option is free or paid
   await page.route("**/api/books?where=*", (r) => r.fulfill({ json: { offers: [
     { site: "Open Library", url: "https://openlibrary.org/works/OL1W", access: "borrow", note: "Free to borrow, but every copy is on loan. Join the waiting list (3 waiting)." },
     { site: "WorldCat", url: "https://search.worldcat.org/search?q=bn:9780201694710", access: "library", note: "Free to borrow from libraries that hold it." },
     { site: "Google Play Books", url: "https://play.google.com/b", access: "paid", price: "₹499.00", note: "E-book to buy." },
   ] } }));
-  await page.locator('[data-book="links"] [data-where-btn]').click();
-  await expect(page.locator('[data-book="links"] [data-offer="borrow"]')).toContainText("Free to borrow");
-  await expect(page.locator('[data-book="links"] [data-offer="paid"]')).toContainText("Paid");
-  await expect(page.locator('[data-book="links"] [data-price]')).toHaveText("₹499.00");
-  await page.locator('[data-book="free"]').getByRole("button", { name: "Add the full text to my library" }).click();
+  await notFree.locator("[data-where-btn]").click();
+  await expect(notFree.locator('[data-offer="borrow"]')).toContainText("Free to borrow");
+  await expect(notFree.locator('[data-offer="paid"]')).toContainText("Paid");
+  await expect(notFree.locator("[data-price]")).toHaveText("₹499.00");
+  await page.locator('#findResults [data-access="free"]').first().locator("[data-add]").click();
   await expect(page.locator("#libItems li")).toHaveCount(2);
 
   await page.locator('[data-lib-tab="zotero"]').click();

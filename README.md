@@ -25,6 +25,7 @@ A word of caution: these scores are signals, not proof. A match can be a properl
 - **Estimate how likely text is to be machine-written,** if you switch it on, sentence by sentence and with the reasons, always marked as a signal rather than a verdict.
 - **Record how you wrote a document** (writing history), so you can show your process if your work is questioned.
 - **Point out confidential names** you list, such as your employer, clients or internal systems, and rank your sections so you fix the worst ones first.
+- **Find books and papers** by title, author, words from the text, a citation, an ISBN or a DOI, across Open Library, the Internet Archive, Project Gutenberg, open-access literature, Crossref and Google Books. Free, legal copies can be downloaded or read in the app.
 - **Keep your own reference library** of books and papers you own (PDF, EPUB, Word), your Zotero items, a .bib or .ris export, and free open-access or public-domain books, and compare every check against it.
 - **Give you reports and files:** a PDF or HTML originality report, a corrected .docx, and the paragraph with its references.
 - **Work from the command line** for batches of documents, with the same matching as the web app.
@@ -101,10 +102,39 @@ The AI won't reword the red sentences. Rewording copied text is still copying, s
 
 **AI indicator.** Off by default. When on, it estimates how likely the text is machine-written, shows a sentence-by-sentence heatmap and explains why. It's an estimate, never a verdict.
 
+**Find a book.** A page in the sidebar for finding any book or paper. Search by:
+
+- anything
+- title
+- author
+- words you remember from the text
+- a citation you paste
+- an ISBN
+- a DOI
+
+Results appear as you type. Each search covers, depending on the type:
+
+- Open Library and the Internet Archive
+- the text inside scanned books
+- Project Gutenberg
+- open-access books and papers (OpenAlex)
+- citations (Crossref, with Unpaywall and OpenAlex for free copies)
+- Google Books
+
+The page shows what each source found, or why it couldn't search. Each result is labelled:
+
+| Label | What you get |
+|---|---|
+| Free download | A legal free copy (PDF, EPUB or plain text) from a public-domain or open-access source. **Read here** opens the full text with the passages that match your search, and **Add to My library** keeps it for your checks. |
+| Matching text | The passage from inside the book that matches your search, as Open Library or Google Books publishes it, with a link to read more of it |
+| Details | The book's details, and **Where to get it: free or paid?** (see below) |
+
+It never downloads copyrighted books. For those you see the matching text and where to read, borrow or buy them.
+
 **My library.** Your own reference books and papers, kept in your browser and compared in every check, so copying from a book you own is caught even when it isn't online. Open it from the books icon at the top. You can add to it in four ways:
 
 - **Your files:** books and papers you own, as PDF, EPUB, Word and other formats. E-books with DRM can't be read; use a DRM-free copy.
-- **Find a book:** search by title, author or subject. A full text is added only when there's a free, legal copy: an open-access book (through OpenAlex), a public-domain scan on the Internet Archive, or Project Gutenberg. For other books, **Where to get it: free or paid?** lists every option with a label:
+- **Find a book:** the same search as the Find a book page. A full text is added only when there's a free, legal copy: an open-access book (through OpenAlex), a public-domain scan on the Internet Archive, or Project Gutenberg. For other books, **Where to get it: free or paid?** lists every option with a label:
 
   | Label | Meaning |
   |---|---|
@@ -282,7 +312,7 @@ Your document, saved documents, history and settings stay in your browser. Anyth
 | Translated search | The same short phrases, to your translation server |
 | Adding a web page or references | Only the addresses, DOIs and references you enter |
 | Word lookup | The one word, to Datamuse, the Free Dictionary API, Wiktionary and Wikidata |
-| My library | Your files stay in your browser. Book search sends what you type to OpenAlex, Open Library and the Internet Archive. "Where to get it" sends the book's title, author and ISBN, and your country, to Open Library and Google Books. A reference file sends its references, never your document. Zotero import uses your key to read your own library. |
+| Find a book and My library | Your files stay in your browser. Book search sends what you type (never your document) to the sources it searches: Open Library, the Internet Archive, Project Gutenberg, OpenAlex, Crossref, Unpaywall and Google Books. "Where to get it" sends the book's title, author and ISBN, and your country, to Open Library and Google Books. A reference file sends its references, never your document. Zotero import uses your key to read your own library. |
 | Paragraph check lookups | Only what you enter: a DOI (to Crossref and Unpaywall, through the server), an ISBN (to Open Library or Google Books) or a Wikipedia title. With "Find possible sources" on: up to 4 short phrases, to Wikipedia, Crossref and OpenAlex. |
 | Scanned PDFs, language detection, tone | Nothing. These run in your browser. |
 | Rewrite | Nothing with Ollama. With Anthropic, the passage you picked. With a free-model gateway, the passage you picked, to whichever free provider the gateway chooses. |
