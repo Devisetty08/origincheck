@@ -22,4 +22,9 @@ jobs:
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" --title "origincheck $GITHUB_REF_NAME" --notes-file notes.md --verify-tag --latest
+        run: | # a re-pushed tag updates its existing release instead of failing
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            gh release edit "$GITHUB_REF_NAME" --title "origincheck $GITHUB_REF_NAME" --notes-file notes.md
+          else
+            gh release create "$GITHUB_REF_NAME" --title "origincheck $GITHUB_REF_NAME" --notes-file notes.md --verify-tag --latest
+          fi
