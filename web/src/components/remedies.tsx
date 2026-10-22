@@ -172,7 +172,7 @@ export function WriteMatches({ hybrid, editorId, ...deps }: RemedyDeps & { hybri
       <h3 className="flex items-center gap-1.5 font-semibold"><FileWarning size={15} className={list.length ? "text-high" : "text-low"} />
         {list.length ? `${list.length} passage${list.length > 1 ? "s" : ""} match a source` : "No passages match a source"}
         <span className="ml-auto text-[12.5px] font-normal text-mute">Similarity {r.index}%</span></h3>
-      {list.length > 0 && <ul className="mt-2 grid max-h-52 gap-1 overflow-auto">
+      {list.length > 0 && <ul className="mt-2 grid max-h-52 grid-cols-[minmax(0,1fr)] gap-1 overflow-auto">
         {list.map(({ x, k }) => <li key={x.id}>
           <button className="w-full cursor-pointer rounded-md px-1.5 py-1 text-left hover:bg-soft" onClick={() => pick(x)} data-match={x.id}>
             <span className="block truncate font-serif">“{excerpt(doc.text.slice(x.s, x.end), 10)}”</span>

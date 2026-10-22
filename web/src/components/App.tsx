@@ -772,9 +772,10 @@ export default function App() {
         </main>
       </div>
 
-      <nav aria-label="Tools" className="no-print fixed inset-x-0 bottom-0 z-30 grid grid-cols-9 border-t border-line bg-panel md:hidden">
+      {/* nine tools don't fit side by side on a phone: the bar scrolls sideways instead of squeezing the labels together */}
+      <nav aria-label="Tools" className="no-print fixed inset-x-0 bottom-0 z-30 flex overflow-x-auto border-t border-line bg-panel md:hidden">
         {NAV.filter((n) => n.id !== "settings").map((n) => <button key={n.id} onClick={n.on} aria-current={n.active ? "page" : undefined} data-nav-mobile={n.id}
-          className={cx("flex cursor-pointer flex-col items-center gap-0.5 py-2 text-[11px] font-medium", n.active ? "text-accent" : "text-mute")}>
+          className={cx("flex min-w-16 flex-1 shrink-0 cursor-pointer flex-col items-center gap-0.5 px-1 py-2 text-[11px] font-medium whitespace-nowrap", n.active ? "text-accent" : "text-mute")}>
           {n.icon}{n.short}</button>)}
       </nav>
       <Dialog open={!!privacyAsk} onOpenChange={(o) => { if (!o) privacyAsk?.resolve(false); }} title={PRIVACY[privacyAsk?.kind ?? "search"].title}

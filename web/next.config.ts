@@ -5,6 +5,7 @@ const nextConfig: NextConfig = {
   images: { unoptimized: true },
   env: { NEXT_PUBLIC_BASE_PATH: "" },
   poweredByHeader: false,
+  agentRules: false, // don't generate AGENTS.md (instructions for AI coding agents) on `next dev`
   turbopack: {
     rules: {
       "*.css": {
