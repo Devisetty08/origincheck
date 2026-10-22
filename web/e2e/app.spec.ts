@@ -407,6 +407,16 @@ test("My library: a book you own is compared in every check; free books are adde
   await page.locator("#bookQuery").press("Enter");
   await expect(page.locator('[data-book="links"]')).toContainText("borrow it from Open Library");
   await expect(page.locator('[data-book="links"] a').filter({ hasText: "WorldCat" })).toHaveAttribute("href", "https://search.worldcat.org/search?q=bn:9780201694710");
+  // a copyrighted book: where it's available, and whether each option is free or paid
+  await page.route("**/api/books?where=*", (r) => r.fulfill({ json: { offers: [
+    { site: "Open Library", url: "https://openlibrary.org/works/OL1W", access: "borrow", note: "Free to borrow, but every copy is on loan. Join the waiting list (3 waiting)." },
+    { site: "WorldCat", url: "https://search.worldcat.org/search?q=bn:9780201694710", access: "library", note: "Free to borrow from libraries that hold it." },
+    { site: "Google Play Books", url: "https://play.google.com/b", access: "paid", price: "₹499.00", note: "E-book to buy." },
+  ] } }));
+  await page.locator('[data-book="links"] [data-where-btn]').click();
+  await expect(page.locator('[data-book="links"] [data-offer="borrow"]')).toContainText("Free to borrow");
+  await expect(page.locator('[data-book="links"] [data-offer="paid"]')).toContainText("Paid");
+  await expect(page.locator('[data-book="links"] [data-price]')).toHaveText("₹499.00");
   await page.locator('[data-book="free"]').getByRole("button", { name: "Add the full text to my library" }).click();
   await expect(page.locator("#libItems li")).toHaveCount(2);
 

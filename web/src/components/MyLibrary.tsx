@@ -21,11 +21,40 @@ const words = (t: string) => t.split(/\s+/).filter(Boolean).length;
 const byline = (m?: CiteMeta) => (m ? [m.authors.map((a) => a.family).filter(Boolean).slice(0, 2).join(", "), m.year].filter(Boolean).join(" · ") : "");
 const splitName = (n: string): CiteMeta["authors"][number] => { const p = n.trim().split(/\s+/); return p.length > 1 ? { family: p[p.length - 1], given: p.slice(0, -1).join(" ") } : { family: n.trim() }; };
 
-/** Where to borrow, buy or find a book: shown for anything without a free full text. */
+type Access = "free" | "borrow" | "preview" | "library" | "paid" | "restricted";
+type Offer = { site: string; url: string; access: Access; price?: string; note: string };
+const BADGE: Record<Access, [string, string]> = {
+  free: ["Free", "bg-low/15 text-low"], borrow: ["Free to borrow", "bg-low/15 text-low"], preview: ["Preview", "bg-accent/12 text-accent"],
+  library: ["Library", "bg-accent/12 text-accent"], paid: ["Paid", "bg-mid/15 text-mid"], restricted: ["Restricted", "bg-soft text-mute"],
+};
+const region = () => { try { return new Intl.Locale(navigator.language).maximize().region; } catch { return undefined; } };
+
+/**
+ * Where to read, borrow or buy a book that has no free full text, and whether each option is free or paid (with the
+ * price when a service publishes one). Looked up only when asked, so browsing results costs no API quota.
+ */
 export function CopyLinks({ meta, extra }: { meta: Pick<CiteMeta, "title" | "isbn" | "doi" | "authors">; extra?: string }) {
-  return <span className="flex flex-wrap gap-x-3 gap-y-0.5 text-[12.5px]">
+  const [res, setRes] = useState<{ offers: Offer[]; note?: string } | null>(null);
+  const [state, setState] = useState<"" | "busy" | "failed">("");
+  const look = async () => {
+    setState("busy");
+    const p = new URLSearchParams({ where: "1", title: meta.title ?? "", author: meta.authors?.[0]?.family ?? "", isbn: meta.isbn ?? "", country: region() ?? "" });
+    try { const r = await fetch(`/api/books?${p}`); if (!r.ok) throw new Error(); setRes(await r.json()); setState(""); } catch { setState("failed"); }
+  };
+  if (res) return <div className="grid gap-1 text-[12.5px]" data-where>
+    {res.offers.map((o) => <div key={o.site + o.access} className="flex flex-wrap items-baseline gap-x-2" data-offer={o.access}>
+      <span className={cx("rounded-full px-2 py-0.5 text-[11.5px] font-semibold", BADGE[o.access][1])}>{BADGE[o.access][0]}</span>
+      <a className="inline-flex items-center gap-1 font-medium text-accent underline" href={o.url} target="_blank" rel="noreferrer"><ExternalLink size={12} />{o.site}</a>
+      {o.price && <b data-price>{o.price}</b>}
+      <span className="text-mute">{o.note}</span>
+    </div>)}
+    {res.note && <span className="text-mute">{res.note}</span>}
+  </div>;
+  return <span className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[12.5px]">
+    <Button size="sm" onClick={look} disabled={state === "busy"} data-where-btn>{state === "busy" ? <Loader2 size={13} className="animate-spin" /> : <Search size={13} />}Where to get it: free or paid?</Button>
     {extra && <a className="inline-flex items-center gap-1 text-accent underline" href={extra} target="_blank" rel="noreferrer"><ExternalLink size={12} />Book page</a>}
     {findCopyLinks(meta).map((l) => <a key={l.url} className="inline-flex items-center gap-1 text-accent underline" href={l.url} target="_blank" rel="noreferrer"><ExternalLink size={12} />{l.label}</a>)}
+    {state === "failed" && <span className="text-mute">Couldn&apos;t check right now; the links above still work.</span>}
   </span>;
 }
 

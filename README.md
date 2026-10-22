@@ -104,13 +104,24 @@ The AI won't reword the red sentences. Rewording copied text is still copying, s
 **My library.** Your own reference books and papers, kept in your browser and compared in every check, so copying from a book you own is caught even when it isn't online. Open it from the books icon at the top. You can add to it in four ways:
 
 - **Your files:** books and papers you own, as PDF, EPUB, Word and other formats. E-books with DRM can't be read; use a DRM-free copy.
-- **Find a book:** search by title, author or subject. A full text is added only when there's a free, legal copy: an open-access book (through OpenAlex), a public-domain scan on the Internet Archive, or Project Gutenberg. For other books you get links to borrow it (Open Library), find it in a library near you (WorldCat) or preview it (Google Books).
+- **Find a book:** search by title, author or subject. A full text is added only when there's a free, legal copy: an open-access book (through OpenAlex), a public-domain scan on the Internet Archive, or Project Gutenberg. For other books, **Where to get it: free or paid?** lists every option with a label:
+
+  | Label | Meaning |
+  |---|---|
+  | Free | Free to read online, for example a public-domain scan |
+  | Free to borrow | A free loan on Open Library. It says if every copy is on loan, and how many people are waiting. |
+  | Preview | Some pages are free to read on Google Books |
+  | Library | Free to borrow from a library that holds it (WorldCat shows the nearest) |
+  | Paid | The e-book on Google Play Books, with its price in your country, or bookshop prices compared on BookFinder |
+  | Restricted | Online only for readers with a print disability |
+
+  E-book prices need a free Google Books API key in Settings.
 - **A reference file:** a .bib or .ris export from Zotero, Mendeley, EndNote and others. Each reference is looked up and its free full text added when there is one. The rest are listed with where to find a copy.
 - **Zotero:** with your own Zotero key (Settings, My library), import items along with the full text Zotero has indexed from the PDFs in your library. This only works when origincheck runs on your own computer.
 
 Paragraph check can use any book in your library as a source, too.
 
-**Will it get me a copy of any book?** No. It never downloads copyrighted books, and it won't use sites that share them without permission. For a book that isn't free, add the copy you own, or paste the passage you used.
+**Will it get me a copy of any book?** No. It never downloads copyrighted books, and it won't use sites that share them without permission. For a book that isn't free, it shows where you can borrow or buy it and whether that's free or paid. Then add the copy you own, or paste the passage you used.
 
 **History.** Your scores across drafts, with a chart.
 
@@ -271,7 +282,7 @@ Your document, saved documents, history and settings stay in your browser. Anyth
 | Translated search | The same short phrases, to your translation server |
 | Adding a web page or references | Only the addresses, DOIs and references you enter |
 | Word lookup | The one word, to Datamuse, the Free Dictionary API, Wiktionary and Wikidata |
-| My library | Your files stay in your browser. Book search sends what you type to OpenAlex, Open Library and the Internet Archive. A reference file sends its references, never your document. Zotero import uses your key to read your own library. |
+| My library | Your files stay in your browser. Book search sends what you type to OpenAlex, Open Library and the Internet Archive. "Where to get it" sends the book's title, author and ISBN, and your country, to Open Library and Google Books. A reference file sends its references, never your document. Zotero import uses your key to read your own library. |
 | Paragraph check lookups | Only what you enter: a DOI (to Crossref and Unpaywall, through the server), an ISBN (to Open Library or Google Books) or a Wikipedia title. With "Find possible sources" on: up to 4 short phrases, to Wikipedia, Crossref and OpenAlex. |
 | Scanned PDFs, language detection, tone | Nothing. These run in your browser. |
 | Rewrite | Nothing with Ollama. With Anthropic, the passage you picked. With a free-model gateway, the passage you picked, to whichever free provider the gateway chooses. |

@@ -1,6 +1,7 @@
 // Book search for My library (GET ?q=) and the full text of a free book (GET ?get=ia:ID | gutenberg:ID).
 // Only public-domain and open-access texts are fetched; open-access PDFs go through /api/fetch-url.
 import { redact } from "@/server/config";
+import { whereToGet } from "@/server/availability";
 import { bookText, searchBooks } from "@/server/books";
 import { limit } from "@/server/rateLimit";
 
@@ -13,6 +14,11 @@ export async function GET(req: Request) {
   const get = p.get("get"), q = (p.get("q") ?? "").trim();
   try {
     if (get) return Response.json({ text: await bookText(get) });
+    if (p.has("where")) { // where a book can be read, borrowed or bought, and whether it's free or paid
+      const title = (p.get("title") ?? "").slice(0, 200), isbn = p.get("isbn")?.replace(/[^0-9X]/gi, "") || undefined;
+      if (!title && !isbn) return Response.json({ error: "Give a title or ISBN." }, { status: 400 });
+      return Response.json(await whereToGet({ title, isbn, author: p.get("author")?.slice(0, 100) || undefined, country: p.get("country")?.toUpperCase() || undefined }));
+    }
     if (q.length < 2 || q.length > 200) return Response.json({ error: "Search for a title, author or subject." }, { status: 400 });
     return Response.json({ books: await searchBooks(q) });
   } catch (e) {
