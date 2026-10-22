@@ -2,6 +2,7 @@
 
 **Check your writing for plagiarism, grammar and AI text, fix what it finds, and find the books and papers you need. One free, open-source app that runs on your laptop.**
 
+[![MIT licence](https://img.shields.io/badge/licence-MIT-blue)](LICENSE)
 ![Node.js 22](https://img.shields.io/badge/Node.js-22-339933?logo=nodedotjs&logoColor=white)
 ![Next.js 16](https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
@@ -380,4 +381,6 @@ It uses public APIs under their own terms. Keep to them, especially for paid ser
 
 ## Credits and licences
 
-origincheck stands on a lot of open-source work, including [Harper](https://github.com/Automattic/harper), [Transformers.js](https://github.com/huggingface/transformers.js), [pdf.js](https://github.com/mozilla/pdf.js), [mammoth.js](https://github.com/mwilliamson/mammoth.js), [Readability](https://github.com/mozilla/readability), [citation-js](https://github.com/citation-js/citation-js), [Next.js](https://github.com/vercel/next.js) and [React](https://github.com/facebook/react). Matched Wikipedia text is CC BY-SA and is always shown with its article link. Every library, model and service, with versions and licences, is listed in [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
+origincheck is released under the [MIT licence](LICENSE). You can use, copy, change and share it, including commercially, as long as you keep the copyright notice.
+
+It stands on a lot of open-source work, including [Harper](https://github.com/Automattic/harper), [Transformers.js](https://github.com/huggingface/transformers.js), [pdf.js](https://github.com/mozilla/pdf.js), [mammoth.js](https://github.com/mwilliamson/mammoth.js), [Readability](https://github.com/mozilla/readability), [citation-js](https://github.com/citation-js/citation-js), [Next.js](https://github.com/vercel/next.js) and [React](https://github.com/facebook/react). Matched Wikipedia text is CC BY-SA and is always shown with its article link. Every library, model and service, with versions and licences, is listed in [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).

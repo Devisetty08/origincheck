@@ -1,6 +1,6 @@
 # Third-party licences
 
-origincheck uses the open-source components below. Versions are the ones pinned in `web/package-lock.json` at the time of writing. Licences are as declared by each project. See each project for the full licence text.
+origincheck itself is released under the [MIT licence](LICENSE). It uses the open-source components below, each under its own licence. Versions are the ones pinned in `web/package-lock.json` at the time of writing. Licences are as declared by each project. See each project for the full licence text.
 
 ## Checks
 
