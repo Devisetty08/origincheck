@@ -12,7 +12,7 @@
 ![No keys needed to start](https://img.shields.io/badge/API_keys-optional-16a34a)
 ![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)
 
-[Quick start](#quick-start) · [Screenshots](#screenshots) · [Examples](example/README.md) · [Feature guide](#feature-guide) · [FAQ](#faq) · [Changelog](CHANGELOG.md) · [Licence](LICENSE) · [Third-party licences](THIRD_PARTY_LICENSES.md)
+[Quick start](#quick-start) · [Installation](#installation) · [How to use](#how-to-use) · [Screenshots](#screenshots) · [Examples](example/README.md) · [Feature guide](#feature-guide) · [FAQ](#faq) · [Changelog](CHANGELOG.md) · [Licence](LICENSE) · [Third-party licences](THIRD_PARTY_LICENSES.md)
 
 ![The overview: plagiarism, grammar and AI indicator scores, with a "What to do next" list](docs/screenshots/overview.png)
 <sub>The overview after adding a draft and its two sources: three scores and one next step per check.</sub>
@@ -24,6 +24,8 @@
 - [Why this exists](#why-this-exists)
 - [What it does](#what-it-does)
 - [Quick start](#quick-start)
+- [Installation](#installation), step by step, with [troubleshooting](#troubleshooting)
+- [How to use](#how-to-use)
 - [Screenshots](#screenshots)
 - [How it works](#how-it-works)
 - [Where it searches](#where-it-searches)
@@ -63,7 +65,7 @@ It's built for students, researchers and anyone handing in written work who want
 
 ## Quick start
 
-You need [Node.js 22](https://nodejs.org/) on Windows, macOS or Linux.
+If you already have Node.js 22 and Git:
 
 ```
 git clone https://github.com/Devisetty08/origincheck.git
@@ -72,9 +74,117 @@ npm ci
 npm run dev
 ```
 
-Open **http://localhost:3100** and drop in a document. The plagiarism check, grammar check, book search and all the free sources work straight away, with no account and no keys. Add keys later in the app's Settings page if you want more sources (see [Settings and API keys](#settings-and-api-keys)).
+Then open **http://localhost:3100**. New to this? Follow the steps below.
 
-To try it with real data, use the files in [`example/`](example): `draft.docx` as the document and the two files in `example/references/` as sources. You should see a 47% similarity index. The same folder has a paragraph to try in Paragraph check, a `.bib` file for My library, and the reports origincheck made from them (PDF, web report, Paragraph check report and .docx), so you can see the results before installing anything. See [example/README.md](example/README.md).
+## Installation
+
+origincheck runs on your own laptop or desktop (Windows, macOS or Linux). You need about 3 GB of free disk space (plus 4.7 GB if you add the optional local AI model) and an internet connection for the searches. You don't need an account or any API keys.
+
+### Step 1: Install Node.js and Git
+
+| Tool | Windows | macOS | Linux |
+|---|---|---|---|
+| **Node.js 22 or newer** (runs the app) | Download the "LTS" installer from [nodejs.org](https://nodejs.org/) and run it, or `winget install OpenJS.NodeJS.LTS` | Installer from [nodejs.org](https://nodejs.org/), or `brew install node` | Your package manager, or [nvm](https://github.com/nvm-sh/nvm): `nvm install 22` |
+| **Git** (downloads the code) | [git-scm.com](https://git-scm.com/download/win), or `winget install Git.Git` | `xcode-select --install`, or `brew install git` | `sudo apt install git` (or your distribution's package) |
+
+Open a **new** terminal (on Windows, Command Prompt or PowerShell) and check that both are installed:
+
+```
+node -v      # should print v22 or higher
+git --version
+```
+
+No Git? On the GitHub page, click **Code → Download ZIP**, unzip it, and skip `git clone` in the next step.
+
+### Step 2: Download origincheck
+
+```
+git clone https://github.com/Devisetty08/origincheck.git
+cd origincheck/web
+```
+
+### Step 3: Install and start it
+
+```
+npm ci
+npm run dev
+```
+
+`npm ci` installs everything the app needs. It takes a few minutes the first time and only needs running again after an update. `npm run dev` starts origincheck. When the terminal shows **Ready**, open **http://localhost:3100** in your browser.
+
+To stop origincheck, press **Ctrl+C** in the terminal. To start it again later, open a terminal in `origincheck/web` and run `npm run dev`.
+
+For a faster app that starts more slowly, run `npm run build` once, then `npm start` each time. It also opens at http://localhost:3100.
+
+### Step 4 (optional): Extras
+
+- **More sources:** open **Settings** in the app and paste free API keys, such as Tavily for web search or Google Books. They work straight away. See [Settings and API keys](#settings-and-api-keys).
+- **AI rewrite suggestions on your own computer:** install [Ollama](https://ollama.com/), then run `ollama pull qwen2.5:7b` once (about 4.7 GB). Keep Ollama running while you use Rewrite.
+- **Command-line tool and Prose Inspector:** install [Python 3.10 or newer](https://www.python.org/downloads/), then `pip install -r requirements.txt` in the `origincheck` folder. See [Command-line tool](#command-line-tool).
+
+### Updating
+
+```
+cd origincheck
+git pull
+cd web
+npm ci
+npm run dev
+```
+
+### Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| `node` or `npm` is "not recognized" or "command not found" | Close the terminal and open a new one after installing Node.js. If it still fails, reinstall Node.js and keep "Add to PATH" ticked. |
+| Windows: "npm.ps1 cannot be loaded because running scripts is disabled" | Use Command Prompt instead of PowerShell, or run `npm.cmd ci` and `npm.cmd run dev`. |
+| `node -v` shows a version below 22 | Install Node.js 22 or newer (Step 1). |
+| `EADDRINUSE: address already in use :::3100` | origincheck (or another app) is already running on that port. Close it, or start on another port with `npx next dev -p 3200` and open http://localhost:3200. |
+| `npm ci` fails while downloading `onnxruntime-node` (Linux) | Run `ONNXRUNTIME_NODE_INSTALL=skip npm ci`. The app doesn't need that download. |
+| A source shows "not configured" | It needs a free key. Add it in Settings, or ignore it, since the other sources still work. |
+| Rewrite says "Ollama isn't running" | Start the Ollama app (or run `ollama serve`), and make sure you ran `ollama pull qwen2.5:7b`. |
+| A scanned PDF reads as empty | Give it a minute: text recognition (OCR) runs in your browser and downloads its engine the first time. |
+
+## How to use
+
+### Check a document
+
+1. Click **Check document** in the sidebar, then drop in your file (.docx, .pdf, .epub, .txt, .md, .html, .rtf) or click **Paste text instead**.
+2. Optionally, add the sources you used: files, pasted text, web addresses or your reference list. The internet and publications are searched automatically; the first time, a notice tells you what will be sent.
+3. The overview shows three scores (plagiarism, grammar and the optional AI indicator) and a **What to do next** list. Click any score or step to open that check.
+4. To download the results, use **Download report (PDF)**, **Web report (.html)** or **Corrected .docx** at the bottom of the overview.
+
+### Fix what was found
+
+1. Open **Plagiarism check**. Matching passages are highlighted and numbered by source. Click one to see your text next to the source.
+2. For each match, choose **Mark as quoted & cited**, **Rewrite in my own words** (write your version while a meter tells you when it's no longer too close), or **Remove**. The passage is checked again straight away.
+3. Prefer to fix in place? Open **Rewrite**: copied sentences are red. Click one to fix it, or click one of your own sentences for wording suggestions.
+4. Open **Grammar** and **Accept** or **Dismiss** each suggestion.
+
+### Write or rework your text
+
+1. Open **Write** to edit in origincheck's editor. Every check updates as you type, and writing history records how the text develops.
+2. Pick a matched passage from the list beside the editor, then rewrite it until the meter says **Original wording**, and click **Add citation**.
+
+### Check one paragraph
+
+1. Open **Paragraph check**, paste the paragraph, and add its source (paste, file, My library, DOI, ISBN or Wikipedia).
+2. Each sentence gets a status: Original, Needs citation, Quoted or Too close. Click an issue's button to quote and cite, add a citation, fix a citation's format, or rewrite it in your own words.
+3. When the summary says **Ready**, copy the paragraph and its references, or export them as .docx.
+
+### Find a book or paper
+
+1. Open **Find a book**, choose what you're searching by (title, author, words in the text, citation, ISBN or DOI) and type. Results appear as you type.
+2. **Free download** results can be downloaded, read in the app, or added to My library. For other books, click **Where to get it: free or paid?**
+
+### Build your library
+
+1. Click the books icon at the top (**My library and saved documents**).
+2. Add books and papers you own, free books from the search, a .bib or .ris file from your reference manager, or your Zotero library. Every later check compares your document against them.
+
+### Try it with the example files
+
+The [`example/`](example) folder has a document (`draft.docx`) and its two sources (`references/`). Check them and you should see a **47%** similarity index. It also has a paragraph for Paragraph check, a `.bib` file for My library, and the reports origincheck made from them, so you can see the results before installing anything. See [example/README.md](example/README.md).
 
 ## Screenshots
 
