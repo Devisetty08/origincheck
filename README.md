@@ -24,7 +24,7 @@
 - [Why this exists](#why-this-exists)
 - [What it does](#what-it-does)
 - [Quick start](#quick-start)
-- [Installation](#installation), step by step, [on your phone](#use-it-on-your-phone-or-tablet), and [troubleshooting](#troubleshooting)
+- [Installation](#installation), step by step, [on phones](#use-it-on-phones), and [troubleshooting](#troubleshooting)
 - [How to use](#how-to-use)
 - [Screenshots](#screenshots)
 - [How it works](#how-it-works)
@@ -132,19 +132,17 @@ npm ci
 npm run dev
 ```
 
-### Use it on your phone or tablet
+### Use it on phones
 
-origincheck runs on your computer, but any browser can use it, including a phone on the same Wi-Fi:
+Any phone on the same Wi-Fi as the computer can use origincheck, several at once:
 
-1. Start origincheck on your computer (`npm run dev`).
-2. Find your computer's Wi-Fi address. On Windows, run `ipconfig` and look under "Wireless LAN adapter Wi-Fi" for "IPv4 Address", for example `192.168.0.133`. On macOS, go to System Settings → Wi-Fi → Details. On Linux, run `hostname -I`.
-3. On your phone, connect to the same Wi-Fi and open `http://<that address>:3100`, for example `http://192.168.0.133:3100`.
+1. Run origincheck on the computer. For several people, `npm run build` then `npm start` is faster.
+2. Find the computer's Wi-Fi address: `ipconfig` on Windows ("IPv4 Address"), System Settings → Wi-Fi → Details on macOS, `hostname -I` on Linux.
+3. On each phone, open `http://<that address>:3100`, for example `http://192.168.0.133:3100`.
 
-If the phone can't connect:
-- **On Windows,** set the Wi-Fi network to **Private**: Settings → Network & internet → Wi-Fi → your network → Network profile type. Allow "Node.js" if Windows asks. Windows blocks other devices on Public networks.
-- **If you use a VPN** (NordVPN and others), turn on its "Allow LAN" or "Visibility on LAN" option, or pause it. The address the terminal prints after "Network:" may be the VPN's, so use the Wi-Fi address from step 2.
+**Can't connect?** On Windows, set the Wi-Fi network to **Private** and allow Node.js. With a VPN, turn on "Allow LAN".
 
-On a phone, every page works. The layout switches to a phone layout, with the tools in a bar at the bottom. Settings can only be changed on the computer itself, so no one else on the Wi-Fi can change your keys. The optional AI indicator and paraphrase models are large downloads (about 210 MB and 118 MB), so use Wi-Fi rather than mobile data.
+**With several phones:** each phone's documents and library stay on that phone. Everyone shares the computer's API keys, monthly caps and Rewrite model (requests wait their turn). Settings only change on the computer, and the computer must stay on and awake. Use it only on a Wi-Fi you trust.
 
 ### Troubleshooting
 
