@@ -24,6 +24,9 @@ async function route(env: Record<string, string>) {
 }
 const post = (body: unknown, ip = String(Math.random())) =>
   new Request("http://x/api/improve", { method: "POST", body: JSON.stringify(body), headers: { "x-forwarded-for": ip } });
+// the free-model gateway only answers the computer running origincheck
+const postLocal = (body: unknown) =>
+  new Request("http://localhost:3100/api/improve", { method: "POST", body: JSON.stringify(body), headers: { "x-forwarded-for": "127.0.0.1" } });
 const reply = (text: string, stop_reason = "end_turn") => ({ stop_reason, content: [{ type: "text", text }] });
 const KEY = { ANTHROPIC_API_KEY: "sk-test", AI_PROVIDER: "anthropic", USAGE_FILE: join(mkdtempSync(join(tmpdir(), "oc-usage-")), "u.json") };
 
@@ -104,7 +107,7 @@ describe("/api/improve through a free-model gateway (FreeLLMAPI, OmniRoute)", ()
   it("sends only the passage to the OpenAI-compatible endpoint, with the key, the pinned model and temperature 0", async () => {
     answer();
     const POST = await route(GW);
-    const r = await POST(post({ text: "The results, they were very clear.", goal: "shorter" }));
+    const r = await POST(postLocal({ text: "The results, they were very clear.", goal: "shorter" }));
     expect(await r.json()).toMatchObject({ revised: "The results were clear.", provider: "gateway", model: "groq/qwen3-32b" });
     expect(calls[0].url).toBe("http://localhost:20128/v1/chat/completions");
     expect(new Headers(calls[0].init.headers).get("authorization")).toBe("Bearer omni-key");
@@ -113,23 +116,31 @@ describe("/api/improve through a free-model gateway (FreeLLMAPI, OmniRoute)", ()
     expect(body.messages[1].content).toContain("The results, they were very clear.");
     expect(create).not.toHaveBeenCalled();
   });
+  it("refuses phones and other computers on the network: it uses the owner's free accounts", async () => {
+    answer();
+    const POST = await route(GW);
+    const r = await POST(post({ text: "Some text.", goal: "clearer" }));
+    expect(r.status).toBe(403);
+    expect((await r.json()).error).toMatch(/only works on the computer running origincheck/);
+    expect(calls).toHaveLength(0);
+  });
   it("is refused on a hosted deployment: free tiers are for personal use", async () => {
     answer();
     const POST = await route({ ...GW, VERCEL: "1" });
-    const r = await POST(post({ text: "Some text.", goal: "clearer" }));
+    const r = await POST(postLocal({ text: "Some text.", goal: "clearer" }));
     expect(r.status).toBe(503);
     expect((await r.json()).error).toMatch(/personal use/);
     expect(calls).toHaveLength(0);
   });
   it("needs the address and key, stops at the monthly cap, and reports rate limits", async () => {
     answer();
-    expect((await (await route({ ...GW, GATEWAY_API_KEY: "" }))(post({ text: "Some text.", goal: "clearer" }))).status).toBe(503);
+    expect((await (await route({ ...GW, GATEWAY_API_KEY: "" }))(postLocal({ text: "Some text.", goal: "clearer" }))).status).toBe(503);
     const POST = await route({ ...GW, GATEWAY_MONTHLY_REQUEST_CAP: "1", USAGE_FILE: join(mkdtempSync(join(tmpdir(), "oc-usage-")), "u.json") });
-    expect((await POST(post({ text: "First passage.", goal: "clearer" }))).status).toBe(200);
-    expect((await POST(post({ text: "Second passage.", goal: "clearer" }))).status).toBe(429);
+    expect((await POST(postLocal({ text: "First passage.", goal: "clearer" }))).status).toBe(200);
+    expect((await POST(postLocal({ text: "Second passage.", goal: "clearer" }))).status).toBe(429);
     expect(calls).toHaveLength(1);
     vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 429 })));
-    const r = await (await route({ ...GW, USAGE_FILE: join(mkdtempSync(join(tmpdir(), "oc-usage-")), "u.json") }))(post({ text: "Some text.", goal: "clearer" }));
+    const r = await (await route({ ...GW, USAGE_FILE: join(mkdtempSync(join(tmpdir(), "oc-usage-")), "u.json") }))(postLocal({ text: "Some text.", goal: "clearer" }));
     expect((await r.json()).error).toMatch(/rate-limited/);
   });
 });

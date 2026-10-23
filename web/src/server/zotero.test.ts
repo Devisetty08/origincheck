@@ -8,7 +8,9 @@ async function route(env: Record<string, string>) {
   for (const [k, v] of Object.entries(env)) vi.stubEnv(k, v);
   return (await import("@/app/api/zotero/route")).GET;
 }
-const req = (q: string) => new Request(`http://x/api/zotero?${q}`, { headers: { "x-forwarded-for": String(Math.random()) } });
+// from the computer running origincheck, or from a phone on the same Wi-Fi
+const req = (q: string) => new Request(`http://localhost:3100/api/zotero?${q}`, { headers: { "x-forwarded-for": "127.0.0.1" } });
+const fromPhone = (q: string) => new Request(`http://192.168.0.133:3100/api/zotero?${q}`, { headers: { "x-forwarded-for": "192.168.0.57" } });
 const KEYS = { ZOTERO_USER_ID: "42", ZOTERO_API_KEY: "zkey" };
 
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
@@ -40,6 +42,13 @@ describe("/api/zotero", () => {
     const r = await (await route({ ...KEYS, VERCEL: "1" }))(req("q="));
     expect(r.status).toBe(503);
     expect((await r.json()).error).toMatch(/own computer/);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it("refuses other devices on the network: the library is the computer owner's", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const r = await (await route(KEYS))(fromPhone("q="));
+    expect(r.status).toBe(503);
+    expect((await r.json()).error).toMatch(/only works on the computer running origincheck/);
     expect(fetch).not.toHaveBeenCalled();
   });
   it("reports a rejected key", async () => {

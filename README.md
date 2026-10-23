@@ -142,7 +142,7 @@ Any phone on the same Wi-Fi as the computer can use origincheck, several at once
 
 **Can't connect?** On Windows, set the Wi-Fi network to **Private** and allow Node.js. With a VPN, turn on "Allow LAN".
 
-**With several phones:** each phone's documents and library stay on that phone. Everyone shares the computer's API keys, monthly caps and Rewrite model (requests wait their turn). Settings only change on the computer, and the computer must stay on and awake. Use it only on a Wi-Fi you trust.
+**With several phones:** each phone's documents and library stay on that phone. Everyone shares the computer's API keys, monthly caps and Rewrite model (requests wait their turn). Settings, Zotero import and the free-model gateway use the owner's own accounts, so they only work on the computer itself. The computer must stay on and awake. Use it only on a Wi-Fi you trust.
 
 ### Troubleshooting
 

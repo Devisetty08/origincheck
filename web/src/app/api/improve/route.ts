@@ -2,7 +2,8 @@
 // and its text is never logged.
 import { config, redact } from "@/server/config";
 import { limit } from "@/server/rateLimit";
-import { GOALS, improve, ImproveError, MAX_CHARS, type Goal } from "@/server/improve";
+import { GOALS, gatewayProblem, improve, ImproveError, MAX_CHARS, type Goal } from "@/server/improve";
+import { isLocalRequest } from "@/server/local";
 
 export const maxDuration = 180; // a local model on a laptop can take a while
 
@@ -10,6 +11,8 @@ export async function POST(req: Request) {
   const provider = config.aiProvider;
   if (provider === "anthropic" && !config.anthropicKey)
     return Response.json({ error: "Rewrite is set to Anthropic but ANTHROPIC_API_KEY is not set. Add it in Settings, or switch to the free local model." }, { status: 503 });
+  if (provider === "gateway" && !isLocalRequest(req)) // the owner's free accounts: not for other devices on the network
+    return Response.json({ error: gatewayProblem(false) }, { status: 403 });
   const over = limit(req, "improve", 10);
   if (over) return over;
   const body = (await req.json().catch(() => null)) as { text?: unknown; goal?: unknown } | null;

@@ -5,6 +5,7 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { config } from "./config";
+import { LOCAL_ONLY } from "./local";
 import { CapReachedError, spend } from "./usage";
 
 export const GOALS = {
@@ -38,19 +39,20 @@ const ollamaBase = () => config.ollamaUrl.replace(/\/$/, "");
  * Why the free-model gateway can't be used, or null. FreeLLMAPI and OmniRoute route to free tiers under your own
  * accounts: "personal experimentation only" (FreeLLMAPI's terms), so a hosted deployment serving others can't use one.
  */
-export function gatewayProblem(): string | null {
+export function gatewayProblem(local = true): string | null {
   if (process.env.VERCEL) return "A free-model gateway is for personal use on your own computer, so it is off on a hosted deployment. Use Ollama or Anthropic here.";
+  if (!local) return `Rewrite uses the computer owner's free-model gateway, so it ${LOCAL_ONLY}.`;
   if (!config.gatewayUrl) return "AI_PROVIDER is gateway but GATEWAY_BASE_URL is not set (FreeLLMAPI: http://localhost:3001/v1 or http://localhost:31415/v1; OmniRoute: http://localhost:20128/v1).";
   if (!config.gatewayKey) return "AI_PROVIDER is gateway but GATEWAY_API_KEY is not set. Copy it from the gateway's dashboard.";
   return null;
 }
 
-/** Whether Rewrite can run, and if not, what to do about it (shown in the app). */
-export async function improveStatus(): Promise<{ provider: "ollama" | "anthropic" | "gateway" | null; model?: string; note?: string }> {
+/** Whether Rewrite can run, and if not, what to do about it (shown in the app). `local`: asked from the computer itself. */
+export async function improveStatus(local = true): Promise<{ provider: "ollama" | "anthropic" | "gateway" | null; model?: string; note?: string }> {
   if (config.aiProvider === "anthropic")
     return config.anthropicKey ? { provider: "anthropic", model: config.anthropicModel } : { provider: null, note: "AI_PROVIDER is anthropic but ANTHROPIC_API_KEY is not set." };
   if (config.aiProvider === "gateway") {
-    const problem = gatewayProblem();
+    const problem = gatewayProblem(local);
     if (problem) return { provider: null, note: problem };
     try {
       const r = await fetch(`${config.gatewayUrl}/models`, { headers: { Authorization: `Bearer ${config.gatewayKey}` }, signal: AbortSignal.timeout(1500) });

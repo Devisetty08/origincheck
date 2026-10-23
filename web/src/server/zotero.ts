@@ -4,6 +4,7 @@ import "server-only";
 import type { CiteMeta } from "@/lib/similarity";
 import { config } from "./config";
 import { get } from "./http";
+import { LOCAL_ONLY } from "./local";
 
 const API = "https://api.zotero.org";
 
@@ -11,8 +12,10 @@ export class ZoteroError extends Error {
   constructor(public status: number, message: string) { super(message); }
 }
 
-export function zoteroProblem(): string | null {
+/** Why Zotero import can't run, or null. `local`: the request comes from the computer running origincheck. */
+export function zoteroProblem(local = true): string | null {
   if (process.env.VERCEL) return "Zotero import uses your personal key, so it only works when origincheck runs on your own computer.";
+  if (!local) return `Zotero import uses the computer owner's Zotero library, so it ${LOCAL_ONLY}.`;
   if (!config.zoteroUserId || !config.zoteroKey) return "Add your Zotero user ID and API key in Settings (My library).";
   return null;
 }

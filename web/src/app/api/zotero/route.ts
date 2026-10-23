@@ -1,11 +1,12 @@
 // Zotero import (the user's own library, with their key from Settings): GET ?q= lists items; GET ?text=KEY returns the
 // full text Zotero indexed from one attachment. Only on the user's own computer; nothing is logged.
 import { redact } from "@/server/config";
+import { isLocalRequest } from "@/server/local";
 import { limit } from "@/server/rateLimit";
 import { ZoteroError, zoteroItems, zoteroProblem, zoteroText } from "@/server/zotero";
 
 export async function GET(req: Request) {
-  const problem = zoteroProblem();
+  const problem = zoteroProblem(isLocalRequest(req)); // the owner's library: not for other devices on the network
   if (problem) return Response.json({ error: problem }, { status: 503 });
   const over = limit(req, "zotero", 30);
   if (over) return over;

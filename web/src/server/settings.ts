@@ -4,16 +4,14 @@ import "server-only";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { ENV_VARS } from "@/lib/envVars";
-
-const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]", "::1"]);
+import { isLocalRequest } from "./local";
 
 /** null when this request may save settings, otherwise the reason it can't. */
 export function writeBlocked(req: Request): string | null {
   if (process.env.VERCEL) return "On Vercel, set these under Project → Settings → Environment Variables, then redeploy.";
   if (process.env.NODE_ENV === "production" && process.env.ALLOW_SETTINGS_WRITE !== "true")
     return "This server runs in production mode. Edit web/.env.local and restart, or start it with ALLOW_SETTINGS_WRITE=true to edit here.";
-  const host = new URL(req.url).hostname;
-  if (!LOCAL_HOSTS.has(host)) return "Settings can only be changed from this computer (open the app at http://localhost).";
+  if (!isLocalRequest(req)) return "Settings can only be changed from this computer (open the app at http://localhost).";
   const origin = req.headers.get("origin");
   if (origin && new URL(origin).host !== new URL(req.url).host) return "Cross-site request refused.";
   return null;
