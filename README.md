@@ -35,7 +35,7 @@
 - [How it compares](#how-it-compares)
 - [Limitations](#limitations)
 - [FAQ](#faq)
-- [Command-line tool and Prose Inspector](#command-line-tool)
+- [Command-line tool](#command-line-tool)
 - [Contributing](#contributing)
 - [Disclaimer](#disclaimer)
 - [Credits and licences](#credits-and-licences) ([LICENSE](LICENSE), [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md))
@@ -120,7 +120,7 @@ For a faster app that starts more slowly, run `npm run build` once, then `npm st
 
 - **More sources:** open **Settings** in the app and paste free API keys, such as Tavily for web search or Google Books. They work straight away. See [Settings and API keys](#settings-and-api-keys).
 - **AI rewrite suggestions on your own computer:** install [Ollama](https://ollama.com/), then run `ollama pull qwen2.5:7b` once (about 4.7 GB). Keep Ollama running while you use Rewrite.
-- **Command-line tool and Prose Inspector:** install [Python 3.10 or newer](https://www.python.org/downloads/), then `pip install -r requirements.txt` in the `origincheck` folder. See [Command-line tool](#command-line-tool).
+- **Command-line tool:** install [Python 3.10 or newer](https://www.python.org/downloads/), then `pip install -r requirements.txt` in the `origincheck` folder. See [Command-line tool](#command-line-tool).
 
 ### Updating
 
@@ -445,13 +445,6 @@ Similarity index: 47%
 
 It writes a colour-coded HTML report, like [example/reports/command_line_report.html](example/reports/command_line_report.html). Options: `-s DIR` (a source folder, repeatable), `-o FILE`, `--exclude-quotes`, `--exclude-bib`, `--min-words N`, `--ngram N`, `--exclude-source-pct X`, `--web` (Brave, needs `BRAVE_API_KEY`), `--save-to-repo`, `--no-repo` and `--json`.
 
-**Prose Inspector** (`prose-inspector/`) is a small Streamlit app that reports sentence rhythm, stock phrases and repetition. It only analyses; it doesn't rewrite.
-
-```
-pip install -r prose-inspector/requirements.txt
-streamlit run prose-inspector/app.py
-```
-
 ## Contributing
 
 Issues and pull requests are welcome. If you find a security problem, please report it privately as [SECURITY.md](SECURITY.md) explains, not in a public issue. Good first PRs:
@@ -482,7 +475,6 @@ web/                    the app (Next.js)
 docs/screenshots/       the images in this README
 example/                sample inputs, and the reports origincheck made from them
 origincheck.py          command-line tool
-prose-inspector/        Streamlit writing-pattern report
 ```
 
 ## Disclaimer

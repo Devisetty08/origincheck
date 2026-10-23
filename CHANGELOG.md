@@ -2,6 +2,10 @@
 
 All notable changes to origincheck. Dates are in YYYY-MM-DD form.
 
+## v1.0.3 (2026-10-23)
+
+- **Prose Inspector removed.** The separate Streamlit app (`prose-inspector/`) duplicated most of the Grammar page and wasn't used by the main app. Removing it means one app to install and run, with no Streamlit dependency. The command-line tool (`origincheck.py`) stays.
+
 ## v1.0.2 (2026-10-23)
 
 - **No known vulnerabilities:** `npm audit` now reports 0, down from 5. The lint setup no longer uses `eslint-config-next`, whose Next.js plugin was the only route to the vulnerable `braces` package. The same TypeScript, React, React hooks and accessibility rules still run. Only the Next.js-specific ones are dropped (pages router, `<Head>`, `<Script>`, Google Fonts), which this app doesn't use.
