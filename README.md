@@ -461,7 +461,18 @@ npm run build && npx playwright test # end-to-end tests, desktop and mobile
 npm run lint
 ```
 
-CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs lint, the type check, the unit tests, the build and the end-to-end tests on every push.
+**CI** ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs on every push and pull request, in stages:
+
+```
+Lint & type check ─┐
+Unit tests ────────┼─► Build ─► End-to-end (desktop-light)
+Security audit ────┤          └► End-to-end (mobile-dark)
+Command-line tool ─┘
+```
+
+The four checks run in parallel. The app is built once, and the end-to-end tests run on that build for desktop and phone at the same time. If an end-to-end test fails, its HTML report is attached to the run.
+
+**Releases** ([`.github/workflows/release.yml`](.github/workflows/release.yml)): add a `## vX.Y.Z (date)` section to [CHANGELOG.md](CHANGELOG.md), then push a tag with `git tag -a vX.Y.Z -m "origincheck vX.Y.Z"` and `git push origin vX.Y.Z`. The release is published only if the changelog has notes for that version and the whole CI pipeline passes.
 
 ```
 web/                    the app (Next.js)

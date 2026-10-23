@@ -1,41 +1,151 @@
 name: CI
 
-# The app is deployed by Vercel's GitHub integration (it needs a server for the API proxy).
-# This workflow only tests: lint, types, unit tests, build and end-to-end tests with external APIs and AI models mocked.
+# The checks for every push and pull request, in stages:
+#
+#   Lint & type check ─┐
+#   Unit tests ────────┼─► Build ─► End-to-end (desktop-light)
+#   Security audit ────┤          └► End-to-end (mobile-dark)
+#   Command-line tool ─┘
+#
+# External APIs and AI models are mocked, so no keys are needed. The release workflow runs this whole pipeline first.
 on:
   push:
     branches: [main, "feat/**"]
   pull_request:
+  workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
 
+# a newer push to the same branch cancels the older run (but never cancels a release's checks)
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_call' && !startsWith(github.ref, 'refs/tags/') }}
+
+env:
+  NODE_VERSION: 22
+  # Transformers.js runs in the browser here, so onnxruntime-node never needs the CUDA binaries its install script
+  # downloads from NuGet on Linux (slow, and it fails the job when the feed is unreachable).
+  ONNXRUNTIME_NODE_INSTALL: skip
+
+defaults:
+  run:
+    working-directory: web
+
 jobs:
-  test:
+  # ---------------------------------------------------------------- stage 1: checks, in parallel
+  lint:
+    name: Lint & type check
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: web
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: web/package-lock.json
-      - run: npm ci
-        env:
-          # Transformers.js runs in the browser here, so onnxruntime-node never needs the CUDA binaries
-          # its install script downloads from NuGet on Linux (slow, and it fails the job when the feed is unreachable).
-          ONNXRUNTIME_NODE_INSTALL: skip
-      - run: npm run lint
-      - run: npx tsc --noEmit
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: npm, cache-dependency-path: web/package-lock.json }
+      - name: Install dependencies
+        run: npm ci
+      - name: Lint (ESLint)
+        run: npm run lint
+      - name: Type check (TypeScript)
+        run: npx tsc --noEmit
+
+  unit:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: npm, cache-dependency-path: web/package-lock.json }
+      - name: Install dependencies
+        run: npm ci
       - name: Unit tests (Vitest)
         run: npm test
-      - run: npm run build
-      - name: End-to-end tests (Playwright)
+
+  audit:
+    name: Security audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "${{ env.NODE_VERSION }}" }
+      - name: Check dependencies for known vulnerabilities
+        run: npm audit --audit-level=high
+
+  cli:
+    name: Command-line tool
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip, cache-dependency-path: requirements.txt }
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Check the example (expects a 47% similarity index)
         run: |
-          npx playwright install --with-deps chromium
-          npx playwright test
+          python origincheck.py example/draft.docx -s example/references --exclude-quotes --exclude-bib --no-repo -o "$RUNNER_TEMP/report.html" | tee "$RUNNER_TEMP/out.txt"
+          grep -q "Similarity index: 47%" "$RUNNER_TEMP/out.txt"
+
+  # ---------------------------------------------------------------- stage 2: build once
+  build:
+    name: Build
+    needs: [lint, unit, audit, cli]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: npm, cache-dependency-path: web/package-lock.json }
+      - name: Install dependencies
+        run: npm ci
+      - name: Production build (Next.js)
+        run: npm run build
+      - name: Keep the build for the end-to-end stage
+        uses: actions/upload-artifact@v4
+        with:
+          name: next-build
+          path: |
+            web/.next
+            !web/.next/cache
+            web/public
+          include-hidden-files: true
+          retention-days: 1
+
+  # ---------------------------------------------------------------- stage 3: end-to-end, desktop and phone
+  e2e:
+    name: End-to-end (${{ matrix.project }})
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [desktop-light, mobile-dark]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: npm, cache-dependency-path: web/package-lock.json }
+      - name: Install dependencies
+        run: npm ci
+      - name: Get the build
+        uses: actions/download-artifact@v4
+        with: { name: next-build, path: web }
+      - name: Install the browser (Chromium)
+        run: npx playwright install --with-deps chromium
+      - name: End-to-end tests (Playwright)
+        run: npx playwright test --project=${{ matrix.project }}
         env:
           CI: "1"
+      - name: Keep the test report if something failed
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ matrix.project }}
+          path: web/playwright-report
+          retention-days: 7

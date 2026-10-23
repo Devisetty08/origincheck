@@ -2,6 +2,11 @@
 
 All notable changes to origincheck. Dates are in YYYY-MM-DD form.
 
+## v1.0.4 (2026-10-23)
+
+- **CI in stages:** lint & type check, unit tests, security audit and a command-line tool check run in parallel. The app is then built once, and end-to-end tests run on that build for desktop and phone side by side. A failed end-to-end run keeps its HTML report.
+- **Safer releases:** a release is published only when the changelog has notes for the version and every CI stage passes.
+
 ## v1.0.3 (2026-10-23)
 
 - **Prose Inspector removed.** The separate Streamlit app (`prose-inspector/`) duplicated most of the Grammar page and wasn't used by the main app. Removing it means one app to install and run, with no Streamlit dependency. The command-line tool (`origincheck.py`) stays.

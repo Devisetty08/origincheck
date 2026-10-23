@@ -6,7 +6,7 @@ export default defineConfig({
   timeout: 90_000,
   fullyParallel: false,
   retries: process.env.CI ? 1 : 0,
-  reporter: process.env.CI ? "github" : "list",
+  reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "list", // CI keeps an HTML report for failures
   use: { baseURL: "http://localhost:4173/", acceptDownloads: true, trace: "retain-on-failure" },
   webServer: { command: "npx next start -p 4173", url: "http://localhost:4173/", reuseExistingServer: !process.env.CI },
   projects: [
