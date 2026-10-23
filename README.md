@@ -24,7 +24,7 @@
 - [Why this exists](#why-this-exists)
 - [What it does](#what-it-does)
 - [Quick start](#quick-start)
-- [Installation](#installation), step by step, with [troubleshooting](#troubleshooting)
+- [Installation](#installation), step by step, [on your phone](#use-it-on-your-phone-or-tablet), and [troubleshooting](#troubleshooting)
 - [How to use](#how-to-use)
 - [Screenshots](#screenshots)
 - [How it works](#how-it-works)
@@ -132,6 +132,20 @@ npm ci
 npm run dev
 ```
 
+### Use it on your phone or tablet
+
+origincheck runs on your computer, but any browser can use it, including a phone on the same Wi-Fi:
+
+1. Start origincheck on your computer (`npm run dev`).
+2. Find your computer's Wi-Fi address. On Windows, run `ipconfig` and look under "Wireless LAN adapter Wi-Fi" for "IPv4 Address", for example `192.168.0.133`. On macOS, go to System Settings → Wi-Fi → Details. On Linux, run `hostname -I`.
+3. On your phone, connect to the same Wi-Fi and open `http://<that address>:3100`, for example `http://192.168.0.133:3100`.
+
+If the phone can't connect:
+- **On Windows,** set the Wi-Fi network to **Private**: Settings → Network & internet → Wi-Fi → your network → Network profile type. Allow "Node.js" if Windows asks. Windows blocks other devices on Public networks.
+- **If you use a VPN** (NordVPN and others), turn on its "Allow LAN" or "Visibility on LAN" option, or pause it. The address the terminal prints after "Network:" may be the VPN's, so use the Wi-Fi address from step 2.
+
+On a phone, every page works. The layout switches to a phone layout, with the tools in a bar at the bottom. Settings can only be changed on the computer itself, so no one else on the Wi-Fi can change your keys. The optional AI indicator and paraphrase models are large downloads (about 210 MB and 118 MB), so use Wi-Fi rather than mobile data.
+
 ### Troubleshooting
 
 | Problem | Fix |
@@ -139,6 +153,7 @@ npm run dev
 | `node` or `npm` is "not recognized" or "command not found" | Close the terminal and open a new one after installing Node.js. If it still fails, reinstall Node.js and keep "Add to PATH" ticked. |
 | Windows: "npm.ps1 cannot be loaded because running scripts is disabled" | Use Command Prompt instead of PowerShell, or run `npm.cmd ci` and `npm.cmd run dev`. |
 | `node -v` shows a version below 22 | Install Node.js 22 or newer (Step 1). |
+| On a phone, the page opens but only "Check document" responds | You're on an older version: update (see Updating). It allows devices on your home network to use `npm run dev`. |
 | `EADDRINUSE: address already in use :::3100` | origincheck (or another app) is already running on that port. Close it, or start on another port with `npx next dev -p 3200` and open http://localhost:3200. |
 | `npm ci` fails while downloading `onnxruntime-node` (Linux) | Run `ONNXRUNTIME_NODE_INSTALL=skip npm ci`. The app doesn't need that download. |
 | A source shows "not configured" | It needs a free key. Add it in Settings, or ignore it, since the other sources still work. |

@@ -2,6 +2,11 @@
 
 All notable changes to origincheck. Dates are in YYYY-MM-DD form.
 
+## v1.0.5 (2026-10-23)
+
+- **Phones and tablets work with `npm run dev`.** Opened from another device on the same Wi-Fi, the page loaded, but only "Check document" responded, because Next.js's development server blocked that device's requests for the page's code. Devices on private home networks (192.168.x.x, 10.x.x.x, 172.16–31.x.x, *.local) are now allowed. Settings still can only be changed on the computer itself.
+- **README:** a "Use it on your phone or tablet" section, covering the Wi-Fi address, Windows' Private network setting and VPNs.
+
 ## v1.0.4 (2026-10-23)
 
 - **CI in stages:** lint & type check, unit tests, security audit and a command-line tool check run in parallel. The app is then built once, and end-to-end tests run on that build for desktop and phone side by side. A failed end-to-end run keeps its HTML report.
